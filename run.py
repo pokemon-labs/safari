@@ -25,7 +25,6 @@ from src.battle import Battle, Player
 from src.helpers import normalize_name
 from src.search import perform_searches_and_select_move
 from src.load_team import load_team, TeamListIterator
-from data.mods.apply_mods import apply_mods
 
 logger = logging.getLogger(__name__)
 
@@ -328,7 +327,6 @@ async def _run_battle(client: PSWebsocketClient, fmt: Format, team_dict) -> str 
 async def main() -> None:
     FoulPlayConfig.configure()
     init_logging(FoulPlayConfig.log_level, FoulPlayConfig.log_to_file)
-    apply_mods(FoulPlayConfig.format)
 
     client = await PSWebsocketClient.create(
         FoulPlayConfig.username, FoulPlayConfig.password, FoulPlayConfig.websocket_uri

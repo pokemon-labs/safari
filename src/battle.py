@@ -27,7 +27,6 @@ from copy import deepcopy
 from dataclasses import dataclass
 
 import src.constants as constants
-from data import all_move_json
 from src.helpers import normalize_name
 
 logger = logging.getLogger(__name__)
@@ -35,11 +34,7 @@ logger = logging.getLogger(__name__)
 import oak
 
 
-WRAP_MOVES = {
-    name
-    for name, data in all_move_json.items()
-    if data.get(constants.VOLATILE_STATUS) == constants.PARTIALLY_TRAPPED
-}
+WRAP_MOVES = {"wrap", "firespin"}
 
 _STATUS_BYTE = {
     constants.BURN: 0x10,
