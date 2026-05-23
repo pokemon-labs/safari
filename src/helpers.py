@@ -1,6 +1,6 @@
 import math
-import constants
-from config import FoulPlayConfig
+import src.constants as constants
+from src.config import FoulPlayConfig
 
 
 def normalize_name(name):

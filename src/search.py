@@ -8,7 +8,7 @@ from copy import deepcopy
 import numpy as np
 
 import oak
-from config import FoulPlayConfig
+from src.config import FoulPlayConfig
 from src.battle import Battle
 from src.teams import TeamPredictor, _species_id, _move_id
 

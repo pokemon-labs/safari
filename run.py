@@ -19,12 +19,12 @@ import requests
 import websockets
 import websockets.asyncio.client
 
-import constants
-from config import FoulPlayConfig, SaveReplay, BotModes, Format, init_logging
+import src.constants as constants
+from src.config import FoulPlayConfig, SaveReplay, BotModes, Format, init_logging
 from src.battle import Battle, Player
 from src.helpers import normalize_name
 from src.search import perform_searches_and_select_move
-from teams import load_team, TeamListIterator
+from src.load_team import load_team, TeamListIterator
 from data.mods.apply_mods import apply_mods
 
 logger = logging.getLogger(__name__)

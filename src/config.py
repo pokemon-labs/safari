@@ -192,7 +192,7 @@ class _FoulPlayConfig:
         self.bandit = args.bandit
         self.parallelism = args.search_parallelism
         self.run_count = args.run_count
-        self.team_name = args.team_name or self.format
+        self.team_name = args.team_name or self.format.value
         self.team_list = args.team_list
         self.user_to_challenge = args.user_to_challenge
         self.save_replay = SaveReplay[args.save_replay]

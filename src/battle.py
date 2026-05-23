@@ -26,7 +26,7 @@ import logging
 from copy import deepcopy
 from dataclasses import dataclass
 
-import constants
+import src.constants as constants
 from data import all_move_json
 from src.helpers import normalize_name
 

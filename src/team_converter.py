@@ -1,4 +1,6 @@
-from fp.helpers import normalize_name
+from __future__ import annotations
+
+from src.helpers import normalize_name
 
 
 def json_to_packed(json_team):
@@ -72,9 +74,9 @@ def single_pokemon_export_to_dict(pkmn_export_string):
         pkmn_dict["gender"] = "F"
         name = name.replace("(F)", "")
     species, nickname = get_species_in_parentheses(name)
-    if species:
+    if species is not None:
         pkmn_dict["species"] = normalize_name(species.strip())
-        pkmn_dict["name"] = nickname.strip()
+        pkmn_dict["name"] = (nickname or "").strip()
     else:
         pkmn_dict["species"] = normalize_name(name.strip())
     if "@" in pkmn_info[0]:
