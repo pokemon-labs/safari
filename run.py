@@ -12,7 +12,6 @@ import logging
 import random
 import time
 import traceback
-from copy import deepcopy
 
 import requests
 import websockets

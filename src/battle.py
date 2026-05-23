@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from typing import List
 
 import constants
-from data import all_move_json, pokedex
+from data import all_move_json
 from src.helpers import normalize_name
 
 logger = logging.getLogger(__name__)
