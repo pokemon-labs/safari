@@ -1,8 +1,4 @@
 {
-  "include": ["src", "run.py"],
-  "reportMissingImports": "none",
-  "reportMissingModuleSource": "none",
-  "reportUnknownMemberType": "none",
-  "reportUnknownVariableType": "none",
-  "reportUnknownArgumentType": "none"
+  "stubPath": "stubs",
+  "reportMissingModuleSource": "none"
 }

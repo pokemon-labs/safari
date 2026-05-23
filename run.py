@@ -17,6 +17,7 @@ from copy import deepcopy
 
 import requests
 import websockets
+import websockets.asyncio.client
 
 import constants
 from config import FoulPlayConfig, SaveReplay, BotModes, Format, init_logging
@@ -43,7 +44,7 @@ class LoginError(Exception):
 
 class PSWebsocketClient:
     def __init__(self) -> None:
-        self.websocket: websockets.WebSocketClientProtocol | None = None
+        self.websocket: websockets.asyncio.client.ClientConnection | None = None
         self.address: str = ""
         self.login_uri: str = ""
         self.username: str = ""
@@ -67,7 +68,8 @@ class PSWebsocketClient:
 
     async def receive_message(self) -> str:
         assert self.websocket is not None
-        msg = await self.websocket.recv()
+        raw = await self.websocket.recv()
+        msg = raw if isinstance(raw, str) else raw.decode()
         logger.debug("recv: %s", msg)
         return msg
 
