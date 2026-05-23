@@ -117,7 +117,11 @@ class Battle:
         # side_idx -> currently active storage index
         self._active_slot: dict = {0: 0, 1: 0}
         # side_idx -> bind turns used (for partial trap tracking)
+        # TODO this is in durations binding. Gen 1 tracks if *you* are binding/fire spin the other player
+        # Its parsing needs to be looked at
         self._bind_turns: dict = {0: 0, 1: 0}
+
+    
 
     # -----------------------------------------------------------------------
     # Oak side/active shortcuts that keep public + private in sync
