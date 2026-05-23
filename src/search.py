@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import random
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 
@@ -9,7 +10,7 @@ import numpy as np
 import oak
 from config import FoulPlayConfig
 from src.battle import Battle
-from src.teams import TeamPredictor
+from src.teams import TeamPredictor, _species_id, _move_id
 
 logger = logging.getLogger(__name__)
 
@@ -23,29 +24,48 @@ def _get_predictor() -> TeamPredictor:
     return _predictor
 
 
-def _determinize(battle: Battle) -> oak.Battle:
-    """Produce one fully-determined oak.Battle from the imperfect-info state."""
+def _fill_opponent(battle: Battle, det: oak.Battle) -> None:
+    """Write predicted opponent sets into det.side(1) for unknown slots."""
     pred = _get_predictor()
-    det = battle.determinize(use_private=True)
-    completed = pred.complete_side(det.side(1), battle.p2.pokemon)
-    # write completed slots back into det side 1
-    for i in range(battle.p2.pokemon):
-        src = completed.pokemon(i)
-        dst = det.side(1).pokemon(i)
-        dst.species = src.species
-        dst.level = src.level
-        dst.hp = src.hp
-        dst.status = src.status
-        for mi in range(4):
-            dst.move(mi).id = src.move(mi).id
-            dst.move(mi).pp = src.move(mi).pp
+    n = battle.p2.pokemon
+    side1 = det.side(1)
+
+    known_species: list[str] = []
+    for i in range(n):
+        sp = side1.pokemon(i).species
+        if sp != 0:
+            from src.helpers import normalize_name
+            known_species.append(normalize_name(oak.species_names[sp]))
+
+    candidates = [
+        t for t in pred.teams
+        if all(k in t.species_set() for k in known_species)
+    ]
+    if not candidates:
+        candidates = pred.teams
+    chosen = random.choice(candidates)
+
+    slot = len(known_species)
+    for pset in chosen:
+        if slot >= n:
+            break
+        from src.helpers import normalize_name
+        if pset.species in {normalize_name(oak.species_names[side1.pokemon(i).species])
+                            for i in range(len(known_species))}:
+            continue
+        pkmn = side1.pokemon(slot)
+        pkmn.species = _species_id(pset.species)
+        pkmn.level = 100
+        for mi, move_name in enumerate(pset.moves[:4]):
+            pkmn.move(mi).id = _move_id(move_name)
+            pkmn.move(mi).pp = 63
+        slot += 1
+
+
+def _make_determinization(battle: Battle) -> oak.Battle:
+    det = deepcopy(battle.public)
+    _fill_opponent(battle, det)
     return det
-
-
-def _prepare_battles(battle: Battle, n: int) -> list[tuple[oak.Battle, float]]:
-    """Return n determinizations each with equal sampling weight."""
-    chance = 1.0 / n
-    return [(_determinize(battle), chance) for _ in range(n)]
 
 
 def _oak_result(
@@ -70,25 +90,24 @@ def _select_move(results: list[tuple[oak.Output, float, int]]) -> str:
             total[i] += weight * output.p1_empirical[i]
     logger.debug("empirical: %s", total)
     idx = int(np.argmax(total))
-    # indices 0-3 = moves 1-4, 4-8 = switches 1-5
     if idx < 4:
         return f"move {idx + 1}"
     return f"switch {idx - 3}"
 
 
 def perform_searches_and_select_move(battle: Battle) -> str:
-    battle = deepcopy(battle)
     n = max(1, FoulPlayConfig.parallelism)
-    budget = FoulPlayConfig.budget
+    weight = 1.0 / n
     durations = battle.durations
+    budget = FoulPlayConfig.budget
 
-    battles = _prepare_battles(battle, n)
-    logger.info("searching %d determinizations at budget=%s", n, budget)
+    dets = [_make_determinization(battle) for _ in range(n)]
+    logger.info("searching %d determinizations budget=%s", n, budget)
 
-    with ThreadPoolExecutor(max_workers=FoulPlayConfig.parallelism) as ex:
+    with ThreadPoolExecutor(max_workers=n) as ex:
         futures = [
-            (ex.submit(_oak_result, det, durations, budget, FoulPlayConfig.eval, FoulPlayConfig.bandit), w, i)
-            for i, (det, w) in enumerate(battles)
+            (ex.submit(_oak_result, det, durations, budget, FoulPlayConfig.eval, FoulPlayConfig.bandit), weight, i)
+            for i, det in enumerate(dets)
         ]
 
     results = [(f.result(), w, i) for f, w, i in futures]
