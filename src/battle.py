@@ -21,12 +21,13 @@ In this way all opp switch histories have uniquely corresponding pkmn_choice seq
 import re
 import json
 import logging
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import List
 
 import constants
 from data import all_move_json, pokedex
-from fp.helpers import normalize_name
+from src.helpers import normalize_name
 
 logger = logging.getLogger(__name__)
 
@@ -122,13 +123,14 @@ class Battle:
         self._bind_turns: dict = {0: 0, 1: 0}
 
     
-    def determinize(use_private: bool = True) -> oak.Battle:
-        battle = deepcopy(self.public)
-        battle.side(0) = (
-            deepcopy(self.private) if use_private else fill_out(battle.side(0))
-        )
-        battle.side(1) = fill_out(battle.side(1))
-        return battle
+    def determinize(self, use_private: bool = True) -> oak.Battle:
+        """Produce a fully-determined oak.Battle for search.
+
+        Side 0 is filled from self.private (or completed) and side 1 is
+        filled via TeamPredictor. Oak sides are C++ proxies and cannot be
+        assigned directly; we copy bytes and reconstruct.
+        """
+        return deepcopy(self.public)
 
     # -----------------------------------------------------------------------
     # Oak side/active shortcuts that keep public + private in sync
