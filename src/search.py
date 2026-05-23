@@ -57,6 +57,7 @@ def perform_searches_and_select_move_oak(battle: Battle) -> str:
     battle = deepcopy(battle)
     num_battles = n_battles()
     budget = FoulPlayConfig.budget
+    # TODO stubb. this was deleted from FP. Use the Set
     if battle.battle_type == BattleType.STANDARD_BATTLE:
         battles = prepare_battles(battle, num_battles)
     else:

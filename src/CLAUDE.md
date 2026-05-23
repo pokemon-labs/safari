@@ -12,9 +12,10 @@ Right now its in complete disarray. Big picture:
 The real meat is in
 * battle.py Battle: Self contained parsing of public information
 * teams.py SetPredictor
-Battle is mostly 'done' and teams.py needs some attention but should be stubbed out.
+* search.py which should eventually have a method that just takes the ground state Battle, produces a bunch of determinizations, does search, collects the output, and then produces a protocol message eg. `/choose move 2`
+Battle is mostly 'done' and teams.py needs some attention but should be stubbed out. 
 
-So your task is to consolidate the remaining program logic: the battle loop and socket stuff, and main loop that does challenges, ladder, accept_chall into one file, `run.py`
+So your current primary task is to consolidate the remaining program logic: the battle loop and socket stuff, and main loop that does challenges, ladder, accept_chall into one file, `run.py`. L
 
 I want you to stage this is much as possible while also working to try to get this staticly type safe. I will be using the standard checker for this, but focus more on consolodating stubbed code and fixing includes than running the checker all the time and running out of command use.
 

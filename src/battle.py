@@ -122,6 +122,13 @@ class Battle:
         self._bind_turns: dict = {0: 0, 1: 0}
 
     
+    def determinize(use_private: bool = True) -> oak.Battle:
+        battle = deepcopy(self.public)
+        battle.side(0) = (
+            deepcopy(self.private) if use_private else fill_out(battle.side(0))
+        )
+        battle.side(1) = fill_out(battle.side(1))
+        return battle
 
     # -----------------------------------------------------------------------
     # Oak side/active shortcuts that keep public + private in sync
