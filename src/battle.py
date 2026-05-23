@@ -18,6 +18,8 @@ Therefore the order array is always [*s_k, 0, ... 0], where s_k is a permutation
 In this way all opp switch histories have uniquely corresponding pkmn_choice sequences.
 """
 
+from __future__ import annotations
+
 import re
 import json
 import logging
@@ -63,8 +65,8 @@ _STAT_ABBREV_TO_BOOST_PROP = {
 @dataclass
 class Player:
     user: str = ""
-    avatar: int = None
-    rating: int = None
+    avatar: int | None = None
+    rating: int | None = None
     pokemon: int = 6
 
 
@@ -338,7 +340,7 @@ class Battle:
     # Protocol handlers
     # -----------------------------------------------------------------------
 
-    def switch_or_drPlayerag(self, split_msg):
+    def switch_or_drag(self, split_msg):
         side_idx = 1 if self._is_opponent(split_msg) else 0
         details = split_msg[3] if len(split_msg) > 3 else ""
         condition = split_msg[4] if len(split_msg) > 4 else ""
