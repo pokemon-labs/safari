@@ -25,7 +25,6 @@ import json
 import logging
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import List
 
 import constants
 from data import all_move_json
@@ -92,7 +91,8 @@ class Battle:
         self.p1 = p1  # us — always p1
         self.p2 = p2  # opponent — always p2
 
-        self.rules: List[str] = []
+        self.rules: list[str] = []
+        self.format: str = ""
 
         # both sides revealed from protocol
         self.public = oak.Battle(bytes(384))
@@ -100,29 +100,22 @@ class Battle:
         # our side determined from request; overlays public.side(0)
         self.private = oak.Battle(bytes(384))
 
-        self.request = None
-        self.msg_lines = []
+        self.request: dict | None = None
+        self.msg_lines: list[str] = []
 
         self.started: bool = False
-        self.rqid = None
+        self.rqid: int | None = None
         self.force_switch: bool = False
         self.wait: bool = False
-        self.time_remaining = None
-        self.team_dict = None  # TODO
+        self.time_remaining: int | None = None
+        self.team_dict = None
 
         # tracking state not in the oak struct
-        # (side_idx, storage_idx) -> int
-        self._max_hp: dict = {}
-        # side_idx -> str species name -> storage_idx
-        self._name_to_slot: dict = {0: {}, 1: {}}
-        # side_idx -> count of pokemon ever seen (for slot assignment)
-        self._seen: dict = {0: 0, 1: 0}
-        # side_idx -> currently active storage index
-        self._active_slot: dict = {0: 0, 1: 0}
-        # side_idx -> bind turns used (for partial trap tracking)
-        # TODO this is in durations binding. Gen 1 tracks if *you* are binding/fire spin the other player
-        # Its parsing needs to be looked at
-        self._bind_turns: dict = {0: 0, 1: 0}
+        self._max_hp: dict[tuple[int, int], int] = {}
+        self._name_to_slot: dict[int, dict[str, int]] = {0: {}, 1: {}}
+        self._seen: dict[int, int] = {0: 0, 1: 0}
+        self._active_slot: dict[int, int] = {0: 0, 1: 0}
+        self._bind_turns: dict[int, int] = {0: 0, 1: 0}
 
     
     def determinize(self, use_private: bool = True) -> oak.Battle:
@@ -202,16 +195,17 @@ class Battle:
     # Request
     # -----------------------------------------------------------------------
 
-    def parse_request(self, split_msg: List[str]):
+    def parse_request(self, split_msg: list[str]):
         if len(split_msg) < 3:
             return
         raw = split_msg[2].strip("'")
         if not raw:
             return
-        self.request = json.loads(raw)
-        self.rqid = self.request.get(constants.RQID)
-        self.force_switch = bool(self.request.get(constants.FORCE_SWITCH))
-        self.wait = bool(self.request.get(constants.WAIT))
+        req: dict = json.loads(raw)
+        self.request = req
+        self.rqid = req.get(constants.RQID)
+        self.force_switch = bool(req.get(constants.FORCE_SWITCH))
+        self.wait = bool(req.get(constants.WAIT))
         self._apply_request()
 
     def _apply_request(self):
@@ -727,7 +721,7 @@ def _parse_condition(condition: str):
     return hp, max_hp, status_str
 
 
-def _status_byte(status_str: str, hp: int = 1) -> int:
+def _status_byte(status_str: str | None, hp: int = 1) -> int:
     if not status_str or hp == 0:
         return 0
     return _STATUS_BYTE.get(status_str, 0)

@@ -7,11 +7,13 @@ Consolidates: websocket_client, run_battle, and the old main loop.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import json
 import logging
 import random
 import time
 import traceback
+from copy import deepcopy
 
 import requests
 import websockets
@@ -41,7 +43,7 @@ class LoginError(Exception):
 
 class PSWebsocketClient:
     def __init__(self) -> None:
-        self.websocket = None
+        self.websocket: websockets.WebSocketClientProtocol | None = None
         self.address: str = ""
         self.login_uri: str = ""
         self.username: str = ""
@@ -64,11 +66,13 @@ class PSWebsocketClient:
         return self
 
     async def receive_message(self) -> str:
+        assert self.websocket is not None
         msg = await self.websocket.recv()
         logger.debug("recv: %s", msg)
         return msg
 
     async def send_message(self, room: str, message_list: list[str]) -> None:
+        assert self.websocket is not None
         msg = room + "|" + "|".join(message_list)
         logger.debug("send: %s", msg)
         await self.websocket.send(msg)
@@ -78,6 +82,7 @@ class PSWebsocketClient:
         await self.send_message("", [f"/join {room_name}"])
 
     async def close(self) -> None:
+        assert self.websocket is not None
         await self.websocket.close()
 
     async def _get_challstr(self) -> tuple[str, str]:
@@ -204,7 +209,6 @@ def _battle_finished(tag: str, msg: str) -> bool:
 
 async def _pick_move(battle: Battle) -> list[str]:
     loop = asyncio.get_event_loop()
-    import concurrent.futures
     with concurrent.futures.ThreadPoolExecutor() as pool:
         decision = await loop.run_in_executor(pool, perform_searches_and_select_move, deepcopy(battle))
     return _format_decision(battle, decision)
@@ -244,7 +248,7 @@ async def _run_battle(client: PSWebsocketClient, fmt: Format, team_dict) -> str 
     p1 = Player(user=FoulPlayConfig.username)
     p2 = Player(user=opp_name)
     battle = Battle(tag, p1, p2)
-    battle.format = fmt
+    battle.format = fmt.value
 
     # identify our slot: |player|p1|username|... or |player|p2|username|...
     # We are always the one whose username matches FoulPlayConfig.username
