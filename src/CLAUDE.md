@@ -4,7 +4,7 @@ It totally replaces the PokeEngine module with oak search backend
 
 The Oak api can be gleaned from github.com/pokemon-labs/oak in cpp/src/pyoak.cc
 
-* If OAK.md does not exists in this dir, I want you to read the above file and write a terse context markdown for yourself, then replace this line*
+OAK.md written — see that file for the Python API surface.
 
 The FoulPlay set prediction used a mix of Smogon stats and self-hosted data. We are replacing that with src/teams. The SetPredictor class will be used with a method that takes an imcomplete oak.Side (Safari Battle has p1, p2 with known number of pokemon for each player 1 <= n <= 6>) and fills in the remaining sets. So it takes Oak.Side and the number of pokemon that player/side has (The pokeballs in a battle you can see from turn 1).
 
