@@ -175,21 +175,19 @@ class PSWebsocketClient:
 
 def _format_decision(battle: Battle, decision: str) -> list[str]:
     if decision.startswith(constants.SWITCH_STRING + " "):
-        switch_name = normalize_name(decision.split("switch ")[-1])
-        our_side = battle.public.side(0)
+        switch_name = normalize_name(decision.split("switch ", 1)[-1])
+        # name_to_slot[0]: species_name -> storage_idx
+        storage_idx = battle._name_to_slot[0].get(switch_name)
         slot = None
-        for pos in range(6):
-            storage_idx = our_side.order[pos]
-            name = normalize_name(battle._name_to_slot[0].get(storage_idx, ""))
-            # reverse lookup: name_to_slot maps name->idx; invert to find name for idx
-            for pname, pidx in battle._name_to_slot[0].items():
-                if pidx == storage_idx and pname == switch_name:
-                    slot = pos + 1
+        if storage_idx is not None:
+            our_side = battle.public.side(0)
+            order = our_side.order
+            for pos, idx in enumerate(order):
+                if idx == storage_idx:
+                    slot = pos + 1  # showdown 1-indexed; pos 0 = active (can't switch to)
                     break
-            if slot is not None:
-                break
         if slot is None:
-            logger.warning("could not find switch slot for %s, defaulting to 2", switch_name)
+            logger.warning("switch slot not found for %r, defaulting to 2", switch_name)
             slot = 2
         message = f"/choose switch {slot}"
     else:
@@ -249,21 +247,34 @@ async def _run_battle(client: PSWebsocketClient, fmt: Format, team_dict) -> str 
     battle = Battle(tag, p1, p2)
     battle.format = fmt
 
-    # identify which slot we are (p1 or p2)
+    # identify our slot: |player|p1|username|... or |player|p2|username|...
+    # We are always the one whose username matches FoulPlayConfig.username
     while True:
         msg = await client.receive_message()
-        if "|player|" in msg and battle.p2.user in msg:
-            parts = msg.split("|")
-            battle.p2.user = parts[2]
-            battle.p1.user = constants.ID_LOOKUP[battle.p2.user]
-            break
+        for line in msg.split("\n"):
+            parts = line.split("|")
+            if len(parts) >= 4 and parts[1] == "player":
+                slot, uname = parts[2], parts[3]
+                if normalize_name(uname) == normalize_name(FoulPlayConfig.username):
+                    battle.p1.user = slot          # our slot (p1 or p2)
+                    battle.p2.user = constants.ID_LOOKUP[slot]
+                    break
+        else:
+            if constants.START_STRING in msg:
+                # already past player lines; default to p1
+                battle.p1.user = "p1"
+                battle.p2.user = "p2"
+            else:
+                continue
+        break
 
-    # wait for |start|
+    # wait for |start| (may already be in msg from above)
     while True:
         if constants.START_STRING in msg:
             battle.started = True
+            after_start = msg.split(constants.START_STRING, 1)[1].strip()
             battle.msg_lines = [
-                m for m in msg.split(constants.START_STRING)[1].strip().split("\n")
+                m for m in after_start.split("\n")
                 if m and not m.startswith(f"|switch|{battle.p1.user}")
             ]
             break
