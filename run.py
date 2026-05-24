@@ -24,7 +24,7 @@ from src.config import FoulPlayConfig, SaveReplay, BotModes, Format, init_loggin
 from src.battle import Battle, Player
 from src.helpers import normalize_name
 from src.search import perform_searches_and_select_move
-from src.load_team import load_team, TeamListIterator
+from src.teams import TeamPredictor, to_packed
 
 logger = logging.getLogger(__name__)
 
@@ -69,13 +69,13 @@ class PSWebsocketClient:
         assert self.websocket is not None
         raw = await self.websocket.recv()
         msg = raw if isinstance(raw, str) else raw.decode()
-        logger.debug("recv: %s", msg)
+        logger.debug(f"recv: {msg}")
         return msg
 
     async def send_message(self, room: str, message_list: list[str]) -> None:
         assert self.websocket is not None
         msg = room + "|" + "|".join(message_list)
-        logger.debug("send: %s", msg)
+        logger.debug(f"send: {msg}")
         await self.websocket.send(msg)
         self.last_message = msg
 
@@ -344,17 +344,13 @@ async def main() -> None:
 
     wins = losses = ties = battles_run = 0
 
+    predictor = TeamPredictor(FoulPlayConfig.teams)
+
+    print("TEAMS", len(predictor.teams), to_packed(predictor.teams[0]))
+
+    await client.update_team(to_packed(predictor.teams[0]))
+
     while True:
-        if FoulPlayConfig.requires_team():
-            team_name = (
-                team_iter.get_next_team() if team_iter else FoulPlayConfig.team_name
-            )
-            team_packed, team_dict, team_file = load_team(team_name)
-            await client.update_team(team_packed)
-        else:
-            team_dict = None
-            team_file = "None"
-            await client.update_team("None")
 
         mode = FoulPlayConfig.bot_mode
         if mode == BotModes.challenge_user:

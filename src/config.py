@@ -150,6 +150,11 @@ class _FoulPlayConfig:
             help="Number of PokemonShowdown battles to run",
         )
         parser.add_argument(
+            "--teams",
+            default=None,
+            help="Path to team file for set predictor",
+        )
+        parser.add_argument(
             "--team-name",
             default=None,
             help="Which team to use. Can be a filename or a foldername relative to ./teams/teams/. "
@@ -192,6 +197,7 @@ class _FoulPlayConfig:
         self.bandit = args.bandit
         self.parallelism = args.search_parallelism
         self.run_count = args.run_count
+        self.teams = args.teams
         self.team_name = args.team_name or self.format.value
         self.team_list = args.team_list
         self.user_to_challenge = args.user_to_challenge

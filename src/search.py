@@ -10,57 +10,11 @@ import numpy as np
 import oak
 from src.config import FoulPlayConfig
 from src.battle import Battle
-from src.teams import TeamPredictor, _species_id, _move_id
+from src.teams import TeamPredictor
 
 logger = logging.getLogger(__name__)
 
-_predictor: TeamPredictor | None = None
-
-
-def _get_predictor() -> TeamPredictor:
-    global _predictor
-    if _predictor is None:
-        _predictor = TeamPredictor("teams150")
-    return _predictor
-
-
-def _fill_opponent(battle: Battle, det: oak.Battle) -> None:
-    """Write predicted opponent sets into det.side(1) for unknown slots."""
-    pred = _get_predictor()
-    n = battle.p2.pokemon
-    side1 = det.side(1)
-
-    known_species: list[str] = []
-    for i in range(n):
-        sp = side1.pokemon(i).species
-        if sp != 0:
-            from src.helpers import normalize_name
-            known_species.append(normalize_name(oak.species_names[sp]))
-
-    candidates = [
-        t for t in pred.teams
-        if all(k in t.species_set() for k in known_species)
-    ]
-    if not candidates:
-        candidates = pred.teams
-    chosen = random.choice(candidates)
-
-    slot = len(known_species)
-    for pset in chosen:
-        if slot >= n:
-            break
-        from src.helpers import normalize_name
-        if pset.species in {normalize_name(oak.species_names[side1.pokemon(i).species])
-                            for i in range(len(known_species))}:
-            continue
-        pkmn = side1.pokemon(slot)
-        pkmn.species = _species_id(pset.species)
-        pkmn.level = 100
-        for mi, move_name in enumerate(pset.moves[:4]):
-            pkmn.move(mi).id = _move_id(move_name)
-            pkmn.move(mi).pp = 63
-        slot += 1
-
+def _fill_opponent(battle: Battle, det: oak.Battle) -> None: ...
 
 def _make_determinization(battle: Battle) -> oak.Battle:
     det = deepcopy(battle.public)
