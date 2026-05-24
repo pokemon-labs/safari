@@ -14,15 +14,15 @@ class TeamPredictor:
         self.teams: list[list[oak.Set]] = oak.load_teams(path)
         assert self.teams, f"no teams loaded from {path!r}"
 
-def to_packed(self: oak.Set) -> str:
+def set_to_packed(self: oak.Set) -> str:
     moves = ",".join(oak.move_id(m) for m in self.moves if m)
 
     return (
         f"{self.nickname if hasattr(self, 'nickname') else ''}|"
         f"{oak.species_id(self.species)}||"
         f"|{moves}||||||"
-        f"{self.level}||||||"
+        f"{self.level}||||||,,,,,"
     )
 
 def to_packed(team: List[oak.Set]) -> str:
-    return "]".join(to_packed(s) for s in team)
+    return "]".join(set_to_packed(s) for s in team)

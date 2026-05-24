@@ -1,0 +1,14 @@
+python run.py \
+--websocket-uri ws://localhost:8000/showdown/websocket \
+--ps-username 'foul-oak' \
+--ps-password '123123' \
+--bot-mode challenge_user \
+--user-to-challenge 'thegreenlesswreath' \
+--format 'gen1ou' \
+--teams /home/user/teams150 \
+--run-count 1 \
+--search-parallelism 1 \
+--budget 3000ms \
+--eval /home/user/rl7/current.battle.net \
+--bandit pexp3-1.0-0.1 \
+--log-level DEBUG

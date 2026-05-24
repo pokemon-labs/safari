@@ -116,7 +116,7 @@ class PSWebsocketClient:
 
         await self.send_message("", [f"/trn {self.username},0,{assertion}"])
         await asyncio.sleep(3)
-        logger.info("logged in as %s", self.username)
+        logger.info(f"logged in as {self.username}")
         return self.username if self.password is None else json.loads(resp.text[1:])["curuser"]["userid"]
 
     async def update_team(self, team: str) -> None:
@@ -243,7 +243,7 @@ async def _wait_for_first_request(client: PSWebsocketClient, battle: Battle) -> 
                 return
 
 
-async def _run_battle(client: PSWebsocketClient, fmt: Format, team_dict) -> str | None:
+async def _run_battle(client: PSWebsocketClient, fmt: Format) -> str | None:
     tag, opp_name = await _get_battle_tag_and_opponent(client)
 
     p1 = Player(user=FoulPlayConfig.username)
@@ -336,19 +336,16 @@ async def main() -> None:
     if FoulPlayConfig.avatar is not None:
         await client.avatar(FoulPlayConfig.avatar)
 
-    team_iter = (
-        TeamListIterator(FoulPlayConfig.team_list)
-        if FoulPlayConfig.team_list is not None
-        else None
-    )
-
     wins = losses = ties = battles_run = 0
 
     predictor = TeamPredictor(FoulPlayConfig.teams)
 
-    print("TEAMS", len(predictor.teams), to_packed(predictor.teams[0]))
+    top_team : list[Oak.Set] = predictor.teams[0]
 
-    await client.update_team(to_packed(predictor.teams[0]))
+    tt_packed = to_packed(top_team)
+    print(tt_packed)
+
+    await client.update_team(tt_packed)
 
     while True:
 
@@ -362,7 +359,7 @@ async def main() -> None:
         else:
             raise ValueError(f"unknown bot mode: {mode}")
 
-        winner = await _run_battle(client, FoulPlayConfig.format, team_dict)
+        winner = await _run_battle(client, FoulPlayConfig.format)
 
         if winner == FoulPlayConfig.username:
             wins += 1
