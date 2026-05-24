@@ -18,10 +18,9 @@ def set_to_packed(self: oak.Set) -> str:
     moves = ",".join(oak.move_id(m) for m in self.moves if m)
 
     return (
-        f"{self.nickname if hasattr(self, 'nickname') else ''}|"
-        f"{oak.species_id(self.species)}||"
-        f"|{moves}||||||"
-        f"{self.level}||||||,,,,,"
+        f"{oak.species_id(self.species)}||||"
+        f"{moves}||||||"
+        f"{self.level}|"
     )
 
 def to_packed(team: List[oak.Set]) -> str:
