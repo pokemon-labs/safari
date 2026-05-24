@@ -131,20 +131,20 @@ class PSWebsocketClient:
             if len(parts) >= 4 and parts[1] == "queryresponse":
                 details = json.loads(parts[3])
                 if details.get("avatar") == avatar:
-                    logger.info("avatar set to %s", avatar)
+                    logger.info(f"avatar set to {avatar}")
                 else:
-                    logger.warning("could not set avatar to %s, got %s", avatar, details.get("avatar"))
+                    logger.warning(f"could not set avatar to {avatar}, got {details.get('avatar')}")
                 break
 
     async def challenge_user(self, target: str, fmt: Format) -> None:
-        logger.info("challenging %s", target)
+        logger.info(f"challenging {target}")
         await self.send_message("", [f"/challenge {target},{fmt.value}"])
         self.last_challenge_time = time.time()
 
     async def accept_challenge(self, fmt: Format, room_name: str | None) -> None:
         if room_name is not None:
             await self.join_room(room_name)
-        logger.info("waiting for %s challenge", fmt.value)
+        logger.info(f"waiting for {fmt.value} challenge")
         username = None
         while username is None:
             msg = await self.receive_message()
@@ -160,7 +160,7 @@ class PSWebsocketClient:
         await self.send_message("", [f"/accept {username}"])
 
     async def search_for_match(self, fmt: Format) -> None:
-        logger.info("searching ladder for %s", fmt.value)
+        logger.info(f"searching ladder for {fmt.value}")
         await self.send_message("", [f"/search {fmt.value}"])
 
     async def leave_battle(self, tag: str) -> None:
@@ -192,7 +192,7 @@ def _format_decision(battle: Battle, decision: str) -> list[str]:
                     slot = pos + 1  # showdown 1-indexed; pos 0 = active (can't switch to)
                     break
         if slot is None:
-            logger.warning("switch slot not found for %r, defaulting to 2", switch_name)
+            logger.warning(f"switch slot not found for {switch_name!r}, defaulting to 2")
             slot = 2
         message = f"/choose switch {slot}"
     else:
@@ -303,7 +303,7 @@ async def _run_battle(client: PSWebsocketClient, fmt: Format) -> str | None:
                 if constants.WIN_STRING in msg
                 else None
             )
-            logger.info("winner: %s", winner)
+            logger.info(f"winner: {winner}")
             cfg = FoulPlayConfig
             if (
                 cfg.save_replay == SaveReplay.always
@@ -363,15 +363,15 @@ async def main() -> None:
 
         if winner == FoulPlayConfig.username:
             wins += 1
-            logger.info("won with %s", team_file)
+            logger.info(f"won with {team_file}")
         elif winner is None:
             ties += 1
-            logger.info("tied with %s", team_file)
+            logger.info(f"tied with {team_file}")
         else:
             losses += 1
-            logger.info("lost with %s", team_file)
+            logger.info(f"lost with {team_file}")
 
-        logger.info("W:%d L:%d T:%d", wins, losses, ties)
+        logger.info(f"W:{wins} L:{losses} T:{ties}")
         battles_run += 1
         if battles_run >= FoulPlayConfig.run_count:
             break

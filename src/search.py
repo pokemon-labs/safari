@@ -42,7 +42,7 @@ def _select_move(results: list[tuple[oak.Output, float, int]]) -> str:
     for output, weight, _ in results:
         for i in range(9):
             total[i] += weight * output.p1_empirical[i]
-    logger.debug("empirical: %s", total)
+    logger.debug(f"empirical: {total}")
     idx = int(np.argmax(total))
     if idx < 4:
         return f"move {idx + 1}"
@@ -56,7 +56,7 @@ def perform_searches_and_select_move(battle: Battle) -> str:
     budget = FoulPlayConfig.budget
 
     dets = [_make_determinization(battle) for _ in range(n)]
-    logger.info("searching %d determinizations budget=%s", n, budget)
+    logger.info(f"searching {n} determinizations budget={budget}")
 
     with ThreadPoolExecutor(max_workers=n) as ex:
         futures = [
@@ -66,5 +66,5 @@ def perform_searches_and_select_move(battle: Battle) -> str:
 
     results = [(f.result(), w, i) for f, w, i in futures]
     choice = _select_move(results)
-    logger.info("choice: %s", choice)
+    logger.info(f"choice: {choice}")
     return choice
