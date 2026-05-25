@@ -6,7 +6,7 @@ Representation of the de-facto, imperfect information game from the agent's pers
 The features of the underlying sim battle are revealed from the protocol log, 
 which essentially consists of the public history and a small portion of agent's private history
 
-TODO explain how we leave slots/move-slots tails blank to represent unrevealed
+explain how we leave slots/move-slots tails blank to represent unrevealed
 
 In all perfect info games, the public signals encode information about what the opponent selected.
 This is important strategic information that informs the players about each others 'types'

@@ -40,14 +40,14 @@ def init_logging(level, log_to_file):
     stdout_handler.setLevel(level)
     stdout_handler.setFormatter(CustomFormatter())
     logger.addHandler(stdout_handler)
-    FoulPlayConfig.stdout_log_handler = stdout_handler
+    Config.stdout_log_handler = stdout_handler
 
     if log_to_file:
         file_handler = CustomRotatingFileHandler("init.log")
         file_handler.setLevel(logging.DEBUG)  # file logs are always debug
         file_handler.setFormatter(CustomFormatter())
         logger.addHandler(file_handler)
-        FoulPlayConfig.file_log_handler = file_handler
+        Config.file_log_handler = file_handler
 
 
 class SaveReplay(Enum):
@@ -68,7 +68,7 @@ class Format(Enum):
     randombattle = "gen1randombattle"
 
 
-class _FoulPlayConfig:
+class _Config:
     websocket_uri: str
     username: str
     password: str | None
@@ -80,9 +80,17 @@ class _FoulPlayConfig:
     budget: str
     eval: str
     bandit: str
+    # TODO remove for 2D p1/p2 determinization
     parallelism: int
+
     run_count: int
+    # TODO change name to user_teams
+    # its a path to a teams file like Config.teams uses
+    # 
+    # For each iteration of the run.py battle loop we uniformly sample a team from list[Team] and that for the chall/ladder
     team_name: str
+    # TODO put the parsed list in the main function an propogate it as needed (really only to Socket.set_team), dont put the loaded teams in the config!!
+    # TODO SYNTAX remove one below. Obselete due to above
     team_list: str | None = None
     user_to_challenge: str
     save_replay: SaveReplay
@@ -90,7 +98,14 @@ class _FoulPlayConfig:
     log_level: str
     log_to_file: bool
     stdout_log_handler: logging.StreamHandler
-    file_log_handler: Optional[CustomRotatingFileHandler]
+    file_log_handler: Optional[CustomRotatingFileHandler]    
+
+    # TODO determinization, add to args and fill out the rest
+    p1_types :int = 1
+    p2_types :int = 1
+    # parallelism is p1 * p2
+    # INFO nash policy mode will solve bayes nash. Stub out this policy mode for now
+
 
     def configure(self):
         parser = argparse.ArgumentParser()
@@ -218,4 +233,4 @@ class _FoulPlayConfig:
             ), "If bot_mode is `CHALLENGE_USER`, you must declare USER_TO_CHALLENGE"
 
 
-FoulPlayConfig = _FoulPlayConfig()
+Config = _Config()

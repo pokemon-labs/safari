@@ -20,7 +20,7 @@ import websockets
 import websockets.asyncio.client
 
 import src.constants as constants
-from src.config import FoulPlayConfig, SaveReplay, BotModes, Format, init_logging
+from src.config import Config, SaveReplay, BotModes, Format, init_logging
 from src.battle import Battle, Player
 from src.helpers import normalize_name
 from src.search import perform_searches_and_select_move
@@ -246,20 +246,20 @@ async def _wait_for_first_request(client: PSWebsocketClient, battle: Battle) -> 
 async def _run_battle(client: PSWebsocketClient, fmt: Format) -> str | None:
     tag, opp_name = await _get_battle_tag_and_opponent(client)
 
-    p1 = Player(user=FoulPlayConfig.username)
+    p1 = Player(user=Config.username)
     p2 = Player(user=opp_name)
     battle = Battle(tag, p1, p2)
     battle.format = fmt.value
 
     # identify our slot: |player|p1|username|... or |player|p2|username|...
-    # We are always the one whose username matches FoulPlayConfig.username
+    # We are always the one whose username matches Config.username
     while True:
         msg = await client.receive_message()
         for line in msg.split("\n"):
             parts = line.split("|")
             if len(parts) >= 4 and parts[1] == "player":
                 slot, uname = parts[2], parts[3]
-                if normalize_name(uname) == normalize_name(FoulPlayConfig.username):
+                if normalize_name(uname) == normalize_name(Config.username):
                     battle.p1.user = slot          # our slot (p1 or p2)
                     battle.p2.user = constants.ID_LOOKUP[slot]
                     break
@@ -304,7 +304,7 @@ async def _run_battle(client: PSWebsocketClient, fmt: Format) -> str | None:
                 else None
             )
             logger.info(f"winner: {winner}")
-            cfg = FoulPlayConfig
+            cfg = Config
             if (
                 cfg.save_replay == SaveReplay.always
                 or (cfg.save_replay == SaveReplay.on_loss and winner != cfg.username)
@@ -325,20 +325,20 @@ async def _run_battle(client: PSWebsocketClient, fmt: Format) -> str | None:
 # ---------------------------------------------------------------------------
 
 async def main() -> None:
-    FoulPlayConfig.configure()
-    init_logging(FoulPlayConfig.log_level, FoulPlayConfig.log_to_file)
+    Config.configure()
+    init_logging(Config.log_level, Config.log_to_file)
 
     client = await PSWebsocketClient.create(
-        FoulPlayConfig.username, FoulPlayConfig.password, FoulPlayConfig.websocket_uri
+        Config.username, Config.password, Config.websocket_uri
     )
-    FoulPlayConfig.user_id = await client.login()
+    Config.user_id = await client.login()
 
-    if FoulPlayConfig.avatar is not None:
-        await client.avatar(FoulPlayConfig.avatar)
+    if Config.avatar is not None:
+        await client.avatar(Config.avatar)
 
     wins = losses = ties = battles_run = 0
 
-    predictor = TeamPredictor(FoulPlayConfig.teams)
+    predictor = TeamPredictor(Config.teams)
 
     top_team : list[Oak.Set] = predictor.teams[0]
 
@@ -349,19 +349,19 @@ async def main() -> None:
 
     while True:
 
-        mode = FoulPlayConfig.bot_mode
+        mode = Config.bot_mode
         if mode == BotModes.challenge_user:
-            await client.challenge_user(FoulPlayConfig.user_to_challenge, FoulPlayConfig.format)
+            await client.challenge_user(Config.user_to_challenge, Config.format)
         elif mode == BotModes.accept_challenge:
-            await client.accept_challenge(FoulPlayConfig.format, FoulPlayConfig.room_name)
+            await client.accept_challenge(Config.format, Config.room_name)
         elif mode == BotModes.search_ladder:
-            await client.search_for_match(FoulPlayConfig.format)
+            await client.search_for_match(Config.format)
         else:
             raise ValueError(f"unknown bot mode: {mode}")
 
-        winner = await _run_battle(client, FoulPlayConfig.format)
+        winner = await _run_battle(client, Config.format)
 
-        if winner == FoulPlayConfig.username:
+        if winner == Config.username:
             wins += 1
             logger.info(f"won with {team_file}")
         elif winner is None:
@@ -373,7 +373,7 @@ async def main() -> None:
 
         logger.info(f"W:{wins} L:{losses} T:{ties}")
         battles_run += 1
-        if battles_run >= FoulPlayConfig.run_count:
+        if battles_run >= Config.run_count:
             break
 
     await client.close()

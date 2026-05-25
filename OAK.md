@@ -1,3 +1,7 @@
+# TODO update this from the cloaned oak REPO
+# Pay attention to Output api
+# aND the fact that we remove Input in favor of component battle, durations, and result
+
 # Oak API Context
 
 Oak is a Gen 1 Pokemon battle engine exposed as a Python extension (`import oak`).

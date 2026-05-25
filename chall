@@ -1,3 +1,6 @@
+# CLAUDE change websocket to showdown main and keep the rest the same
+# I will have the to_challenge account logged in so you can see the errors that come after
+# TODO before doing anything check with me that Im logged in!!!!
 python run.py \
 --websocket-uri ws://localhost:8000/showdown/websocket \
 --ps-username 'foul-oak' \
