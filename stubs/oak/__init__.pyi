@@ -138,7 +138,9 @@ class Set:
     moves: list[int]
 
 def search(
-    input: tuple[Battle, Durations, int],
+    battle: Battle,
+    durations: Durations,
+    result: int,
     heap: Heap,
     agent: Agent,
     output: Output = ...,

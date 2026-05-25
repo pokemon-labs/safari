@@ -150,12 +150,7 @@ def _run_oak_search(
     agent.budget = budget
     agent.bandit = bandit or "pexp3-1.0-0.1"
     agent.eval = evl or "fp"
-    # oak.search takes (input, heap, agent) where input is an MCTS::Input
-    # constructed from (battle, durations, result).
-    # The C++ binding accepts the BattleView/DurationsView/result tuple as input.
-    input_ = oak.parse_battle(oak.battle_string(battle, durations))
-    _battle, _durations, _result = input_
-    return oak.search((_battle, _durations, result), heap, agent)
+    return oak.search(battle, durations, result, heap, agent)
 
 
 def _select_move(results: list[tuple[oak.Output, float, int]]) -> str:
