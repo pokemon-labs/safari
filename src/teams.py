@@ -90,10 +90,9 @@ class TeamPredictor:
         return [(synthetic, 1.0)]
 
 
-def set_to_packed(s: oak.Set) -> str:
-    moves = ",".join(oak.move_id(m) for m in s.moves if m)
-
-    return f"{oak.species_id(s.species)}||||" f"{moves}|||||" f"{s.level}|"
+def set_to_packed(self: oak.Set) -> str:
+    moves = ",".join(oak.move_id(m) for m in self.moves if m)
+    return f"{oak.species_id(self.species)}||||" f"{moves}||||||" f"{self.level}|"
 
 
 def to_packed(team: Team) -> str:
