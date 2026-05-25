@@ -1,21 +1,28 @@
 """
 class Battle:
 
-Representation of the de-facto, imperfect information game from the agent's perspective
+Representation of the de-facto, imperfect information game
+This means the public signals and the agent's private signals
 
-The features of the underlying sim battle are revealed from the protocol log, 
-which essentially consists of the public history and a small portion of agent's private history
+The public signals can be represented as a perfect info battle "state",
+a collection of libpkmn/oak's Battle, Durations, Result objects
+The state is just what species and move sets have been revealed,
+with the other fields (status/stats/binding/etc) either tracked accurately or assumed to be max (evs/dvs).
 
-explain how we leave slots/move-slots tails blank to represent unrevealed
+    Note: This is strategically lossy since the moves selected (i.e. |p1|move|...)  lose context and become just move slots
 
-In all perfect info games, the public signals encode information about what the opponent selected.
-This is important strategic information that informs the players about each others 'types'
+The private signals are treated similarly which means we just need store a libpkmn/oak Side
+(the durations/result data is inherently public.)
 
-In Pokemon, the private information is immutable after the start of the battle and is slowly revealed.
+The public vs private signals correspond roughly to Showdown's protocol log vs request object.
 
-Battle.public has incomplete slots/move-sets. The n-th pokemon to be revealed is at index (not slot) n -1.
-Therefore the order array is always [*s_k, 0, ... 0], where s_k is a permutation on [1, k] and k <= n
-In this way all opp switch histories have uniquely corresponding pkmn_choice sequences.
+The battle object handles the parsing of this information internally.
+
+The end result of tracking this information is "determinization".
+We sample/generate fully revealed teams (also return independent probabilities) for both players which is finally input for an oak search
+
+Sampling the opponent's teams is necessary, but sampling the agent's team makes the collection
+of empirical matrices (with associated probs) from the oak.Output's a *Bayesian* game where the 'types' are teams.
 """
 
 from __future__ import annotations
@@ -106,21 +113,21 @@ class Battle:
         self.team_dict = None
 
         # tracking state not in the oak struct
+        # TODO Some of These should be removable for these reasons below:
+        # We assume evs/dvs are max so...
         self._max_hp: dict[tuple[int, int], int] = {}
+        # The team loader doesnt even check nicknames. We will never use them
+        # Is this needed to parse opp switch protocal string actually?
         self._name_to_slot: dict[int, dict[str, int]] = {0: {}, 1: {}}
+        # Meh just iteratate over the side mons and count how many non 0 species there are
         self._seen: dict[int, int] = {0: 0, 1: 0}
+        # Lets keep this for now
         self._active_slot: dict[int, int] = {0: 0, 1: 0}
+        # No, this is tracked in Durations!!!!
         self._bind_turns: dict[int, int] = {0: 0, 1: 0}
 
-    
-    def determinize(self, use_private: bool = True) -> oak.Battle:
-        """Produce a fully-determined oak.Battle for search.
-
-        Side 0 is filled from self.private (or completed) and side 1 is
-        filled via TeamPredictor. Oak sides are C++ proxies and cannot be
-        assigned directly; we copy bytes and reconstruct.
-        """
-        return deepcopy(self.public)
+    # Removed since determinization is done as a suite where we get some types and pdf over them
+    # This logic now in search.pys
 
     # -----------------------------------------------------------------------
     # Oak side/active shortcuts that keep public + private in sync

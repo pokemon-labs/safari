@@ -4,6 +4,7 @@ run.py — main entry point.
 Handles: login, challenge/accept/ladder modes, the battle loop.
 Consolidates: websocket_client, run_battle, and the old main loop.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -33,6 +34,7 @@ logger = logging.getLogger(__name__)
 # Exceptions
 # ---------------------------------------------------------------------------
 
+
 class LoginError(Exception):
     pass
 
@@ -40,6 +42,7 @@ class LoginError(Exception):
 # ---------------------------------------------------------------------------
 # WebSocket client
 # ---------------------------------------------------------------------------
+
 
 class PSWebsocketClient:
     def __init__(self) -> None:
@@ -52,7 +55,9 @@ class PSWebsocketClient:
         self.last_challenge_time: float = 0.0
 
     @classmethod
-    async def create(cls, username: str, password: str | None, address: str) -> "PSWebsocketClient":
+    async def create(
+        cls, username: str, password: str | None, address: str
+    ) -> "PSWebsocketClient":
         self = cls()
         self.username = username
         self.password = password
@@ -99,9 +104,23 @@ class PSWebsocketClient:
         combined = "|".join([client_id, challstr])
 
         if self.password is None:
-            resp = requests.post(self.login_uri, data={"act": "getassertion", "userid": self.username, "challstr": combined})
+            resp = requests.post(
+                self.login_uri,
+                data={
+                    "act": "getassertion",
+                    "userid": self.username,
+                    "challstr": combined,
+                },
+            )
         else:
-            resp = requests.post(self.login_uri, data={"name": self.username, "pass": self.password, "challstr": combined})
+            resp = requests.post(
+                self.login_uri,
+                data={
+                    "name": self.username,
+                    "pass": self.password,
+                    "challstr": combined,
+                },
+            )
 
         if resp.status_code != 200:
             raise LoginError(f"HTTP {resp.status_code}: {resp.content}")
@@ -117,7 +136,11 @@ class PSWebsocketClient:
         await self.send_message("", [f"/trn {self.username},0,{assertion}"])
         await asyncio.sleep(3)
         logger.info(f"logged in as {self.username}")
-        return self.username if self.password is None else json.loads(resp.text[1:])["curuser"]["userid"]
+        return (
+            self.username
+            if self.password is None
+            else json.loads(resp.text[1:])["curuser"]["userid"]
+        )
 
     async def update_team(self, team: str) -> None:
         await self.send_message("", [f"/utm {team}"])
@@ -133,7 +156,9 @@ class PSWebsocketClient:
                 if details.get("avatar") == avatar:
                     logger.info(f"avatar set to {avatar}")
                 else:
-                    logger.warning(f"could not set avatar to {avatar}, got {details.get('avatar')}")
+                    logger.warning(
+                        f"could not set avatar to {avatar}, got {details.get('avatar')}"
+                    )
                 break
 
     async def challenge_user(self, target: str, fmt: Format) -> None:
@@ -178,6 +203,7 @@ class PSWebsocketClient:
 # Battle loop helpers
 # ---------------------------------------------------------------------------
 
+
 def _format_decision(battle: Battle, decision: str) -> list[str]:
     if decision.startswith(constants.SWITCH_STRING + " "):
         switch_name = normalize_name(decision.split("switch ", 1)[-1])
@@ -189,10 +215,14 @@ def _format_decision(battle: Battle, decision: str) -> list[str]:
             order = our_side.order
             for pos, idx in enumerate(order):
                 if idx == storage_idx:
-                    slot = pos + 1  # showdown 1-indexed; pos 0 = active (can't switch to)
+                    slot = (
+                        pos + 1
+                    )  # showdown 1-indexed; pos 0 = active (can't switch to)
                     break
         if slot is None:
-            logger.warning(f"switch slot not found for {switch_name!r}, defaulting to 2")
+            logger.warning(
+                f"switch slot not found for {switch_name!r}, defaulting to 2"
+            )
             slot = 2
         message = f"/choose switch {slot}"
     else:
@@ -211,7 +241,9 @@ def _battle_finished(tag: str, msg: str) -> bool:
 async def _pick_move(battle: Battle) -> list[str]:
     loop = asyncio.get_event_loop()
     with concurrent.futures.ThreadPoolExecutor() as pool:
-        decision = await loop.run_in_executor(pool, perform_searches_and_select_move, deepcopy(battle))
+        decision = await loop.run_in_executor(
+            pool, perform_searches_and_select_move, deepcopy(battle)
+        )
     return _format_decision(battle, decision)
 
 
@@ -260,7 +292,7 @@ async def _run_battle(client: PSWebsocketClient, fmt: Format) -> str | None:
             if len(parts) >= 4 and parts[1] == "player":
                 slot, uname = parts[2], parts[3]
                 if normalize_name(uname) == normalize_name(Config.username):
-                    battle.p1.user = slot          # our slot (p1 or p2)
+                    battle.p1.user = slot  # our slot (p1 or p2)
                     battle.p2.user = constants.ID_LOOKUP[slot]
                     break
         else:
@@ -278,7 +310,8 @@ async def _run_battle(client: PSWebsocketClient, fmt: Format) -> str | None:
             battle.started = True
             after_start = msg.split(constants.START_STRING, 1)[1].strip()
             battle.msg_lines = [
-                m for m in after_start.split("\n")
+                m
+                for m in after_start.split("\n")
                 if m and not m.startswith(f"|switch|{battle.p1.user}")
             ]
             break
@@ -324,6 +357,7 @@ async def _run_battle(client: PSWebsocketClient, fmt: Format) -> str | None:
 # Main
 # ---------------------------------------------------------------------------
 
+
 async def main() -> None:
     Config.configure()
     init_logging(Config.log_level, Config.log_to_file)
@@ -340,7 +374,7 @@ async def main() -> None:
 
     predictor = TeamPredictor(Config.teams)
 
-    top_team : list[Oak.Set] = predictor.teams[0]
+    top_team: list[Oak.Set] = predictor.teams[0]
 
     tt_packed = to_packed(top_team)
     print(tt_packed)

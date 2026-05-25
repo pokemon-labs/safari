@@ -1,4 +1,4 @@
-# CLAUDE change websocket to showdown main and keep the rest the same
+# TODO change websocket to showdown main and keep the rest the same
 # I will have the to_challenge account logged in so you can see the errors that come after
 # TODO before doing anything check with me that Im logged in!!!!
 python run.py \
@@ -8,9 +8,10 @@ python run.py \
 --bot-mode challenge_user \
 --user-to-challenge 'thegreenlesswreath' \
 --format 'gen1ou' \
---teams /home/user/teams150 \
+--teams ./teams150 \
 --run-count 1 \
---search-parallelism 1 \
+--p1-types 1 \
+--p2-types 1 \
 --budget 3000ms \
 --eval /home/user/rl7/current.battle.net \
 --bandit pexp3-1.0-0.1 \

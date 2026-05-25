@@ -4,38 +4,61 @@ import logging
 import random
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+from teams import TeamPredictor
 
-import numpy as np
-
-import oak
 from src.config import Config, Policy
 from src.battle import Battle
-from src.teams import TeamPredictor
+from src.teams import TeamPredictor, Team
+
+import numpy as np
+import oak
 
 logger = logging.getLogger(__name__)
 
+type Type = tuple[Oak.side, float]
+
+class BayesianGame:
+
+
+    def __init__(self, battle: Battle, p1_k : int, p2_k : int, predictor : TeamPredictor):
+        self.p1_types : list[Type] = [(battle.private, 1.0)] if p1_k == 1 else (
+            self._get_n_types(battle.public.side(0))
+        )
+        
+    def _fill_side_from_team(self, revealed: oak.Side, team: Team, max_pokemon: int = 6) -> oak.Side:
+        side = deepcopy(revealed)
+        for s in team:
+            empty_or_species_match : int | None = None
+            for i in range(6):
+                species: int = side.pokemon(i).species
+                if species == 0 or species == s.species:
+                    empty_or_species_match = i
+                    break
+            if empty_or_species_match is None:
+                assert False, "_fill_side_from_team: Side and Team are inconsistent"
+            else:
+                oak.complete_pokemon_from_set(side.pokemon(empty_or_species_match), s)
+
+
+
+    def _get_n_types(self, side: oak.Side, predictor : TeamPredictor, n : int):
+        matches: list[tuple[Team, float]] = find_all_matching(side)[:n]
+        lowest_logit = 0 if not matches else matches[-1][1]
+        while len(matches) < n:
+            matches.append((_get_random_matching_team,)
+        
+
+        
+
 def _fill_opponent(battle: Battle, det: oak.Battle) -> None: ...
 
-# Iterate over p1/p2 det types. Capture marginal prob of each det and multiply
-# to get joint p1*p2 prob. If p1_types == 1 the battle only depends on p2 (vanilla FoulPlay).
-def _make_determinizations(battle: Battle) -> list[tuple[oak.Battle, oak.Durations, int, float]]:
-    """Return a flat list of (battle, durations, result, joint_prob) for all
-    p1 x p2 type combinations. Joint prob is p1_prob * p2_prob."""
-    p1_count = max(1, getattr(Config, 'p1_types', 1))
-    p2_count = max(1, getattr(Config, 'p2_types', 1))
-    total = p1_count * p2_count
-    joint_prob = 1.0 / total
+def _make_determinizations(battle: Battle, predictor) -> list[tuple[oak.Battle, oak.Durations, int, float]]:
+    pass
+    # TODO make a fresh Bayes game each time
 
-    dets: list[tuple[oak.Battle, oak.Durations, int, float]] = []
-    for _ in range(p1_count):
-        for _ in range(p2_count):
-            det = deepcopy(battle.public)
-            _fill_opponent(battle, det)
-            dets.append((det, battle.durations, battle.result, joint_prob))
-    return dets
 
 # a full Oak state is oak.Battle (NOT src.Battle), oak.Durations, and uint8 = int result
-def _oak_result(
+def _run_oak_search(
     battle: oak.Battle,
     durations: oak.Durations,
     result: int,
@@ -48,9 +71,7 @@ def _oak_result(
     agent.budget = budget
     agent.bandit = bandit or "pexp3-1.0-0.1"
     agent.eval = evl or "fp"
-    # oak.search(input, heap, agent) — input bundles battle+durations+result
-    input_ = oak.MCTSInput(battle, durations, result)
-    return oak.search(input_, heap, agent)
+    return oak.search(battle, durations, result, heap, agent)
 
 
 def _select_move(results: list[tuple[oak.Output, float, int]]) -> str:
@@ -102,12 +123,11 @@ def perform_searches_and_select_move(battle: Battle) -> str:
     dets = _make_determinizations(battle)
     logger.info(f"searching {len(dets)} determinizations (p1={getattr(Config,'p1_types',1)} x p2={getattr(Config,'p2_types',1)}) budget={budget}")
 
-    parallelism = max(1, Config.parallelism)
-    with ThreadPoolExecutor(max_workers=parallelism) as ex:
+    with ThreadPoolExecutor(max_workers=len(dets)) as ex:
         futures = [
             (
                 ex.submit(
-                    _oak_result,
+                    _run_oak_search,
                     det_battle, det_durations, det_result,
                     budget, Config.eval, Config.bandit,
                 ),

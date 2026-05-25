@@ -8,9 +8,9 @@ from typing import Optional, Literal
 
 
 class Policy(Enum):
-    argmax = 'x'
-    nash = 'n'
-    empirical = 'e'
+    argmax = "x"
+    nash = "n"
+    empirical = "e"
 
 
 class CustomFormatter(logging.Formatter):
@@ -106,7 +106,6 @@ class _Config:
     log_to_file: bool
     stdout_log_handler: logging.StreamHandler
     file_log_handler: Optional[CustomRotatingFileHandler]
-
 
     def configure(self):
         parser = argparse.ArgumentParser()
@@ -219,8 +218,8 @@ class _Config:
         self.budget = args.budget
         self.eval = args.eval
         self.bandit = args.bandit
-        self.p1_types = args.p1_types
-        self.p2_types = args.p2_types
+        self.p1_types = args.p1_types or 1
+        self.p2_types = args.p2_types or 1
         self.parallelism = self.p1_types * self.p2_types
         self.policy_mode = Policy(args.policy_mode)
         self.run_count = args.run_count

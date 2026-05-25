@@ -10,75 +10,62 @@ import oak
 
 type Team = tuple[oak.Set]
 
+
+def sorted_team(team: list[oak.Set]) -> list[oak.Set]:
+    team[1:] = sorted(team[1:], key=lambda s: s.species)
+    return team
+
+
+def pokemon_to_set(pokemon: oak.Pokemon) -> oak.Set:
+    s = oak.Set()
+    s.species = pokemon.species
+    s.level = pokemon.level
+    s.moves = [pokemon.move(_).id for _ in range(4)]
+    return s
+
+
+def side_to_team(side: oak.Side) -> Team:
+    return tuple(pokemon_to_set(side.pokemon(_)) for _ in range(6))
+
+
+# a is partial of b
+def matches(a: Team, b: Team) -> bool:
+    return all(s.species == 0 or any(s < t for t in b) for s in a)
+
+
+# TODO replace all self.policy with self.logits
 class TeamPredictor:
-    """Completes an oak.Side using a corpus of known teams."""
 
     def __init__(self, path: str, first_to_last_ratio: float = 0.01) -> None:
-        self.teams: list[tuple[oak.Set]] = oak.load_teams(path)
+        self.teams: list[Team] = [
+            tuple(sorted_team(team)) for team in oak.load_teams(path)
+        ]
         assert all(len(team) <= 6 for team in self.teams)
         assert self.teams, f"no teams loaded from {path!r}"
+        assert 0 < first_to_last_ratio <= 1
 
-        # Policy is a prob distribution over teams.
-        # Each team has a logit; logits descend from first to last in an affine
-        # fashion such that exp(logit[0]) / exp(logit[-1]) == first_to_last_ratio.
-        # logit step = log(first_to_last_ratio) / (len - 1)  (negative, descending)
         n = len(self.teams)
         if n == 1:
-            self.policy: list[float] = [1.0]
+            self.policy: list[float] = [0.0]
         else:
             step = math.log(first_to_last_ratio) / (n - 1)
-            logits = [step * i for i in range(n)]
-            max_l = logits[0]
-            exps = [math.exp(l - max_l) for l in logits]
-            total = sum(exps)
-            self.policy = [e / total for e in exps]
+            self.logits = [step * i for i in range(n)]
 
-    # oak.Set supports == comparison (from pyoak.cc)
-    def compare(self, a: oak.Set, b: oak.Set) -> bool:
-        return a == b
+        all_sets = set()
+        for team in self.teams:
+            for s in team:
+                all_sets.add(s)
+        print(f"{len(all_sets)} unique sets found!")
 
-    def sort_teams(self, teams: list[Team]) -> None:
-        """Sort in-place using oak.Set ordering (species then moves)."""
-        teams.sort(key=lambda team: [s.species for s in team])
-
-    # Using set ordering (containment):
-    # A pool team "contains" the observed side if:
-    #   - pool[0].species == observed lead species
-    #   - every other revealed species on the observed side is present
-    #     in some non-lead slot of the pool team
-    # The arg is a partial observation (revealed pokemon only).
-    # Returns a probability-weighted list of matching teams (measure space).
     def find_all_matching(self, side: oak.Side) -> list[tuple[Team, float]]:
-        observed: list[oak.Set] = []
-        for i in range(6):
-            pkmn = side.pokemon(i)
-            if pkmn.species == 0:
-                break
-            observed.append(pkmn)
-
-        if not observed:
-            return self._uniform_all()
-
-        observed_lead_species = observed[0].species
-        observed_rest_species = {p.species for p in observed[1:]}
-
-        matches: list[tuple[int, Team]] = []  # (original_index, team)
-        for idx, team in enumerate(self.teams):
-            if not team:
-                continue
-            if team[0].species != observed_lead_species:
-                continue
-            pool_rest_species = {s.species for s in team[1:]}
-            if not observed_rest_species.issubset(pool_rest_species):
-                continue
-            matches.append((idx, team))
-
-        if not matches:
-            return self._determinize_from_thin_air(observed)
-
-        raw_weights = [self.policy[idx] for idx, _ in matches]
-        total = sum(raw_weights)
-        return [(team, w / total) for (_, team), w in zip(matches, raw_weights)]
+        result = []
+        t = side_to_team(side)
+        for _ in range(len(self.teams)):
+            team = self.teams[_]
+            logit = self.logits[_]
+            if matches(t, team):
+                result.append((team, logit))
+        return result
 
     def _uniform_all(self) -> list[tuple[Team, float]]:
         """Return all teams with uniform weight (no observations)."""
@@ -92,10 +79,7 @@ class TeamPredictor:
         and pad the remaining slots with randomly sampled sets from the full corpus."""
         observed_species = {p.species for p in observed}
         pool_of_sets: list[oak.Set] = [
-            s
-            for team in self.teams
-            for s in team
-            if s.species not in observed_species
+            s for team in self.teams for s in team if s.species not in observed_species
         ]
         n_missing = 6 - len(observed)
         if n_missing > 0 and pool_of_sets:
@@ -109,11 +93,29 @@ class TeamPredictor:
 def set_to_packed(s: oak.Set) -> str:
     moves = ",".join(oak.move_id(m) for m in s.moves if m)
 
-    return (
-        f"{oak.species_id(s.species)}||||"
-        f"{moves}|||||"
-        f"{s.level}|"
-    )
+    return f"{oak.species_id(s.species)}||||" f"{moves}|||||" f"{s.level}|"
+
 
 def to_packed(team: Team) -> str:
     return "]".join(set_to_packed(s) for s in team)
+
+
+if __name__ == "__main__":
+
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--teams",
+        required=True,
+    )
+
+    args = parser.parse_args()
+
+    predictor = TeamPredictor(args.teams, 1)
+
+    b = oak.Battle()
+    side = b.side(0)
+    side.pokemon(0).species = 124
+    res = predictor.find_all_matching(side)
+    print(len(res), "matching teams")
