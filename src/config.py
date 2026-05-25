@@ -7,6 +7,12 @@ from logging.handlers import RotatingFileHandler
 from typing import Optional, Literal
 
 
+class Policy(Enum):
+    argmax = 'x'
+    nash = 'n'
+    empirical = 'e'
+
+
 class CustomFormatter(logging.Formatter):
     def format(self, record):
         lvl = "{}".format(record.levelname)
@@ -80,31 +86,26 @@ class _Config:
     budget: str
     eval: str
     bandit: str
-    # TODO remove for 2D p1/p2 determinization
-    parallelism: int
+    # parallelism is derived as p1_types * p2_types in configure()
+    parallelism: int = 1
 
     run_count: int
-    # TODO change name to user_teams
-    # its a path to a teams file like Config.teams uses
-    # 
-    # For each iteration of the run.py battle loop we uniformly sample a team from list[Team] and that for the chall/ladder
-    team_name: str
-    # TODO put the parsed list in the main function an propogate it as needed (really only to Socket.set_team), dont put the loaded teams in the config!!
-    # TODO SYNTAX remove one below. Obselete due to above
-    team_list: str | None = None
+    # Path to teams file used for set predictor (opponent model).
+    # For each battle loop iteration we uniformly sample a team from this file
+    # and use it for the challenge/ladder request.
+    user_teams: str
+    # determinization grid dimensions
+    p1_types: int = 1
+    p2_types: int = 1
+    # policy_mode controls move selection from MCTS output
+    policy_mode: Policy = Policy.argmax
     user_to_challenge: str
     save_replay: SaveReplay
     room_name: str
     log_level: str
     log_to_file: bool
     stdout_log_handler: logging.StreamHandler
-    file_log_handler: Optional[CustomRotatingFileHandler]    
-
-    # TODO determinization, add to args and fill out the rest
-    p1_types :int = 1
-    p2_types :int = 1
-    # parallelism is p1 * p2
-    # INFO nash policy mode will solve bayes nash. Stub out this policy mode for now
+    file_log_handler: Optional[CustomRotatingFileHandler]
 
 
     def configure(self):
@@ -153,12 +154,6 @@ class _Config:
         )
 
         parser.add_argument(
-            "--search-parallelism",
-            type=int,
-            default=1,
-            help="Number of states to search in parallel",
-        )
-        parser.add_argument(
             "--run-count",
             type=int,
             default=1,
@@ -172,14 +167,28 @@ class _Config:
         parser.add_argument(
             "--team-name",
             default=None,
-            help="Which team to use. Can be a filename or a foldername relative to ./teams/teams/. "
-            "If a foldername, a random team from that folder will be chosen each battle. "
+            help="Which team to use (user_teams). Can be a filename or foldername relative to "
+            "./teams/teams/. If a foldername, a random team from that folder is chosen each battle. "
             "If not set, defaults to the --pokemon-format value.",
         )
         parser.add_argument(
-            "--team-list",
-            default=None,
-            help="A path to a text file containing a list of team names to choose from in order. Takes precedence over --team-name.",
+            "--p1-types",
+            type=int,
+            default=1,
+            help="Number of p1 determinization types (default: 1)",
+        )
+        parser.add_argument(
+            "--p2-types",
+            type=int,
+            default=1,
+            help="Number of p2 determinization types (default: 1)",
+        )
+        parser.add_argument(
+            "--policy-mode",
+            type=str,
+            default="x",
+            choices=["x", "n", "e"],
+            help="Move selection policy: x=argmax, n=nash, e=empirical (default: x)",
         )
         parser.add_argument(
             "--save-replay",
@@ -210,11 +219,13 @@ class _Config:
         self.budget = args.budget
         self.eval = args.eval
         self.bandit = args.bandit
-        self.parallelism = args.search_parallelism
+        self.p1_types = args.p1_types
+        self.p2_types = args.p2_types
+        self.parallelism = self.p1_types * self.p2_types
+        self.policy_mode = Policy(args.policy_mode)
         self.run_count = args.run_count
         self.teams = args.teams
-        self.team_name = args.team_name or self.format.value
-        self.team_list = args.team_list
+        self.user_teams = args.team_name or self.format.value
         self.user_to_challenge = args.user_to_challenge
         self.save_replay = SaveReplay[args.save_replay]
         self.room_name = args.room_name
