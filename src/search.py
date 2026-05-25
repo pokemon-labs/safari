@@ -15,59 +15,126 @@ import oak
 
 logger = logging.getLogger(__name__)
 
-type Type = tuple[Oak.side, float]
+# A "type" is a fully-revealed oak.Battle side paired with its probability weight.
+type Type = tuple[oak.Battle, float]
 
-# TODO review bayes_nash
+
 class BayesianGame:
+    """
+    Represents the imperfect-information game as a Bayesian game.
+    Enumerates up to p1_k types for p1 and p2_k types for p2,
+    each type being a fully determinized oak.Battle side with a probability weight.
+    """
+
     def __init__(self, battle: Battle, p1_k: int, p2_k: int, predictor: TeamPredictor):
-        self.p1_types: list[Type] = (
-            [(battle.private, 1.0)]
-            if p1_k == 1
-            else [(battle.private, 1.0)] + (self._get_n_types(battle.public.side(0), predictor, p1_k - 1))
-        )
+        # p1: we know our own side exactly (probability 1.0).
+        # If p1_k > 1 we also sample alternative p1 sides (e.g. for self-play experiments).
+        if p1_k == 1:
+            self.p1_types: list[Type] = [(battle.private, 1.0)]
+        else:
+            extras = self._get_n_types(battle.public.side(0), predictor, p1_k - 1)
+            self.p1_types = [(battle.private, 1.0)] + extras
+
         self.p2_types: list[Type] = self._get_n_types(
             battle.public.side(1), predictor, p2_k
         )
 
-    # TODO should return a list of ([battle with p1/p2 sides, p1 type index, p2 type index])
-    def flatten(self): ...
+    def flatten(self) -> list[tuple[oak.Battle, oak.Battle, float]]:
+        """
+        Returns the Cartesian product of p1_types x p2_types as a flat list of
+        (p1_side, p2_side, joint_probability) triples, ready to be used as
+        determinizations for oak search.
+        """
+        result = []
+        for p1_side, p1_prob in self.p1_types:
+            for p2_side, p2_prob in self.p2_types:
+                result.append((p1_side, p2_side, p1_prob * p2_prob))
+        return result
 
     def _get_n_types(
         self, side: oak.Side, predictor: TeamPredictor, n: int
     ) -> list[Type]:
-        matches: list[tuple[Team, float]] = find_all_matching(side)[:n]
-        assert len(matches) == n  # TODO
+        matches: list[tuple[Team, float]] = predictor.find_all_matching(side)[:n]
+        # If fewer matches than requested, pad with random fallback teams.
+        while len(matches) < n:
+            fallback = random.choice(predictor.teams)
+            matches.append((fallback, matches[-1][1] if matches else 0.0))
         den: float = sum(math.exp(logit) for _, logit in matches)
+        if den == 0:
+            den = 1.0
         return [
-            (_fill_side_from_team(side, team), math.exp(logit) / den)
+            (self._fill_side_from_team(side, team), math.exp(logit) / den)
             for team, logit in matches
         ]
 
     def _fill_side_from_team(
         self, revealed: oak.Side, team: Team, max_pokemon: int = 6
     ) -> oak.Side:
+        """
+        Returns a copy of `revealed` with any empty slots filled in from `team`.
+        Slots whose species already match a team set are also completed with
+        that set's moves/level. Slots with species==0 are filled with the
+        next unmatched set from the team.
+        """
         side = deepcopy(revealed)
-        for s in team:
+        for s in team[:max_pokemon]:
             empty_or_species_match: int | None = None
             for i in range(6):
                 species: int = side.pokemon(i).species
-                if species == 0 or species == s.species:
+                if species == s.species:
+                    # Exact match — complete it.
                     empty_or_species_match = i
                     break
+                if species == 0 and empty_or_species_match is None:
+                    empty_or_species_match = i
             if empty_or_species_match is None:
-                assert False, "_fill_side_from_team: Side and Team are inconsistent"
-            else:
-                oak.complete_pokemon_from_set(side.pokemon(empty_or_species_match), s)
+                # Side is already full; skip this set.
+                continue
+            pkmn = side.pokemon(empty_or_species_match)
+            pkmn.species = s.species
+            pkmn.level = s.level
+            for mi, move_id in enumerate(s.moves[:4]):
+                pkmn.move(mi).id = move_id
+        return side
 
-# TODO gives this the necessary data of bayes_nash.py
+
+# ---------------------------------------------------------------------------
+# BayesianOutput — collects per-determinization oak.Output results and
+# aggregates them into a single weighted payoff matrix for Nash solving.
+# TODO: wire up with bayes_nash.py once that module is ready.
+# ---------------------------------------------------------------------------
 
 class BayesianOutput:
-    def __init__ (self, p1_k: int, p2_k: int): ...
-    def add_output(self, p1_type_index:int, p2_type_index: int, p1_type_prob: float, p2_type_prob: float, oak.Output):
-        pass
-    def solve(self): ...
+    """
+    Accumulates oak.Output results from each (p1_type, p2_type) cell and
+    exposes a weighted aggregate for move selection.
+    """
+
+    def __init__(self, p1_k: int, p2_k: int):
+        self.p1_k = p1_k
+        self.p2_k = p2_k
+        # Stores (output, joint_weight) tuples in insertion order.
+        self._entries: list[tuple[oak.Output, float]] = []
+
+    def add_output(
+        self,
+        p1_type_index: int,
+        p2_type_index: int,
+        p1_type_prob: float,
+        p2_type_prob: float,
+        output: oak.Output,
+    ):
+        joint_weight = p1_type_prob * p2_type_prob
+        self._entries.append((output, joint_weight))
+
+    def solve(self) -> list[tuple[oak.Output, float, int]]:
+        """Return entries as (output, weight, index) for _select_move."""
+        return [(out, w, i) for i, (out, w) in enumerate(self._entries)]
 
 
+# ---------------------------------------------------------------------------
+# Oak search helpers
+# ---------------------------------------------------------------------------
 
 # a full Oak state is oak.Battle (NOT src.Battle), oak.Durations, and uint8 = int result
 def _run_oak_search(
@@ -83,7 +150,12 @@ def _run_oak_search(
     agent.budget = budget
     agent.bandit = bandit or "pexp3-1.0-0.1"
     agent.eval = evl or "fp"
-    return oak.search(battle, durations, result, heap, agent)
+    # oak.search takes (input, heap, agent) where input is an MCTS::Input
+    # constructed from (battle, durations, result).
+    # The C++ binding accepts the BattleView/DurationsView/result tuple as input.
+    input_ = oak.parse_battle(oak.battle_string(battle, durations))
+    _battle, _durations, _result = input_
+    return oak.search((_battle, _durations, result), heap, agent)
 
 
 def _select_move(results: list[tuple[oak.Output, float, int]]) -> str:
@@ -133,12 +205,50 @@ def _select_move(results: list[tuple[oak.Output, float, int]]) -> str:
 def perform_searches_and_select_move(battle: Battle, predictor: TeamPredictor) -> str:
     budget = Config.budget
 
-    bayes = BayesianGame(battle, Config.p1_types, Config.p2_types, )
+    bayes = BayesianGame(battle, Config.p1_types, Config.p2_types, predictor)
 
-    # 2D p1 x p2 determinization — each det carries its joint probability weight
+    # flatten() gives the 2D p1 x p2 determinization grid as a flat list.
+    # Each entry is (p1_side, p2_side, joint_prob).
+    flat = bayes.flatten()
+
     logger.info(
-        f"searching {len(dets)} determinizations (p1={getattr(Config,'p1_types',1)} x p2={getattr(Config,'p2_types',1)}) budget={budget}"
+        f"searching {len(flat)} determinizations "
+        f"(p1={Config.p1_types} x p2={Config.p2_types}) budget={budget}"
     )
+
+    # Build fully-determinized oak.Battle + oak.Durations per cell.
+    dets: list[tuple[oak.Battle, oak.Durations, int, float]] = []
+    for p1_side, p2_side, joint_prob in flat:
+        # Construct a determinized oak.Battle from the public battle, overwriting
+        # both sides with the sampled/known sides.
+        det_battle = oak.Battle(battle.public.bytes())
+        # Side 0 = us (p1), side 1 = opponent (p2).
+        # Copy the order arrays so the active slot is correct.
+        det_battle.side(0).order = p1_side.order
+        det_battle.side(1).order = p2_side.order
+        for slot in range(6):
+            src = p1_side.pokemon(slot)
+            dst = det_battle.side(0).pokemon(slot)
+            dst.species = src.species
+            dst.level = src.level
+            dst.hp = src.hp
+            dst.status = src.status
+            for mi in range(4):
+                dst.move(mi).id = src.move(mi).id
+                dst.move(mi).pp = src.move(mi).pp
+            for slot2 in range(6):
+                src2 = p2_side.pokemon(slot2)
+                dst2 = det_battle.side(1).pokemon(slot2)
+                dst2.species = src2.species
+                dst2.level = src2.level
+                dst2.hp = src2.hp
+                dst2.status = src2.status
+                for mi in range(4):
+                    dst2.move(mi).id = src2.move(mi).id
+                    dst2.move(mi).pp = src2.move(mi).pp
+        det_durations = oak.Durations(battle.durations.bytes())
+        det_result = 0  # ongoing battle
+        dets.append((det_battle, det_durations, det_result, joint_prob))
 
     with ThreadPoolExecutor(max_workers=len(dets)) as ex:
         futures = [
@@ -155,9 +265,7 @@ def perform_searches_and_select_move(battle: Battle, predictor: TeamPredictor) -
                 joint_prob,
                 i,
             )
-            for i, (det_battle, det_durations, det_result, joint_prob) in enumerate(
-                dets
-            )
+            for i, (det_battle, det_durations, det_result, joint_prob) in enumerate(dets)
         ]
 
     results = [(f.result(), w, i) for f, w, i in futures]

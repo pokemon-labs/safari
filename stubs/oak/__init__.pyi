@@ -1,52 +1,74 @@
 from typing import Any
+import numpy as np
 
 species_names: list[str]
 move_names: list[str]
 
+def species_id(number: int) -> str: ...
+def move_id(number: int) -> str: ...
+def id_to_species(species_id: str) -> int: ...
+def id_to_move(move_id: str) -> int: ...
+
 class Battle:
     turn: int
-    def __init__(self, data: bytes) -> None: ...
-    def side(self, i: int) -> SideProxy: ...
+    last_damage: int
+    rng: int
+    def __init__(self, data: bytes = ...) -> None: ...
+    def side(self, i: int) -> Side: ...
+    def bytes(self) -> bytes: ...
 
 class Durations:
-    def __init__(self, data: bytes) -> None: ...
+    def __init__(self, data: bytes = ...) -> None: ...
+    def get(self, side: int) -> Duration: ...
+    def bytes(self) -> bytes: ...
 
-class SideProxy:
+class Duration:
+    confusion: int
+    disable: int
+    attacking: int
+    binding: int
+    raw: int
+    def sleep(self, slot: int) -> int: ...
+    def set_sleep(self, slot: int, value: int) -> None: ...
+
+class Side:
     order: list[int]
-    def pokemon(self, i: int) -> PokemonProxy: ...
-    def active(self) -> ActivePokemonProxy: ...
-    def stored(self) -> PokemonProxy: ...
-    def slot(self, s: int) -> PokemonProxy: ...
+    last_selected_move: int
+    last_used_move: int
+    def pokemon(self, i: int) -> Pokemon: ...
+    def active(self) -> ActivePokemon: ...
+    def stored(self) -> Pokemon: ...
+    def slot(self, s: int) -> Pokemon: ...
 
-class PokemonProxy:
+class Pokemon:
     species: int
     level: int
     hp: int
     status: int
     types: int
-    def move(self, i: int) -> MoveSlotProxy: ...
-    def stats(self) -> StatsProxy: ...
+    def move(self, i: int) -> MoveSlot: ...
+    def stats(self) -> Stats: ...
     def species_name(self) -> str: ...
     def status_name(self) -> str: ...
-    def percent(self) -> float: ...
+    def percent(self) -> int: ...
 
-class ActivePokemonProxy(PokemonProxy):
-    def boosts(self) -> BoostsProxy: ...
-    def volatiles(self) -> VolatilesProxy: ...
+class ActivePokemon(Pokemon):
+    def boosts(self) -> Boosts: ...
+    def volatiles(self) -> Volatiles: ...
 
-class MoveSlotProxy:
+class MoveSlot:
     id: int
     pp: int
     def name(self) -> str: ...
 
-class StatsProxy:
+class Stats:
     hp: int
     atk: int
     def_: int
     spe: int
     spc: int
 
-class BoostsProxy:
+class Boosts:
     atk: int
     def_: int
     spe: int
@@ -55,7 +77,7 @@ class BoostsProxy:
     eva: int
     raw: int
 
-class VolatilesProxy:
+class Volatiles:
     bide: bool
     thrashing: bool
     multi_hit: bool
@@ -85,14 +107,30 @@ class VolatilesProxy:
     state: int
 
 class Output:
-    p1_empirical: list[float]
+    p1_empirical: np.ndarray  # shape (9,)
+    p2_empirical: np.ndarray  # shape (9,)
+    p1_prior: np.ndarray      # shape (9,)
+    p2_prior: np.ndarray      # shape (9,)
+    p1_nash: np.ndarray       # shape (9,)
+    p2_nash: np.ndarray       # shape (9,)
+    visit_matrix: np.ndarray  # shape (9, 9)
+    value_matrix: np.ndarray  # shape (9, 9)
+    empirical_value: float
+    nash_value: float
+    iterations: int
+    duration_ms: int
 
-class Heap: ...
+class Heap:
+    def empty(self) -> bool: ...
+    def type(self) -> str: ...
 
 class Agent:
     budget: str
     bandit: str
     eval: str
+    discrete: bool
+    matrix_ucb: bool
+    table: bool
 
 class Set:
     species: int
@@ -100,6 +138,26 @@ class Set:
     moves: list[int]
 
 def search(
-    battle: Battle, durations: Durations, heap: Heap, agent: Agent
+    input: tuple[Battle, Durations, int],
+    heap: Heap,
+    agent: Agent,
+    output: Output = ...,
 ) -> Output: ...
+
+def parse_battle(
+    battle_string: str, seed: int = ...
+) -> tuple[Battle, Durations, int]: ...
+
+def update(
+    battle: Battle, durations: Durations, c1: int, c2: int
+) -> int: ...
+
+def battle_string(battle: Battle, durations: Durations) -> str: ...
+
+def format(battle: Battle, durations: Durations, output: Output) -> str: ...
+
+def solve_matrix(
+    row_payoff: np.ndarray, discretize_factor: int = ...
+) -> tuple[np.ndarray, np.ndarray, float]: ...
+
 def load_teams(path: str) -> list[list[Set]]: ...

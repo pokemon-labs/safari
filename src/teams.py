@@ -28,12 +28,11 @@ def side_to_team(side: oak.Side) -> Team:
     return tuple(pokemon_to_set(side.pokemon(_)) for _ in range(6))
 
 
-# a is partial of b
+# a is partial of b: every non-empty slot in a has a matching species in b
 def matches(a: Team, b: Team) -> bool:
-    return all(s.species == 0 or any(s < t for t in b) for s in a)
+    return all(s.species == 0 or any(s.species == t.species for t in b) for s in a)
 
 
-# TODO replace all self.policy with self.logits
 class TeamPredictor:
 
     def __init__(self, path: str, first_to_last_ratio: float = 0.01) -> None:
@@ -46,7 +45,7 @@ class TeamPredictor:
 
         n = len(self.teams)
         if n == 1:
-            self.policy: list[float] = [0.0]
+            self.logits: list[float] = [0.0]
         else:
             step = math.log(first_to_last_ratio) / (n - 1)
             self.logits = [step * i for i in range(n)]
@@ -90,9 +89,9 @@ class TeamPredictor:
         return [(synthetic, 1.0)]
 
 
-def set_to_packed(self: oak.Set) -> str:
-    moves = ",".join(oak.move_id(m) for m in self.moves if m)
-    return f"{oak.species_id(self.species)}||||" f"{moves}||||||" f"{self.level}|"
+def set_to_packed(s: oak.Set) -> str:
+    moves = ",".join(oak.move_id(m) for m in s.moves if m)
+    return f"{oak.species_id(s.species)}||||" f"{moves}||||||" f"{s.level}|"
 
 
 def to_packed(team: Team) -> str:
