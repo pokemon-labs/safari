@@ -34,12 +34,27 @@ from copy import deepcopy
 from dataclasses import dataclass
 
 import src.constants as constants
-from src.helpers import normalize_name
 
 logger = logging.getLogger(__name__)
 
 import oak
 
+def normalize_name(name):
+    return (
+        name.replace(" ", "")
+        .replace("-", "")
+        .replace(".", "")
+        .replace("'", "")
+        .replace("%", "")
+        .replace("*", "")
+        .replace(":", "")
+        .replace("(", "")
+        .replace(")", "")
+        .strip()
+        .lower()
+        .encode("ascii", "ignore")
+        .decode("utf-8")
+    )
 
 WRAP_MOVES = {"wrap", "firespin"}
 

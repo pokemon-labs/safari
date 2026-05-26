@@ -38,3 +38,6 @@ print("_")
 check_matching(p2_matching)
 
 predictor.sets.print()
+
+# TODO initialize search.Player, Search
+# The underlying sets and number of types should just be the first 2 matches

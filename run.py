@@ -22,8 +22,7 @@ import websockets.asyncio.client
 
 import src.constants as constants
 from src.config import Config, SaveReplay, BotModes, Format, init_logging
-from src.battle import PSBattle, Player
-from src.helpers import normalize_name
+from src.battle import Battle, Player
 from src.search import perform_searches_and_select_move
 from src.teams import TeamPredictor, to_packed
 
@@ -205,29 +204,7 @@ class PSWebsocketClient:
 
 
 def _format_decision(battle: Battle, decision: str) -> list[str]:
-    if decision.startswith(constants.SWITCH_STRING + " "):
-        switch_name = normalize_name(decision.split("switch ", 1)[-1])
-        # name_to_slot[0]: species_name -> storage_idx
-        storage_idx = battle._name_to_slot[0].get(switch_name)
-        slot = None
-        if storage_idx is not None:
-            our_side = battle.public.side(0)
-            order = our_side.order
-            for pos, idx in enumerate(order):
-                if idx == storage_idx:
-                    slot = (
-                        pos + 1
-                    )  # showdown 1-indexed; pos 0 = active (can't switch to)
-                    break
-        if slot is None:
-            logger.warning(
-                f"switch slot not found for {switch_name!r}, defaulting to 2"
-            )
-            slot = 2
-        message = f"/choose switch {slot}"
-    else:
-        message = f"/choose {decision}"
-    return [message, str(battle.rqid)]
+    return [decision, str(battle.rqid)]
 
 
 def _battle_finished(tag: str, msg: str) -> bool:
