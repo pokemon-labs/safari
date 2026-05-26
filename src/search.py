@@ -83,8 +83,11 @@ class Search:
         return [(i, j) for i in range(self.p1.n) for j in range(self.p2.n)]
 
     def init_battles(self):
-        # TODO set self.battles[i, j] to be a deep copy of self.battle.public
-        # then for p1, p2 members call modify on their sides
+        for i, j in self.indices():
+            b = oak.Battle(self.battle.public.bytes())
+            self.p1.modify(i, b.side(0))
+            self.p2.modify(j, b.side(1))
+            self.battles[(i, j)] = b
 
     def run_searches(self):
         with ThreadPoolExecutor(max_workers=Config.paralellism) as ex:
@@ -93,8 +96,8 @@ class Search:
                     ex.submit(
                         oak.search,
                         self.battles[(i, j)],
-                        battle.durations,
-                        battle.result,
+                        self.battle.durations,
+                        self.battle.result,
                         oak.Heap(),
                         get_agent(self.p1, self.p2, i, j)
                     ),
@@ -104,36 +107,48 @@ class Search:
             ]
         for future, pair in futures:
             self.outputs[pair] = future.result()
-        
+
         # assert each type has a well defined number of actions
-        # TODO also assert that the output.p1/p2_choices are equal for all 9 padded entries and in the same order
-        # TODO also comput self.p1/p2_actions which are the self.outputs(i, 0).m and similar for p2
+        # and that p1/p2 choices are consistent across types
         for i in range(self.p1.n):
             for j in range(self.p2.n):
                 assert self.outputs[(i, j)].m == self.outputs[(i, 0)].m
                 assert self.outputs[(i, j)].n == self.outputs[(0, j)].n
+                ref_p1 = self.outputs[(i, 0)].p1_empirical
+                ref_p2 = self.outputs[(0, j)].p2_empirical
+                cur_p1 = self.outputs[(i, j)].p1_empirical
+                cur_p2 = self.outputs[(i, j)].p2_empirical
+                assert np.array_equal(ref_p1 > 0, cur_p1 > 0), \
+                    f"p1 choices differ at ({i},{j}) vs ({i},0)"
+                assert np.array_equal(ref_p2 > 0, cur_p2 > 0), \
+                    f"p2 choices differ at ({i},{j}) vs (0,{j})"
+
+        # compute p1/p2 action counts per type
+        self.p1_actions = [self.outputs[(i, 0)].m for i in range(self.p1.n)]
+        self.p2_actions = [self.outputs[(0, j)].n for j in range(self.p2.n)]
 
     def solve(self):
 
-        p1 = src.bayes_nash.Player(
-            [self.outputs[(i, 0)].m for i in range(self.p1.n)],
-            self.p1.omega
-        )
-        p2 = src.bayes_nash.Player(
-            [self.outputs[(0, j)].n for j in range(self.p2.n)],
-            self.p2.omega
-        )
-        matrices = None
-        # TODO convert each output.empirical matrix into an appropriate np matrix for bayes_nash.Solver
+        p1 = src.bayes_nash.Player(self.p1_actions, self.p1.omega)
+        p2 = src.bayes_nash.Player(self.p2_actions, self.p2.omega)
+
+        # Convert each output's empirical visit_matrix into a payoff matrix for bayes_nash.Solver.
+        # visit_matrix is shape (9,9) with joint visit counts; value_matrix holds p1 values.
+        # We slice to [m, n] actual actions and normalize rows to get an empirical payoff estimate.
+        matrices = {}
         for i, j in self.indices():
-            pass
-        solver = src.bayles_nash.solver(p1, p2, matrices)
+            out = self.outputs[(i, j)]
+            m = self.p1_actions[i]
+            n = self.p2_actions[j]
+            matrices[(i, j)] = out.value_matrix[:m, :n]
+
+        solver = src.bayes_nash.Solver(p1, p2, matrices)
         (
-            p1_avg
+            p1_avg,
             p2_avg,
             p1_cur,
             p2_cur,
-        ) = solver.run(10000, 1.0, 1.0) # These are real
+        ) = solver.run(10000, 1.0, 1.0)
         # These are 4 numpy arrays with padded policies over each players types
         return (p1_avg, p2_avg)
 
