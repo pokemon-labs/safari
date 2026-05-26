@@ -7,8 +7,9 @@ from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 
 from src.config import Config, Policy
-from src.battle import Battle
+from src.battle import PSBattle
 from src.teams import TeamPredictor, Team, side_to_team
+from src.bayes_nash import Solver, Player
 
 import numpy as np
 import oak
@@ -18,126 +19,52 @@ logger = logging.getLogger(__name__)
 # A "type" is a fully-revealed oak.Battle side paired with its probability weight.
 type Type = tuple[Team, float]
 
-
-class BayesianGame:
-
-    def __init__(self, battle: Battle, p1_k: int, p2_k: int, predictor: TeamPredictor):
-        self.p1_k = p1_k
-        self.p2_k = p2_k
-        if p1_k == 1:
-            self.p1_types: list[Type] = [(side_to_team(battle.private.side(0)), 1.0)]
-        else:
-            real_weight: float = 0.2
-            not_real_weight: float = 1 - real_weight
-            extras = self._get_n_types(
-                battle.public.side(0), predictor, p1_k - 1, not_real_weight
-            )
-            self.p1_types = [(side_to_team(battle.private), real_weight)] + extras
-        self.p2_types: list[Type] = self._get_n_types(
-            battle.public.side(1), predictor, p2_k
-        )
-
-    def flatten(self) -> list[oak.Battle, int, int]:
-        pass
-
-    def _get_n_types(
-        self, side: oak.Side, predictor: TeamPredictor, n: int, weight: float = 1
-    ) -> list[Type]:
-        matches: list[tuple[Team, float]] = predictor.find_all_matching(side)[:n]
-        # If fewer matches than requested, pad with random fallback teams.
-        while len(matches) < n:
-            fallback = random.choice(predictor.teams)
-            matches.append((fallback, matches[-1][1] if matches else 0.0))
-        den: float = sum(math.exp(logit) for _, logit in matches)
-        return [(team, weight * math.exp(logit) / den) for team, logit in matches]
-
-    def _fill_side_from_team(
-        self, revealed: oak.Side, team: Team, max_pokemon: int = 6
-    ) -> oak.Side:
-        """
-        Returns a copy of `revealed` with any empty slots filled in from `team`.
-        Slots whose species already match a team set are also completed with
-        that set's moves/level. Slots with species==0 are filled with the
-        next unmatched set from the team.
-        """
-        side = deepcopy(revealed)
-        for s in team[:max_pokemon]:
-            empty_or_species_match: int | None = None
-            for i in range(6):
-                species: int = side.pokemon(i).species
-                if species == s.species:
-                    # Exact match — complete it.
-                    empty_or_species_match = i
-                    break
-                if species == 0 and empty_or_species_match is None:
-                    empty_or_species_match = i
-            if empty_or_species_match is None:
-                # Side is already full; skip this set.
-                continue
-            pkmn = side.pokemon(empty_or_species_match)
-            pkmn.species = s.species
-            pkmn.level = s.level
-            for mi, move_id in enumerate(s.moves[:4]):
-                pkmn.move(mi).id = move_id
-        return side
-
-
-# ---------------------------------------------------------------------------
-# BayesianOutput — collects per-determinization oak.Output results and
-# aggregates them into a single weighted payoff matrix for Nash solving.
-# TODO: wire up with bayes_nash.py once that module is ready.
-# ---------------------------------------------------------------------------
-
-
-class BayesianOutput:
+class Player:
     """
-    Accumulates oak.Output results from each (p1_type, p2_type) cell and
-    exposes a weighted aggregate for move selection.
+    An object that stores the type info as POD and handles 
+    
     """
+    def __init__(self, side: oak.Side types: list[Team], omega: list[float]) -> None:
+        self.side: oak.Side = side
 
-    def __init__(self, p1_k: int, p2_k: int):
-        self.p1_k = p1_k
-        self.p2_k = p2_k
-        # Stores (output, joint_weight) tuples in insertion order.
-        self._entries: list[tuple[oak.Output, float]] = []
-
-    def add_output(
-        self,
-        p1_type_index: int,
-        p2_type_index: int,
-        p1_type_prob: float,
-        p2_type_prob: float,
-        output: oak.Output,
-    ):
-        joint_weight = p1_type_prob * p2_type_prob
-        self._entries.append((output, joint_weight))
-
-    def solve(self) -> list[tuple[oak.Output, float, int]]:
-        """Return entries as (output, weight, index) for _select_move."""
-        return [(out, w, i) for i, (out, w) in enumerate(self._entries)]
+    def modify(self, type_index : int, dest: oak.Side) -> None:
 
 
-# ---------------------------------------------------------------------------
-# Oak search helpers
-# ---------------------------------------------------------------------------
-
-
-# a full Oak state is oak.Battle (NOT src.Battle), oak.Durations, and uint8 = int result
-def _run_oak_search(
-    battle: oak.Battle,
-    durations: oak.Durations,
-    result: int,
-    budget: str,
-    evl: str,
-    bandit: str,
-) -> oak.Output:
-    heap = oak.Heap()
+def get_agent(p1: Player, p2: Player, t1: int, t2: int) -> Oak.Agent:
+    """
+    This information tells us the teams and also the probs
+    So we can set search budget in particular
+    Maybe less iterations for unlikely stuff? Etc
+    More iterations for the p1 type 0 (our actual team)
+    """
     agent = oak.Agent()
-    agent.budget = budget
-    agent.bandit = bandit or "pexp3-1.0-0.1"
-    agent.eval = evl or "fp"
-    return oak.search(battle, durations, result, heap, agent)
+    agent.bandit = "ucb-1.0"
+    agent.eval = "fp"
+    agent.budget = "3000ms"
+    return agent
 
+
+def copy_and_determinize(public: Oak.battle, p1: Player, p2: Player, t1: int, t2: int) -> Oak.Battle:
+    battle = deepcopy(public)
+    p1.modify(t1, battle.side(0))
+    p2.modify(t2, battle.side(1))
+    return battle
+
+def determinize_and_search(b: Battle, p1: Player, p2: Player, t1: int, t2: int) -> Oak.Output:
+    battle = copy_and_determinize(b.public, p1, p2, t1, t2)
+    heap = oak.Heap()
+    agent = get_agent(p1, p2, t1, t2)
+    output = oak.search(battle, b.durations, b.result, heap, agent)
+    return output
+
+
+class Search:
+    def __init__(self, b: Battle, p1: Player, p2: Player) -> None:
+        self.battle = b
+        self.p1 = p1
+        self.p2 = p2
+    
+    def solver(self,) -> bayes_nash.Solver
 
 def _select_move(results: list[tuple[oak.Output, float, int]]) -> str:
     mode = getattr(Config, "policy_mode", Policy.argmax)

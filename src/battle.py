@@ -64,7 +64,7 @@ _STAT_ABBREV_TO_BOOST_PROP = {
 
 
 @dataclass
-class Player:
+class PSPlayer:
     user: str = ""
     avatar: int | None = None
     rating: int | None = None
@@ -87,8 +87,8 @@ def _move_id(name: str) -> int:
     return 0
 
 
-class Battle:
-    def __init__(self, tag: str, p1: Player, p2: Player):
+class PSBattle:
+    def __init__(self, tag: str, p1: PSPlayer, p2: PSPlayer):
         self.tag = tag
         self.p1 = p1  # us — always p1
         self.p2 = p2  # opponent — always p2

@@ -10,8 +10,23 @@ from collections import defaultdict
 import oak
 
 type Team = tuple[oak.Set]
+type Species = int
+type Move = int
 
 # Helpers
+
+
+def set_to_packed(s: oak.Set) -> str:
+    moves = ",".join(oak.move_id(m) for m in s.moves if m)
+    return f"{oak.species_id(s.species)}||||" f"{moves}||||||" f"{s.level}|"
+
+
+def to_packed(team: Team) -> str:
+    """
+    Showdown protocol, used to set our team before the Battle
+    """
+    return "]".join(set_to_packed(s) for s in team)
+
 
 def set_to_string(s: oak.Set):
     return f"{oak.species_id(s.species)}{s.species} " + " ".join(
@@ -23,13 +38,14 @@ def team_to_string(team: Team):
     return "; ".join([set_to_string(s) for s in team])
 
 
-def sorted_team(team: list[oak.Set]) -> list[oak.Set]:
+def sorted_team(t: list[oak.Set]) -> tuple[oak.Set]:
     """
-    The oak.Set's from oak.load_teams have soreted move sets already.
+    The oak.Sets from oak.load_teams have sorted move sets already.
     So we just have to sort the bench by species to get uniqueness of representation
     """
+    team = deepcopy(t)
     team[1:] = sorted(team[1:], key=lambda s: s.species)
-    return team
+    return tuple(team)
 
 
 def pokemon_to_set(pokemon: oak.Pokemon) -> oak.Set:
@@ -65,7 +81,11 @@ class SetDict:
         self.sets: dict[oak.Set, float] = defaultdict(lambda: 0)
 
     def print(self) -> None:
-        for s, p in sorted([(s, p) for s, p in self.sets.items()], key=lambda pair : pair[1], reverse=True):
+        for s, p in sorted(
+            [(s, p) for s, p in self.sets.items()],
+            key=lambda pair: pair[1],
+            reverse=True,
+        ):
             print(f"{set_to_string(s)} : {p}")
 
     def renormalize(self) -> None:
@@ -124,34 +144,3 @@ class TeamPredictor:
             if matches(t, team):
                 result.append((team, logit))
         return result
-
-    def _uniform_all(self) -> list[tuple[Team, float]]:
-        """Return all teams with uniform weight (no observations)."""
-        n = len(self.teams)
-        return [(team, 1.0 / n) for team in self.teams]
-
-    def _determinize_from_thin_air(
-        self, observed: list[oak.Set]
-    ) -> list[tuple[Team, float]]:
-        """No pool team matched. Build a synthetic team from the observed pokemon
-        and pad the remaining slots with randomly sampled sets from the full corpus."""
-        observed_species = {p.species for p in observed}
-        pool_of_sets: list[oak.Set] = [
-            s for team in self.teams for s in team if s.species not in observed_species
-        ]
-        n_missing = 6 - len(observed)
-        if n_missing > 0 and pool_of_sets:
-            padding = random.sample(pool_of_sets, min(n_missing, len(pool_of_sets)))
-        else:
-            padding = []
-        synthetic: Team = tuple(list(observed) + padding)
-        return [(synthetic, 1.0)]
-
-
-def set_to_packed(s: oak.Set) -> str:
-    moves = ",".join(oak.move_id(m) for m in s.moves if m)
-    return f"{oak.species_id(s.species)}||||" f"{moves}||||||" f"{s.level}|"
-
-
-def to_packed(team: Team) -> str:
-    return "]".join(set_to_packed(s) for s in team)

@@ -22,7 +22,7 @@ import websockets.asyncio.client
 
 import src.constants as constants
 from src.config import Config, SaveReplay, BotModes, Format, init_logging
-from src.battle import Battle, Player
+from src.battle import PSBattle, Player
 from src.helpers import normalize_name
 from src.search import perform_searches_and_select_move
 from src.teams import TeamPredictor, to_packed
