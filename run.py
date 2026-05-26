@@ -238,11 +238,11 @@ def _battle_finished(tag: str, msg: str) -> bool:
     )
 
 
-async def _pick_move(battle: Battle) -> list[str]:
+async def _pick_move(battle: Battle, predictor: TeamPredictor) -> list[str]:
     loop = asyncio.get_event_loop()
     with concurrent.futures.ThreadPoolExecutor() as pool:
         decision = await loop.run_in_executor(
-            pool, perform_searches_and_select_move, deepcopy(battle)
+            pool, perform_searches_and_select_move, deepcopy(battle), predictor
         )
     return _format_decision(battle, decision)
 
@@ -275,7 +275,9 @@ async def _wait_for_first_request(client: PSWebsocketClient, battle: Battle) -> 
                 return
 
 
-async def _run_battle(client: PSWebsocketClient, fmt: Format) -> str | None:
+async def _run_battle(
+    client: PSWebsocketClient, fmt: Format, predictor: TeamPredictor
+) -> str | None:
     tag, opp_name = await _get_battle_tag_and_opponent(client)
 
     p1 = Player(user=Config.username)
@@ -324,7 +326,7 @@ async def _run_battle(client: PSWebsocketClient, fmt: Format) -> str | None:
     await client.send_message(tag, ["/timer on"])
 
     if not battle.wait:
-        move = await _pick_move(battle)
+        move = await _pick_move(battle, predictor)
         await client.send_message(tag, move)
 
     # main battle loop
@@ -349,7 +351,7 @@ async def _run_battle(client: PSWebsocketClient, fmt: Format) -> str | None:
 
         action_required = battle.update(msg)
         if action_required and not battle.wait:
-            move = await _pick_move(battle)
+            move = await _pick_move(battle, predictor)
             await client.send_message(tag, move)
 
 
@@ -393,7 +395,7 @@ async def main() -> None:
         else:
             raise ValueError(f"unknown bot mode: {mode}")
 
-        winner = await _run_battle(client, Config.format)
+        winner = await _run_battle(client, Config.format, predictor)
 
         if winner == Config.username:
             wins += 1

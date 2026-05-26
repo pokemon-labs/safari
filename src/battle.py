@@ -151,15 +151,15 @@ class Battle:
 
     def actives(self, split_msg):
         u_pub, u_priv, o_pub, o_priv = self.sides(split_msg)
-        return u_pub.active(), u_priv.active(), o_pub.active(), o_priv.active()
+        return u_pub.active, u_priv.active, o_pub.active, o_priv.active
 
     def volatiles(self, split_msg):
         u_pub, u_priv, o_pub, o_priv = self.sides(split_msg)
         return (
-            u_pub.active().volatiles(),
-            u_priv.active().volatiles(),
-            o_pub.active().volatiles(),
-            o_priv.active().volatiles(),
+            u_pub.active.volatiles(),
+            u_priv.active.volatiles(),
+            o_pub.active.volatiles(),
+            o_priv.active.volatiles(),
         )
 
     # -----------------------------------------------------------------------
@@ -289,7 +289,7 @@ class Battle:
         if not prop:
             return
         for battle in (self.public, self.private):
-            b = battle.side(side_idx).active().boosts()
+            b = battle.side(side_idx).active.boosts()
             cur = getattr(b, prop)
             setattr(b, prop, max(-6, min(6, cur + delta)))
 
@@ -298,25 +298,25 @@ class Battle:
         if not prop:
             return
         for battle in (self.public, self.private):
-            b = battle.side(side_idx).active().boosts()
+            b = battle.side(side_idx).active.boosts()
             setattr(b, prop, max(-6, min(6, value)))
 
     def _clear_boosts(self, side_idx: int):
         for battle in (self.public, self.private):
-            b = battle.side(side_idx).active().boosts()
+            b = battle.side(side_idx).active.boosts()
             b.atk = b.def_ = b.spe = b.spc = b.acc = b.eva = 0
 
     def _set_vol(self, side_idx: int, **kwargs):
         for battle in (self.public, self.private):
-            v = battle.side(side_idx).active().volatiles()
+            v = battle.side(side_idx).active.volatiles()
             for attr, val in kwargs.items():
                 setattr(v, attr, val)
 
     def _clear_switch_volatiles(self, side_idx: int):
         for battle in (self.public, self.private):
-            v = battle.side(side_idx).active().volatiles()
+            v = battle.side(side_idx).active.volatiles()
             v.bits = 0
-            b = battle.side(side_idx).active().boosts()
+            b = battle.side(side_idx).active.boosts()
             b.atk = b.def_ = b.spe = b.spc = b.acc = b.eva = 0
         self._bind_turns[side_idx] = 0
 
@@ -418,7 +418,7 @@ class Battle:
         if side_idx == 1 and move_name and move_name != "struggle":
             mid = _move_id(move_name)
             for battle in (self.public, self.private):
-                act = battle.side(1).active()
+                act = battle.side(1).active
                 for mi in range(4):
                     slot = act.move(mi)
                     if slot.id == mid:
@@ -450,7 +450,7 @@ class Battle:
     def clearnegativeboost(self, split_msg):
         side_idx = 1 if self._is_opponent(split_msg) else 0
         for battle in (self.public, self.private):
-            b = battle.side(side_idx).active().boosts()
+            b = battle.side(side_idx).active.boosts()
             for attr in ("atk", "def_", "spe", "spc", "acc", "eva"):
                 if getattr(b, attr) < 0:
                     setattr(b, attr, 0)
@@ -501,7 +501,7 @@ class Battle:
             self._set_vol(side_idx, mist=True)
         elif vol == constants.SUBSTITUTE:
             for battle in (self.public, self.private):
-                act = battle.side(side_idx).active()
+                act = battle.side(side_idx).active
                 v = act.volatiles()
                 v.substitute = True
                 v.substitute_hp = act.stats().hp // 4
@@ -553,14 +553,14 @@ class Battle:
         self._set_vol(side_idx, transform=True)
 
         for battle in (self.public, self.private):
-            sb = battle.side(side_idx).active().boosts()
-            ob = battle.side(other_idx).active().boosts()
+            sb = battle.side(side_idx).active.boosts()
+            ob = battle.side(other_idx).active.boosts()
             sb.atk = ob.atk
             sb.def_ = ob.def_
             sb.spe = ob.spe
             sb.spc = ob.spc
-            v = battle.side(side_idx).active().volatiles()
-            v.transform_species = battle.side(other_idx).active().species & 0xF
+            v = battle.side(side_idx).active.volatiles()
+            v.transform_species = battle.side(other_idx).active.species & 0xF
 
     def activate(self, split_msg):
         side_idx = 1 if self._is_opponent(split_msg) else 0
@@ -593,7 +593,7 @@ class Battle:
         if reason == constants.PARALYZED:
             # gen1: full paralysis releases partial trap on other side
             for battle in (self.public, self.private):
-                ov = battle.side(other_idx).active().volatiles()
+                ov = battle.side(other_idx).active.volatiles()
                 if ov.binding:
                     ov.binding = False
                     self._bind_turns[other_idx] = 0

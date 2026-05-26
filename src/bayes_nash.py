@@ -1,3 +1,14 @@
+# TODO turn this into a minimal and modern PyPI package
+# 
+
+# The argparse should be moved away from the file that downstream users will import
+# Instead this function should probably be moved to a testing suite?
+# My first thought was '-m' but why would a user want to solve ranomd games lol
+# Please critisize the below comments. Idk Python. You are trained on good and small python libs
+# I think we need a toml but no setup.py?
+# Yeah syrely all the actuall programs are tests and should be made internal tests
+
+
 import numpy as np
 from typing import Dict, List
 import argparse
@@ -76,6 +87,7 @@ parser.add_argument(
     default=2,
     help="Max actions for both players",
 )
+
 
 def add_player_args(parser, prefix: str):
     parser.add_argument(

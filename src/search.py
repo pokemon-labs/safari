@@ -8,7 +8,7 @@ from copy import deepcopy
 
 from src.config import Config, Policy
 from src.battle import Battle
-from src.teams import TeamPredictor, Team
+from src.teams import TeamPredictor, Team, side_to_team
 
 import numpy as np
 import oak
@@ -16,43 +16,31 @@ import oak
 logger = logging.getLogger(__name__)
 
 # A "type" is a fully-revealed oak.Battle side paired with its probability weight.
-type Type = tuple[oak.Battle, float]
+type Type = tuple[Team, float]
 
 
 class BayesianGame:
-    """
-    Represents the imperfect-information game as a Bayesian game.
-    Enumerates up to p1_k types for p1 and p2_k types for p2,
-    each type being a fully determinized oak.Battle side with a probability weight.
-    """
 
     def __init__(self, battle: Battle, p1_k: int, p2_k: int, predictor: TeamPredictor):
-        # p1: we know our own side exactly (probability 1.0).
-        # If p1_k > 1 we also sample alternative p1 sides (e.g. for self-play experiments).
+        self.p1_k = p1_k
+        self.p2_k = p2_k
         if p1_k == 1:
-            self.p1_types: list[Type] = [(battle.private, 1.0)]
+            self.p1_types: list[Type] = [(side_to_team(battle.private.side(0)), 1.0)]
         else:
-            extras = self._get_n_types(battle.public.side(0), predictor, p1_k - 1)
-            self.p1_types = [(battle.private, 1.0)] + extras
-
+            real_weight: float = .2
+            not_real_weight: float = 1 - real_weight
+            extras = self._get_n_types(battle.public.side(0), predictor, p1_k - 1, not_real_weight)
+            self.p1_types = [(side_to_team(battle.private), real_weight)] + extras
         self.p2_types: list[Type] = self._get_n_types(
             battle.public.side(1), predictor, p2_k
         )
 
-    def flatten(self) -> list[tuple[oak.Battle, oak.Battle, float]]:
-        """
-        Returns the Cartesian product of p1_types x p2_types as a flat list of
-        (p1_side, p2_side, joint_probability) triples, ready to be used as
-        determinizations for oak search.
-        """
-        result = []
-        for p1_side, p1_prob in self.p1_types:
-            for p2_side, p2_prob in self.p2_types:
-                result.append((p1_side, p2_side, p1_prob * p2_prob))
-        return result
+    def flatten(self) -> list[oak.Battle, int, int]:
+
+        for i in range(self.p1_k)
 
     def _get_n_types(
-        self, side: oak.Side, predictor: TeamPredictor, n: int
+        self, side: oak.Side, predictor: TeamPredictor, n: int, weight: float = 1
     ) -> list[Type]:
         matches: list[tuple[Team, float]] = predictor.find_all_matching(side)[:n]
         # If fewer matches than requested, pad with random fallback teams.
@@ -60,10 +48,8 @@ class BayesianGame:
             fallback = random.choice(predictor.teams)
             matches.append((fallback, matches[-1][1] if matches else 0.0))
         den: float = sum(math.exp(logit) for _, logit in matches)
-        if den == 0:
-            den = 1.0
         return [
-            (self._fill_side_from_team(side, team), math.exp(logit) / den)
+            (team, weight * math.exp(logit) / den)
             for team, logit in matches
         ]
 
@@ -104,6 +90,7 @@ class BayesianGame:
 # TODO: wire up with bayes_nash.py once that module is ready.
 # ---------------------------------------------------------------------------
 
+
 class BayesianOutput:
     """
     Accumulates oak.Output results from each (p1_type, p2_type) cell and
@@ -135,6 +122,7 @@ class BayesianOutput:
 # ---------------------------------------------------------------------------
 # Oak search helpers
 # ---------------------------------------------------------------------------
+
 
 # a full Oak state is oak.Battle (NOT src.Battle), oak.Durations, and uint8 = int result
 def _run_oak_search(
@@ -213,7 +201,7 @@ def perform_searches_and_select_move(battle: Battle, predictor: TeamPredictor) -
 
     # Build fully-determinized oak.Battle + oak.Durations per cell.
     dets: list[tuple[oak.Battle, oak.Durations, int, float]] = []
-    for p1_side, p2_side, joint_prob in flat:
+    for (p1_side, p), (p2_side, q), joint_prob in flat:
         # Construct a determinized oak.Battle from the public battle, overwriting
         # both sides with the sampled/known sides.
         det_battle = oak.Battle(battle.public.bytes())
@@ -260,7 +248,9 @@ def perform_searches_and_select_move(battle: Battle, predictor: TeamPredictor) -
                 joint_prob,
                 i,
             )
-            for i, (det_battle, det_durations, det_result, joint_prob) in enumerate(dets)
+            for i, (det_battle, det_durations, det_result, joint_prob) in enumerate(
+                dets
+            )
         ]
 
     results = [(f.result(), w, i) for f, w, i in futures]

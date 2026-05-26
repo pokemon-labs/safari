@@ -109,10 +109,10 @@ class Volatiles:
 class Output:
     p1_empirical: np.ndarray  # shape (9,)
     p2_empirical: np.ndarray  # shape (9,)
-    p1_prior: np.ndarray      # shape (9,)
-    p2_prior: np.ndarray      # shape (9,)
-    p1_nash: np.ndarray       # shape (9,)
-    p2_nash: np.ndarray       # shape (9,)
+    p1_prior: np.ndarray  # shape (9,)
+    p2_prior: np.ndarray  # shape (9,)
+    p1_nash: np.ndarray  # shape (9,)
+    p2_nash: np.ndarray  # shape (9,)
     visit_matrix: np.ndarray  # shape (9, 9)
     value_matrix: np.ndarray  # shape (9, 9)
     empirical_value: float
@@ -145,21 +145,13 @@ def search(
     agent: Agent,
     output: Output = ...,
 ) -> Output: ...
-
 def parse_battle(
     battle_string: str, seed: int = ...
 ) -> tuple[Battle, Durations, int]: ...
-
-def update(
-    battle: Battle, durations: Durations, c1: int, c2: int
-) -> int: ...
-
+def update(battle: Battle, durations: Durations, c1: int, c2: int) -> int: ...
 def battle_string(battle: Battle, durations: Durations) -> str: ...
-
 def format(battle: Battle, durations: Durations, output: Output) -> str: ...
-
 def solve_matrix(
     row_payoff: np.ndarray, discretize_factor: int = ...
 ) -> tuple[np.ndarray, np.ndarray, float]: ...
-
 def load_teams(path: str) -> list[list[Set]]: ...
