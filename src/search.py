@@ -9,7 +9,7 @@ from copy import deepcopy
 from src.config import Config, Policy
 from src.battle import PSBattle
 from src.teams import TeamPredictor, Team, side_to_team
-from src.bayes_nash import Solver, Player
+import src.bayes_nash
 
 import numpy as np
 import oak
@@ -19,15 +19,39 @@ logger = logging.getLogger(__name__)
 # A "type" is a fully-revealed oak.Battle side paired with its probability weight.
 type Type = tuple[Team, float]
 
+
 class Player:
     """
-    An object that stores the type info as POD and handles 
-    
-    """
-    def __init__(self, side: oak.Side types: list[Team], omega: list[float]) -> None:
-        self.side: oak.Side = side
+    A proxy for BayesNash player that encaps all oak calls
 
-    def modify(self, type_index : int, dest: oak.Side) -> None:
+    """
+
+    def __init__(self, side: oak.Side, teams: list[Team], omega: list[float]) -> None:
+        self.n = len(teams)
+        assert len(omega) == self.n
+        self.side: oak.Side = side
+        self.teams = teams
+        self.omega = omega
+
+    def _find(self, n: int, f) -> int | None:
+        return next((i for i in range(n) if f(i)), None)
+
+    def modify(self, index: int, dest: oak.Side) -> None:
+        team = self.teams[index]
+        for s in team:
+            assert s.species
+            dest_pokemon: oak.Pokemon | None = None
+            present = self._find(6, lambda i: dest.pokemon(i).species == s.species)
+            if present is None:
+                empty = self._find(6, lambda i: dest.pokemon(i).species == 0)
+                assert (
+                    empty is not None
+                ), f"Failed to find empty slot for {oak.species_id(s.species)}"
+                dest_pokemon = dest.pokemon(empty)
+            else:
+                dest_pokemon = dest.pokemon(present)
+            # This handles stats, pp, etc
+            oak.complete_pokemon_from_set(dest_pokemon, s)
 
 
 def get_agent(p1: Player, p2: Player, t1: int, t2: int) -> Oak.Agent:
@@ -44,27 +68,49 @@ def get_agent(p1: Player, p2: Player, t1: int, t2: int) -> Oak.Agent:
     return agent
 
 
-def copy_and_determinize(public: Oak.battle, p1: Player, p2: Player, t1: int, t2: int) -> Oak.Battle:
-    battle = deepcopy(public)
-    p1.modify(t1, battle.side(0))
-    p2.modify(t2, battle.side(1))
-    return battle
-
-def determinize_and_search(b: Battle, p1: Player, p2: Player, t1: int, t2: int) -> Oak.Output:
-    battle = copy_and_determinize(b.public, p1, p2, t1, t2)
-    heap = oak.Heap()
-    agent = get_agent(p1, p2, t1, t2)
-    output = oak.search(battle, b.durations, b.result, heap, agent)
-    return output
-
-
 class Search:
     def __init__(self, b: Battle, p1: Player, p2: Player) -> None:
         self.battle = b
         self.p1 = p1
         self.p2 = p2
-    
-    def solver(self,) -> bayes_nash.Solver
+
+        type BattleMatrix = dict[tuple[int, int], oak.Battle]
+        type OutputMatrix = dict[tuple[int, int], oak.Output]
+        self.battles: BattleMatrix = {}
+        self.outputs: OutputMatrix = {}
+
+    def indices(self):
+        return [(i, j) for i in range(self.p1.n) for j in range(self.p2.n)]
+
+    def init_battles(self):
+        
+
+    def run_searches(self):
+        with ThreadPoolExecutor(max_workers=Config.paralellism) as ex:
+            futures = [
+                (
+                    ex.submit(
+                        oak.search,
+                        self.battles[(i, j)],
+                        battle.durations,
+                        battle.result,
+                        oak.Heap(),
+                        get_agent(self.p1, self.p2, i, j)
+                    ),
+                    (i, j),
+                )
+                for i, j in self.indices()
+            ]
+        for future, pair in futures:
+            self.outputs[pair] = future.result()
+
+    def solve(self):
+
+        p1 = src.bayes_nash.Player(
+
+        )
+
+        solver = src.bayles_nash.solver
 
 def _select_move(results: list[tuple[oak.Output, float, int]]) -> str:
     mode = getattr(Config, "policy_mode", Policy.argmax)
@@ -158,27 +204,6 @@ def perform_searches_and_select_move(battle: Battle, predictor: TeamPredictor) -
         det_result = 0  # ongoing battle
         dets.append((det_battle, det_durations, det_result, joint_prob))
 
-    with ThreadPoolExecutor(max_workers=len(dets)) as ex:
-        futures = [
-            (
-                ex.submit(
-                    _run_oak_search,
-                    det_battle,
-                    det_durations,
-                    det_result,
-                    budget,
-                    Config.eval,
-                    Config.bandit,
-                ),
-                joint_prob,
-                i,
-            )
-            for i, (det_battle, det_durations, det_result, joint_prob) in enumerate(
-                dets
-            )
-        ]
-
-    results = [(f.result(), w, i) for f, w, i in futures]
     choice = _select_move(results)
     logger.info(f"choice: {choice}")
     return choice
