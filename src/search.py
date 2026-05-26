@@ -27,17 +27,18 @@ class BayesianGame:
         if p1_k == 1:
             self.p1_types: list[Type] = [(side_to_team(battle.private.side(0)), 1.0)]
         else:
-            real_weight: float = .2
+            real_weight: float = 0.2
             not_real_weight: float = 1 - real_weight
-            extras = self._get_n_types(battle.public.side(0), predictor, p1_k - 1, not_real_weight)
+            extras = self._get_n_types(
+                battle.public.side(0), predictor, p1_k - 1, not_real_weight
+            )
             self.p1_types = [(side_to_team(battle.private), real_weight)] + extras
         self.p2_types: list[Type] = self._get_n_types(
             battle.public.side(1), predictor, p2_k
         )
 
     def flatten(self) -> list[oak.Battle, int, int]:
-
-        for i in range(self.p1_k)
+        pass
 
     def _get_n_types(
         self, side: oak.Side, predictor: TeamPredictor, n: int, weight: float = 1
@@ -48,10 +49,7 @@ class BayesianGame:
             fallback = random.choice(predictor.teams)
             matches.append((fallback, matches[-1][1] if matches else 0.0))
         den: float = sum(math.exp(logit) for _, logit in matches)
-        return [
-            (team, weight * math.exp(logit) / den)
-            for team, logit in matches
-        ]
+        return [(team, weight * math.exp(logit) / den) for team, logit in matches]
 
     def _fill_side_from_team(
         self, revealed: oak.Side, team: Team, max_pokemon: int = 6

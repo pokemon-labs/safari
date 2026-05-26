@@ -96,11 +96,9 @@ class Battle:
         self.rules: list[str] = []
         self.format: str = ""
 
-        # both sides revealed from protocol
+        self.team: Team | None = None
         self.public = oak.Battle(bytes(384))
         self.durations = oak.Durations(bytes(8))
-        # our side determined from request; overlays public.side(0)
-        self.private = oak.Battle(bytes(384))
 
         self.request: dict | None = None
         self.msg_lines: list[str] = []
@@ -110,57 +108,24 @@ class Battle:
         self.force_switch: bool = False
         self.wait: bool = False
         self.time_remaining: int | None = None
-        self.team_dict = None
 
-        # tracking state not in the oak struct
-        # TODO Some of These should be removable for these reasons below:
-        # We assume evs/dvs are max so...
-        self._max_hp: dict[tuple[int, int], int] = {}
-        # The team loader doesnt even check nicknames. We will never use them
-        # Is this needed to parse opp switch protocal string actually?
-        self._name_to_slot: dict[int, dict[str, int]] = {0: {}, 1: {}}
-        # Meh just iteratate over the side mons and count how many non 0 species there are
-        self._seen: dict[int, int] = {0: 0, 1: 0}
-        # Lets keep this for now
-        self._active_slot: dict[int, int] = {0: 0, 1: 0}
-        # No, this is tracked in Durations!!!!
-        self._bind_turns: dict[int, int] = {0: 0, 1: 0}
-
-    # Removed since determinization is done as a suite where we get some types and pdf over them
-    # This logic now in search.pys
-
-    # -----------------------------------------------------------------------
-    # Oak side/active shortcuts that keep public + private in sync
-    # -----------------------------------------------------------------------
-
-    def sides(self, split_msg):
+    def sides(self, split_msg) -> tuple[oak.Side, oak.Side]:
         """Return (our_pub, our_priv, opp_pub, opp_priv) sides."""
         if self._is_opponent(split_msg):
             return (
                 self.public.side(1),
-                self.private.side(1),
                 self.public.side(0),
-                self.private.side(0),
             )
         return (
             self.public.side(0),
-            self.private.side(0),
             self.public.side(1),
-            self.private.side(1),
         )
 
     def actives(self, split_msg):
-        u_pub, u_priv, o_pub, o_priv = self.sides(split_msg)
-        return u_pub.active, u_priv.active, o_pub.active, o_priv.active
+        return (side.active for side in self.sides(split_msg))
 
     def volatiles(self, split_msg):
-        u_pub, u_priv, o_pub, o_priv = self.sides(split_msg)
-        return (
-            u_pub.active.volatiles(),
-            u_priv.active.volatiles(),
-            o_pub.active.volatiles(),
-            o_priv.active.volatiles(),
-        )
+        return (side.active.volatiles() for side in self.sides(split_msg))
 
     # -----------------------------------------------------------------------
     # Public interface
@@ -187,10 +152,7 @@ class Battle:
             action = split_msg[1].strip()
             fn = self._HANDLERS.get(action)
             if fn:
-                try:
-                    fn(self, split_msg)
-                except Exception as e:
-                    logger.warning(f"handler '{action}' raised: {e}")
+                fn(self, split_msg)
         self.msg_lines.clear()
 
     # -----------------------------------------------------------------------
@@ -217,54 +179,7 @@ class Battle:
         side_data = self.request.get("side", {})
         pokemon_list = side_data.get("pokemon", [])
         our_side_idx = 0  # we are always p1
-
-        for storage_idx, poke_json in enumerate(pokemon_list[:6]):
-            details = poke_json.get("details", "")
-            species_name, level = _parse_details(details)
-
-            condition = poke_json.get("condition", "")
-            hp, max_hp, status_str = _parse_condition(condition)
-            self._max_hp[(our_side_idx, storage_idx)] = max_hp
-
-            name_key = normalize_name(species_name)
-            if name_key not in self._name_to_slot[our_side_idx]:
-                self._name_to_slot[our_side_idx][name_key] = storage_idx
-            if storage_idx >= self._seen[our_side_idx]:
-                self._seen[our_side_idx] = storage_idx + 1
-
-            for battle in (self.public, self.private):
-                pkmn = battle.side(our_side_idx).pokemon(storage_idx)
-                pkmn.species = _species_id(species_name)
-                pkmn.level = level
-                pkmn.hp = hp
-                pkmn.status = _status_byte(status_str, hp)
-
-            # moves come from side.pokemon[].moves (id strings like "return102")
-            moves = poke_json.get("moves", [])
-            for move_idx, move_id in enumerate(moves[:4]):
-                mid = _move_id(normalize_name(move_id))
-                for battle in (self.public, self.private):
-                    battle.side(our_side_idx).pokemon(storage_idx).move(
-                        move_idx
-                    ).id = mid
-
-            # pp comes from active[0].moves (has actual pp values)
-            # only valid for the currently active pokemon
-            if poke_json.get("active", False):
-                self._active_slot[our_side_idx] = storage_idx
-                active_moves = self.request.get("active", [{}])[0].get("moves", [])
-                for move_idx, move_json in enumerate(active_moves[:4]):
-                    pp = move_json.get("pp", 0)
-                    for battle in (self.public, self.private):
-                        battle.side(our_side_idx).pokemon(storage_idx).move(
-                            move_idx
-                        ).pp = pp
-
-        # set order: active first, rest in roster order
-        active_slot = self._active_slot[our_side_idx]
-        order = [active_slot] + [i for i in range(6) if i != active_slot]
-        for battle in (self.public, self.private):
-            battle.side(our_side_idx).order = order
+        # Not clear if we even need this anymore
 
     # -----------------------------------------------------------------------
     # Helpers

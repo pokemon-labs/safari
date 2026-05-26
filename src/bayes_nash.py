@@ -1,5 +1,5 @@
 # TODO turn this into a minimal and modern PyPI package
-# 
+#
 
 # The argparse should be moved away from the file that downstream users will import
 # Instead this function should probably be moved to a testing suite?

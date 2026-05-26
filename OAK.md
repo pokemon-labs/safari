@@ -64,7 +64,6 @@ Counts: `.confusion_left, .attacks, .disable_left, .substitute_hp, .transform_sp
 ## Search
 
 ### `oak.search(battle, durations, result, heap, agent) -> oak.Output`
-Runs MCTS. Takes the three battle state values directly — no Input wrapper.
 
 ```python
 import oak
