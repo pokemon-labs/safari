@@ -82,8 +82,8 @@ for i in range(search.p1.n):
         prob = short(search.p1.omega[i] * search.p2.omega[j])
         print(f"Type {i}, {j}, probability: {prob}")
         print("Battle:\n", oak.battle_string(search.battles[key], battle.durations))
+        print(search.outputs[key]["visit_matrix"])
         print("Strategies:")
-
         print([short(_) for _ in a[i]])
         print([short(_) for _ in b[j]])
         # print(search.outputs[key].empirical_matrix)

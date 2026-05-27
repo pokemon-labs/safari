@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import logging
 import random
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from copy import deepcopy
 
 from src.config import Config, Policy
@@ -61,11 +61,15 @@ def get_agent(p1: Player, p2: Player, t1: int, t2: int) -> Oak.Agent:
     Maybe less iterations for unlikely stuff? Etc
     More iterations for the p1 type 0 (our actual team)
     """
-    agent = oak.Agent()
-    agent.bandit = "ucb-1.0"
-    agent.eval = "/home/user/rl7/current.battle.net"
-    agent.budget = "200ms"
-    return agent
+    bandit = "pexp3-0.1-0.1"
+    eval = "/home/user/rl7/current.battle.net"
+    budget = "10s"
+    matrix_ucb = ""
+    return (budget, bandit, eval, matrix_ucb)
+
+
+def _search_mp_worker(*args):
+    return oak.search_mp(*args)
 
 
 class Search:
@@ -75,7 +79,7 @@ class Search:
         self.p2 = p2
 
         type BattleMatrix = dict[tuple[int, int], oak.Battle]
-        type OutputMatrix = dict[tuple[int, int], oak.Output]
+        type OutputMatrix = dict[tuple[int, int], dict]
         self.battles: BattleMatrix = {}
         self.outputs: OutputMatrix = {}
 
@@ -90,61 +94,67 @@ class Search:
             self.battles[(i, j)] = b
 
     def run(self):
+        import pickle
+
+        pickle.dumps(_search_mp_worker)
         print("Start Searches", len(self.indices()))
-        with ThreadPoolExecutor(max_workers=Config.parallelism or 16) as ex:
-            futures = [
-                (
-                    ex.submit(
-                        oak.search,
-                        self.battles[(i, j)],
-                        self.battle.durations,
-                        self.battle.result,
-                        oak.Heap(),
-                        get_agent(self.p1, self.p2, i, j),
-                    ),
-                    (i, j),
-                )
+        with ProcessPoolExecutor(max_workers=4) as ex:
+            futures = {
+                ex.submit(
+                    _search_mp_worker,
+                    self.battles[(i, j)].bytes(),
+                    self.battle.durations.bytes(),
+                    self.battle.result,
+                    *get_agent(self.p1, self.p2, i, j),
+                ): (i, j)
                 for i, j in self.indices()
-            ]
+            }
         print("End Searches")
-        for future, pair in futures:
-            self.outputs[pair] = future.result()
+
+        for future, pair in futures.items():
+            out = future.result()
+            visit = np.asarray(out["visit_matrix"], dtype=np.float64)
+            value = np.asarray(out["value_matrix"], dtype=np.float64)
+            empirical = np.divide(
+                value,
+                visit,
+                out=np.full_like(value, 0.5, dtype=np.float64),
+                where=visit > 0,
+            )
+            out["empirical_matrix"] = empirical
+            self.outputs[pair] = out
 
         # assert each type has a well defined number of actions
         # and that p1/p2 choices are consistent across types
         for i in range(self.p1.n):
             for j in range(self.p2.n):
-                assert self.outputs[(i, j)].m == self.outputs[(i, 0)].m
-                assert self.outputs[(i, j)].n == self.outputs[(0, j)].n
-                ref_p1 = self.outputs[(i, 0)].p1_empirical
-                ref_p2 = self.outputs[(0, j)].p2_empirical
-                cur_p1 = self.outputs[(i, j)].p1_empirical
-                cur_p2 = self.outputs[(i, j)].p2_empirical
+                assert self.outputs[(i, j)]["m"] == self.outputs[(i, 0)]["m"]
+                assert self.outputs[(i, j)]["n"] == self.outputs[(0, j)]["n"]
+                ref_p1 = self.outputs[(i, 0)]["p1_choices"]
+                ref_p2 = self.outputs[(0, j)]["p2_choices"]
+                cur_p1 = self.outputs[(i, j)]["p1_choices"]
+                cur_p2 = self.outputs[(i, j)]["p2_choices"]
                 assert np.array_equal(
-                    ref_p1 > 0, cur_p1 > 0
+                    np.asarray(ref_p1) > 0,
+                    np.asarray(cur_p1) > 0,
                 ), f"p1 choices differ at ({i},{j}) vs ({i},0)"
                 assert np.array_equal(
-                    ref_p2 > 0, cur_p2 > 0
+                    np.asarray(ref_p2) > 0,
+                    np.asarray(cur_p2) > 0,
                 ), f"p2 choices differ at ({i},{j}) vs (0,{j})"
 
-        # compute p1/p2 action counts per type
-        self.p1_actions = [self.outputs[(i, 0)].m for i in range(self.p1.n)]
-        self.p2_actions = [self.outputs[(0, j)].n for j in range(self.p2.n)]
+        self.p1_actions = [self.outputs[(i, 0)]["m"] for i in range(self.p1.n)]
+        self.p2_actions = [self.outputs[(0, j)]["n"] for j in range(self.p2.n)]
 
     def solve(self):
-
         p1 = src.bayes_nash.Player(self.p1_actions, self.p1.omega)
         p2 = src.bayes_nash.Player(self.p2_actions, self.p2.omega)
-
-        # Convert each output's empirical visit_matrix into a payoff matrix for bayes_nash.Solver.
-        # visit_matrix is shape (9,9) with joint visit counts; value_matrix holds p1 values.
-        # We slice to [m, n] actual actions and normalize rows to get an empirical payoff estimate.
         matrices = {}
         for i, j in self.indices():
             out = self.outputs[(i, j)]
             m = self.p1_actions[i]
             n = self.p2_actions[j]
-            matrices[(i, j)] = out.empirical_matrix[:m, :n]
+            matrices[(i, j)] = out["empirical_matrix"][:m, :n]
 
         solver = src.bayes_nash.Solver(p1, p2, matrices)
         (
@@ -153,5 +163,4 @@ class Search:
             p1_cur,
             p2_cur,
         ) = solver.run(10000, 1.0, 1.0)
-        # These are 4 numpy arrays with padded policies over each players types
         return (p1_avg, p2_avg)
