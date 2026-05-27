@@ -87,7 +87,7 @@ class _Config:
     eval: str
     bandit: str
     # parallelism is derived as p1_types * p2_types in configure()
-    parallelism: int = 1
+    parallelism: int = 16
 
     run_count: int
     # Path to teams file used for set predictor (opponent model).
@@ -220,7 +220,7 @@ class _Config:
         self.bandit = args.bandit
         self.p1_types = args.p1_types or 1
         self.p2_types = args.p2_types or 1
-        self.parallelism = self.p1_types * self.p2_types
+        self.parallelism = 16
         self.policy_mode = Policy(args.policy_mode)
         self.run_count = args.run_count
         self.teams = args.teams

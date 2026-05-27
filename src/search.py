@@ -8,7 +8,7 @@ from copy import deepcopy
 
 from src.config import Config, Policy
 from src.battle import PSBattle
-from src.teams import TeamPredictor, Team, side_to_team
+from src.teams import TeamPredictor, Team, side_to_team, team_to_string, set_to_string
 import src.bayes_nash
 
 import numpy as np
@@ -63,8 +63,8 @@ def get_agent(p1: Player, p2: Player, t1: int, t2: int) -> Oak.Agent:
     """
     agent = oak.Agent()
     agent.bandit = "ucb-1.0"
-    agent.eval = "fp"
-    agent.budget = "3000ms"
+    agent.eval = "/home/user/rl7/current.battle.net"
+    agent.budget = "200ms"
     return agent
 
 
@@ -89,8 +89,9 @@ class Search:
             self.p2.modify(j, b.side(1))
             self.battles[(i, j)] = b
 
-    def run_searches(self):
-        with ThreadPoolExecutor(max_workers=Config.paralellism) as ex:
+    def run(self):
+        print("Start Searches", len(self.indices()))
+        with ThreadPoolExecutor(max_workers=Config.parallelism or 16) as ex:
             futures = [
                 (
                     ex.submit(
@@ -99,12 +100,13 @@ class Search:
                         self.battle.durations,
                         self.battle.result,
                         oak.Heap(),
-                        get_agent(self.p1, self.p2, i, j)
+                        get_agent(self.p1, self.p2, i, j),
                     ),
                     (i, j),
                 )
                 for i, j in self.indices()
             ]
+        print("End Searches")
         for future, pair in futures:
             self.outputs[pair] = future.result()
 
@@ -118,10 +120,12 @@ class Search:
                 ref_p2 = self.outputs[(0, j)].p2_empirical
                 cur_p1 = self.outputs[(i, j)].p1_empirical
                 cur_p2 = self.outputs[(i, j)].p2_empirical
-                assert np.array_equal(ref_p1 > 0, cur_p1 > 0), \
-                    f"p1 choices differ at ({i},{j}) vs ({i},0)"
-                assert np.array_equal(ref_p2 > 0, cur_p2 > 0), \
-                    f"p2 choices differ at ({i},{j}) vs (0,{j})"
+                assert np.array_equal(
+                    ref_p1 > 0, cur_p1 > 0
+                ), f"p1 choices differ at ({i},{j}) vs ({i},0)"
+                assert np.array_equal(
+                    ref_p2 > 0, cur_p2 > 0
+                ), f"p2 choices differ at ({i},{j}) vs (0,{j})"
 
         # compute p1/p2 action counts per type
         self.p1_actions = [self.outputs[(i, 0)].m for i in range(self.p1.n)]
@@ -140,7 +144,7 @@ class Search:
             out = self.outputs[(i, j)]
             m = self.p1_actions[i]
             n = self.p2_actions[j]
-            matrices[(i, j)] = out.value_matrix[:m, :n]
+            matrices[(i, j)] = out.empirical_matrix[:m, :n]
 
         solver = src.bayes_nash.Solver(p1, p2, matrices)
         (
@@ -151,4 +155,3 @@ class Search:
         ) = solver.run(10000, 1.0, 1.0)
         # These are 4 numpy arrays with padded policies over each players types
         return (p1_avg, p2_avg)
-

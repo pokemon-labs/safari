@@ -39,6 +39,7 @@ logger = logging.getLogger(__name__)
 
 import oak
 
+
 def normalize_name(name):
     return (
         name.replace(" ", "")
@@ -55,6 +56,7 @@ def normalize_name(name):
         .encode("ascii", "ignore")
         .decode("utf-8")
     )
+
 
 WRAP_MOVES = {"wrap", "firespin"}
 
