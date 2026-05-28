@@ -254,16 +254,18 @@ async def _wait_for_first_request(client: PSWebsocketClient, battle: PSBattle) -
 
 
 async def _run_battle(
-    client: PSWebsocketClient, fmt: Format, predictor: TeamPredictor
+    client: PSWebsocketClient,
+    fmt: Format,
+    predictor: TeamPredictor,
+    selected_team: Team,
 ) -> str | None:
+
     tag, opp_name = await _get_battle_tag_and_opponent(client)
     p1 = PSPlayer(user=Config.username)
     p2 = PSPlayer(user=opp_name)
     battle = PSBattle(tag, p1, p2)
     battle.format = fmt.value
-
-    # identify our slot: |player|p1|username|... or |player|p2|username|...
-    # We are always the one whose username matches Config.username
+    battle.team = selected_team
     while battle.us is None:
         msg = await client.receive_message()
         for line in msg.split("\n"):
@@ -282,7 +284,6 @@ async def _run_battle(
                         assert (
                             False
                         ), f"Bad slot deduction, expected p1/p2 but got {slot}"
-                    print(f"US ========== {battle.us}!!!!!!!!!")
 
     # wait for |start| (may already be in msg from above)
     while True:
@@ -300,9 +301,9 @@ async def _run_battle(
     await _wait_for_first_request(client, battle)
     battle.process_msg_lines_and_clear()
 
-    # await asyncio.sleep(random.randint(3, 7))
-    await client.send_message(tag, ["/timer on"])
+    # await client.send_message(tag, ["/timer on"])
 
+    # TODO ask pmarg why this is here
     if not battle.wait:
         move = await _pick_move(battle, predictor)
         await client.send_message(tag, move)
@@ -356,14 +357,10 @@ async def main() -> None:
     user_teams = TeamPredictor(Config.teams)
     predictor = TeamPredictor(Config.predictor_teams, Config.predictor_ratio)
 
-    top_team: list[Oak.Set] = predictor.teams[0]
-
-    tt_packed = to_packed(top_team)
-    print(tt_packed)
-
-    await client.update_team(tt_packed)
-
     while True:
+
+        selected_team = random.choice(user_teams.teams)
+        await client.update_team(to_packed(selected_team))
 
         mode = Config.bot_mode
         if mode == BotModes.challenge_user:
@@ -375,7 +372,7 @@ async def main() -> None:
         else:
             raise ValueError(f"unknown bot mode: {mode}")
 
-        winner = await _run_battle(client, Config.format, predictor)
+        winner = await _run_battle(client, Config.format, predictor, selected_team)
 
         if winner == Config.username:
             wins += 1

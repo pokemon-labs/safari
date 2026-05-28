@@ -51,7 +51,7 @@ _STAT_ABBREV_TO_BOOST_PROP = {
     "atk": "atk",
     "def": "def",
     "spa": "spc",
-    "spd": "non", # Showdown sends boost msg for spa and spd so we just ignore spd
+    "spd": "non",  # Showdown sends boost msg for spa and spd so we just ignore spd
     "spe": "spe",
     "accuracy": "acc",
     "evasion": "eva",
@@ -225,6 +225,7 @@ class PSBattle:
     # -----------------------------------------------------------------------
 
     def switch_or_drag(self, split_msg: Msg) -> None:
+        # TODO also permute sleep durations
         side, opp_side = self.sides(split_msg)
         details = split_msg[3] if len(split_msg) > 3 else ""  # Jynx
         condition = split_msg[4] if len(split_msg) > 4 else ""  # 100/100
@@ -255,6 +256,7 @@ class PSBattle:
             assert side.order[index] == 0, "Unexpected slot in order"
 
         # Update order
+        # TODO does this even work? order takes the slot but we are passing the raw index
         order = list(side.order)
         order[index] = index + 1
         order[0], order[index] = order[index], order[0]
@@ -285,8 +287,8 @@ class PSBattle:
         side.stored().hp = hp
 
         if status_str:
-            assert False, "TODO status from damage"
-            side.stored().status = 0  # TODO
+            pass  # Showodown will also pass a status thing so IDK
+
         # gen1: hitting self in confusion releases opponent binding
         # other_idx = 1 - side_idx
         # if len(split_msg) > 4 and "[from] confusion" in split_msg[-1]:
@@ -320,6 +322,9 @@ class PSBattle:
             s.moves = [oak.id_to_move(move_id), 0, 0, 0]
             oak.complete_pokemon_moves(side.stored(), s)
             oak.complete_active_moves(side.active, s)
+            # TODO
+            # oak.decrement_pp(side.stored().moves, move)
+            # oak.decrement_pp(side.active.moves, move)
 
     def boost(self, split_msg):
         side, opp_side = self.sides(split_msg)
@@ -341,7 +346,7 @@ class PSBattle:
 
     def status(self, split_msg):
         side, _ = self.sides(split_msg)
-        dur, _ = self.durations(split_msg)
+        dur, _ = self.get_durations(split_msg)
         status_str = split_msg[3].strip() if len(split_msg) > 3 else ""
         byte: int = _STATUS_BYTE.get(status_str, None)
         assert byte is not None, "Bad status string lookup"
@@ -386,79 +391,29 @@ class PSBattle:
         # TODO replace _set_status
 
     def start_volatile_status(self, split_msg):
-        u_vol, u_vol_priv, *_ = self.volatiles(split_msg)
-        vol = normalize_name(split_msg[3].split(":")[-1]) if len(split_msg) > 3 else ""
-
-        side_idx = 1 if self._is_opponent(split_msg) else 0
-
-        if vol == constants.REFLECT:
-            self._set_vol(side_idx, reflect=True)
-        elif vol == constants.LIGHT_SCREEN:
-            self._set_vol(side_idx, light_screen=True)
-        elif vol == constants.MIST:
-            self._set_vol(side_idx, mist=True)
-        elif vol == constants.SUBSTITUTE:
-            for battle in (self.public, self.private):
-                act = battle.side(side_idx).active
-                v = act.volatiles()
-                v.substitute = True
-                v.substitute_hp = act.stats().hp // 4
-        elif vol == constants.CONFUSION:
-            self._set_vol(side_idx, confusion=True, confusion_left=3)
-        elif vol == "focusenergy":
-            self._set_vol(side_idx, focus_energy=True)
-        elif vol == "leechseed":
-            self._set_vol(side_idx, leech_seed=True)
-        else:
-            assert False, f"Unexpected vol start: {vol}"
+        vol, _ = self.volatiles(split_msg)
+        s = normalize_name(split_msg[3].split(":")[-1]) if len(split_msg) > 3 else None
+        assert s is not None
 
     def end_volatile_status(self, split_msg):
-        side_idx = 1 if self._is_opponent(split_msg) else 0
-        vol = normalize_name(split_msg[3].split(":")[-1]) if len(split_msg) > 3 else ""
+        vol, _ = self.volatiles(split_msg)
+        s = normalize_name(split_msg[3].split(":")[-1]) if len(split_msg) > 3 else None
+        assert s is not None
 
-        if vol == constants.SUBSTITUTE:
-            self._set_vol(side_idx, substitute=False, substitute_hp=0)
-        elif vol == constants.CONFUSION:
-            self._set_vol(side_idx, confusion=False, confusion_left=0)
-        elif vol == "leechseed":
-            self._set_vol(side_idx, leech_seed=False)
-        elif vol == constants.PARTIALLY_TRAPPED:
-            self._set_vol(side_idx, binding=False)
-            # self._bind_turns[side_idx] = 0
-        elif vol == "mustrecharge":
-            self._set_vol(side_idx, recharging=False)
-        elif vol == constants.REFLECT:
-            self._set_vol(side_idx, reflect=False)
-        elif vol == constants.LIGHT_SCREEN:
-            self._set_vol(side_idx, light_screen=False)
-        elif vol == constants.MIST:
-            self._set_vol(side_idx, mist=False)
-        elif vol == constants.TRANSFORM:
-            self._set_vol(side_idx, transform=False)
+        if s == "mustrecharge":
+            vol.recharging = False
         else:
-            assert False, f"Unexpected vol end: {vol}"
+            assert False, f"Bad volatile {s}"
 
     def mustrecharge(self, split_msg):
-        side_idx = 1 if self._is_opponent(split_msg) else 0
-        self._set_vol(side_idx, recharging=True)
+        vol, _ = self.volatiles(split_msg)
+        vol.recharging = True
 
     def singleturn(self, _split_msg):
-        pass  # no protect in gen1
+        assert False, "This is supposed to be protect only"
 
     def transform(self, split_msg):
-        side_idx = 1 if self._is_opponent(split_msg) else 0
-        other_idx = 1 - side_idx
-        self._set_vol(side_idx, transform=True)
-
-        for battle in (self.public, self.private):
-            sb = battle.side(side_idx).active.boosts()
-            ob = battle.side(other_idx).active.boosts()
-            sb.atk = ob.atk
-            sb.def_ = ob.def_
-            sb.spe = ob.spe
-            sb.spc = ob.spc
-            v = battle.side(side_idx).active.volatiles()
-            v.transform_species = battle.side(other_idx).active.species & 0xF
+        assert False, "Just take the dub bro"
 
     def activate(self, split_msg):
         side_idx = 1 if self._is_opponent(split_msg) else 0
