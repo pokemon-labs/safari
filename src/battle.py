@@ -1,30 +1,3 @@
-"""
-class Battle:
-
-Representation of the de-facto, imperfect information game
-This means the public signals and the agent's private signals
-
-The public signals can be represented as a perfect info battle "state",
-a collection of libpkmn/oak's Battle, Durations, Result objects
-The state is just what species and move sets have been revealed,
-with the other fields (status/stats/binding/etc) either tracked accurately or assumed to be max (evs/dvs).
-
-    Note: This is strategically lossy since the moves selected (i.e. |p1|move|...)  lose context and become just move slots
-
-The private signals are treated similarly which means we just need store a libpkmn/oak Side
-(the durations/result data is inherently public.)
-
-The public vs private signals correspond roughly to Showdown's protocol log vs request object.
-
-The battle object handles the parsing of this information internally.
-
-The end result of tracking this information is "determinization".
-We sample/generate fully revealed teams (also return independent probabilities) for both players which is finally input for an oak search
-
-Sampling the opponent's teams is necessary, but sampling the agent's team makes the collection
-of empirical matrices (with associated probs) from the oak.Output's a *Bayesian* game where the 'types' are teams.
-"""
-
 from __future__ import annotations
 
 import re
@@ -38,6 +11,8 @@ import src.constants as constants
 logger = logging.getLogger(__name__)
 
 import oak
+
+type Msg = list[str]
 
 
 def normalize_name(name):
@@ -58,22 +33,25 @@ def normalize_name(name):
     )
 
 
-WRAP_MOVES = {"wrap", "firespin"}
+BINDING_MOVES = {"bind", "clamp", "firespin", "wrap"}
 
+# fmt: off
 _STATUS_BYTE = {
-    constants.BURN: 0x10,
-    constants.FROZEN: 0x20,
-    constants.PARALYZED: 0x40,
-    constants.POISON: 0x08,
-    constants.TOXIC: 0x08,
-    constants.SLEEP: 0x04,
+    constants.SLEEP:     0b00000001,
+    constants.BURN:      0b00010000,
+    constants.FROZEN:    0b00100000,
+    constants.PARALYZED: 0b01000000,
+    constants.POISON:    0b00001000,
+    constants.TOXIC:     0b10001000,
+    "rest":              0b10000010, # This is Rest2 TODO check
 }
+# fmt: on
 
 _STAT_ABBREV_TO_BOOST_PROP = {
     "atk": "atk",
-    "def": "def_",
+    "def": "def",
     "spa": "spc",
-    "spd": "spc",
+    "spd": "non", # Showdown sends boost msg for spa and spd so we just ignore spd
     "spe": "spe",
     "accuracy": "acc",
     "evasion": "eva",
@@ -107,8 +85,11 @@ def _move_id(name: str) -> int:
 class PSBattle:
     def __init__(self, tag: str, p1: PSPlayer, p2: PSPlayer):
         self.tag = tag
-        self.p1 = p1  # us — always p1
-        self.p2 = p2  # opponent — always p2
+        self.p1 = p1
+        self.p2 = p2
+        print(f"PSBattle ctor: p1: {self.p1.user}, p2: {self.p2.user}")
+        self.us: str | None = None  # "p1" if we are p1, p2 otherwise.
+        # I think we are always p1 if we send a challenge and p2 if accepting. And random if ladder?
 
         self.rules: list[str] = []
         self.format: str = ""
@@ -144,6 +125,12 @@ class PSBattle:
     def volatiles(self, split_msg):
         return (side.active.volatiles() for side in self.sides(split_msg))
 
+    def get_durations(self, split_msg):
+        if self._is_opponent(split_msg):
+            return (self.durations.get(1), self.durations.get(0))
+        else:
+            return (self.durations.get(0), self.durations.get(1))
+
     # -----------------------------------------------------------------------
     # Public interface
     # -----------------------------------------------------------------------
@@ -162,6 +149,9 @@ class PSBattle:
                 self.msg_lines.append(line)
 
     def process_msg_lines_and_clear(self):
+        print("Message Lines:")
+        for line in self.msg_lines:
+            print(line)
         for line in self.msg_lines:
             split_msg = line.split("|")
             if len(split_msg) < 2:
@@ -170,6 +160,11 @@ class PSBattle:
             fn = self._HANDLERS.get(action)
             if fn:
                 fn(self, split_msg)
+                if action not in ("inactive",):
+                    print(f"args: {split_msg}")
+                    print(
+                        f"|{action}|: \n{oak.battle_string(self.public, self.durations)}"
+                    )
         self.msg_lines.clear()
 
     # -----------------------------------------------------------------------
@@ -204,34 +199,15 @@ class PSBattle:
 
     def _is_opponent(self, split_msg) -> bool:
         if len(split_msg) < 3:
+            assert False, "is_opp called with no thingy"
             return False
-        # p1 is us, p2 is opponent
-        return split_msg[2].startswith("p2")
+        return not split_msg[2].startswith(self.us)
 
-    def _resolve_slot(self, side_idx: int, ident_or_details: str) -> int:
-        name = normalize_name(ident_or_details.split(":")[-1].split(",")[0].strip())
-        if name not in self._name_to_slot[side_idx]:
-            slot = self._seen[side_idx]
-            self._seen[side_idx] += 1
-            self._name_to_slot[side_idx][name] = slot
-        return self._name_to_slot[side_idx][name]
-
-    def _boost_add(self, side_idx: int, stat: str, delta: int):
-        prop = _STAT_ABBREV_TO_BOOST_PROP.get(stat)
-        if not prop:
-            return
-        for battle in (self.public, self.private):
-            b = battle.side(side_idx).active.boosts()
-            cur = getattr(b, prop)
-            setattr(b, prop, max(-6, min(6, cur + delta)))
-
-    def _boost_set(self, side_idx: int, stat: str, value: int):
-        prop = _STAT_ABBREV_TO_BOOST_PROP.get(stat)
-        if not prop:
-            return
-        for battle in (self.public, self.private):
-            b = battle.side(side_idx).active.boosts()
-            setattr(b, prop, max(-6, min(6, value)))
+    # def _boost_set(self, side_idx: int, stat: str, value: int):
+    # prop = _STAT_ABBREV_TO_BOOST_PROP.get(stat)
+    # assert prop is not None
+    # b = battle.side(side_idx).active.boosts()
+    # setattr(b, prop, max(-6, min(6, value)))
 
     def _clear_boosts(self, side_idx: int):
         for battle in (self.public, self.private):
@@ -244,140 +220,141 @@ class PSBattle:
             for attr, val in kwargs.items():
                 setattr(v, attr, val)
 
-    def _clear_switch_volatiles(self, side_idx: int):
-        for battle in (self.public, self.private):
-            v = battle.side(side_idx).active.volatiles()
-            v.bits = 0
-            b = battle.side(side_idx).active.boosts()
-            b.atk = b.def_ = b.spe = b.spc = b.acc = b.eva = 0
-        self._bind_turns[side_idx] = 0
-
-    def _set_hp(self, side_idx: int, storage_idx: int, hp: int):
-        for battle in (self.public, self.private):
-            battle.side(side_idx).pokemon(storage_idx).hp = hp
-
-    def _set_status(self, side_idx: int, storage_idx: int, byte: int):
-        for battle in (self.public, self.private):
-            battle.side(side_idx).pokemon(storage_idx).status = byte
-
-    def _set_order(self, side_idx: int, order: list):
-        for battle in (self.public, self.private):
-            battle.side(side_idx).order = order
-
     # -----------------------------------------------------------------------
     # Protocol handlers
     # -----------------------------------------------------------------------
 
-    def switch_or_drag(self, split_msg):
-        side_idx = 1 if self._is_opponent(split_msg) else 0
-        details = split_msg[3] if len(split_msg) > 3 else ""
-        condition = split_msg[4] if len(split_msg) > 4 else ""
+    def switch_or_drag(self, split_msg: Msg) -> None:
+        side, opp_side = self.sides(split_msg)
+        details = split_msg[3] if len(split_msg) > 3 else ""  # Jynx
+        condition = split_msg[4] if len(split_msg) > 4 else ""  # 100/100
+        print(f"details: {details}; cond: {condition}")
 
         species_name, level = _parse_details(details)
-        storage_slot = self._resolve_slot(side_idx, details)
-        self._active_slot[side_idx] = storage_slot
 
-        hp, max_hp, status_str = _parse_condition(condition)
-        if max_hp:
-            self._max_hp[(side_idx, storage_slot)] = max_hp
-        else:
-            max_hp = self._max_hp.get((side_idx, storage_slot), 100)
-            # opponent HP is given as percentage
-            if side_idx == 1 and max_hp:
-                hp = int(max_hp * hp / 100)
+        species: int = oak.id_to_species(species_name)
+        assert 0 < species <= 151
 
-        for battle in (self.public, self.private):
-            pkmn = battle.side(side_idx).pokemon(storage_slot)
-            pkmn.species = _species_id(species_name)
-            pkmn.level = level
-            pkmn.hp = hp
-            pkmn.status = _status_byte(status_str, hp)
+        index: int | None = None
+        for i in range(6):
+            pokemon = side.pokemon(i)
+            if pokemon.species == species:
+                index = i
+                break
+        if index is None:
+            for i in range(6):
+                pokemon = side.pokemon(i)
+                if pokemon.species == 0:
+                    index = i
+                    break
+            assert index is not None, "New species but no empty slots"
+            s = oak.Set()
+            s.species = species
+            s.level = 100  # TODO actually parse
+            oak.complete_pokemon_from_set(side.pokemon(index), s)
+            assert side.order[index] == 0, "Unexpected slot in order"
 
-        order = [storage_slot] + [i for i in range(6) if i != storage_slot]
-        self._set_order(side_idx, order)
-        self._clear_switch_volatiles(side_idx)
+        # Update order
+        order = list(side.order)
+        order[index] = index + 1
+        order[0], order[index] = order[index], order[0]
+        side.order = order
+
+        print(f"new order: {side.order}")
+
+        oak.switch_in(side.pokemon(index), side.active)
 
     def faint(self, split_msg):
-        side_idx = 1 if self._is_opponent(split_msg) else 0
-        storage_slot = self._active_slot[side_idx]
-        self._set_hp(side_idx, storage_slot, 0)
+        side, _ = self.sides(split_msg)
+        side.stored().hp = 0
 
     def heal_or_damage(self, split_msg):
-        side_idx = 1 if self._is_opponent(split_msg) else 0
-        condition = split_msg[3] if len(split_msg) > 3 else ""
-        storage_slot = self._active_slot[side_idx]
-        max_hp = self._max_hp.get((side_idx, storage_slot), 100)
+        is_opp: bool = self._is_opponent(split_msg)
+        side, opp_side = self.sides(split_msg)
+        condition: str | None = split_msg[3] if len(split_msg) > 3 else None
 
-        hp, new_max, status_str = _parse_condition(condition)
-        if side_idx == 1:
-            hp = int(max_hp * hp / 100)
+        max_hp = side.stored().stats().hp
+        hp_or_percent, max_hp_or_percent, status_str = _parse_condition(condition)
+        hp = None
+        if is_opp:
+            # Opp is taking damage
+            hp = int(max_hp * hp_or_percent / max_hp_or_percent)
         else:
-            if new_max:
-                self._max_hp[(side_idx, storage_slot)] = new_max
+            hp = hp_or_percent
+        assert hp != 0, "Maybe this is wrong, prolly is and theres ALSO a faint"
+        side.stored().hp = hp
 
-        self._set_hp(side_idx, storage_slot, hp)
         if status_str:
-            self._set_status(side_idx, storage_slot, _status_byte(status_str, hp))
-
+            assert False, "TODO status from damage"
+            side.stored().status = 0  # TODO
         # gen1: hitting self in confusion releases opponent binding
-        other_idx = 1 - side_idx
-        if len(split_msg) > 4 and "[from] confusion" in split_msg[-1]:
-            self._set_vol(other_idx, binding=False)
-            self._bind_turns[other_idx] = 0
+        # other_idx = 1 - side_idx
+        # if len(split_msg) > 4 and "[from] confusion" in split_msg[-1]:
+        #     self._set_vol(other_idx, binding=False)
+        #     # self._bind_turns[other_idx] = 0
 
     def sethp(self, split_msg):
+        assert False, "Unused?"
         self.heal_or_damage(split_msg)
 
     def fail(self, _split_msg):
-        pass
+        assert False, "not impl"
 
     def move(self, split_msg):
-        side_idx = 1 if self._is_opponent(split_msg) else 0
-        other_idx = 1 - side_idx
-        move_name = normalize_name(split_msg[3]) if len(split_msg) > 3 else ""
-        missed = any(s.strip() == "[miss]" for s in split_msg)
+        side, opp_side = self.sides(split_msg)
+        dur, opp_dur = self.get_durations(split_msg)
+        move_id: str | None = (
+            normalize_name(split_msg[3]) if len(split_msg) > 3 else None
+        )
+        missed: bool = any(s.strip() == "[miss]" for s in split_msg)
+        if move_id in BINDING_MOVES and not missed:
+            side.active.volatiles().binding = True
+        # moving means side is free from binding
+        opp_side.active.volatiles().binding = False
+        opp_dur.binding = 0
 
-        if move_name in WRAP_MOVES and not missed:
-            self._bind_turns[other_idx] += 1
-            self._set_vol(other_idx, binding=True)
-
-        # moving frees self from binding
-        if self._bind_turns[side_idx] > 0:
-            self._set_vol(side_idx, binding=False)
-            self._bind_turns[side_idx] = 0
-
-        # reveal opponent move
-        if side_idx == 1 and move_name and move_name != "struggle":
-            mid = _move_id(move_name)
-            for battle in (self.public, self.private):
-                act = battle.side(1).active
-                for mi in range(4):
-                    slot = act.move(mi)
-                    if slot.id == mid:
-                        if slot.pp > 0:
-                            slot.pp -= 1
-                        break
-                    if slot.id == 0:
-                        slot.id = mid
-                        break
+        # add move to pokemon/active
+        if move_id and move_id != "struggle":
+            s = oak.Set()
+            move: int = oak.id_to_move(move_id)
+            s.moves = [oak.id_to_move(move_id), 0, 0, 0]
+            oak.complete_pokemon_moves(side.stored(), s)
+            oak.complete_active_moves(side.active, s)
 
     def boost(self, split_msg):
-        side_idx = 1 if self._is_opponent(split_msg) else 0
-        stat = split_msg[3].strip() if len(split_msg) > 3 else ""
+        side, opp_side = self.sides(split_msg)
+        stat: str | None = split_msg[3].strip() if len(split_msg) > 3 else None
         amount = int(split_msg[4].strip()) if len(split_msg) > 4 else 0
-        self._boost_add(side_idx, stat, amount)
+        assert amount != 0, "Why is boost amount 0???"
+        prop = _STAT_ABBREV_TO_BOOST_PROP.get(stat)
+        assert prop is not None, f"Could not parse stat for boost: {stat}"
+        oak.boost(side, opp_side, prop, amount)
 
     def unboost(self, split_msg):
-        side_idx = 1 if self._is_opponent(split_msg) else 0
-        stat = split_msg[3].strip() if len(split_msg) > 3 else ""
+        side, opp_side = self.sides(split_msg)
+        stat: str | None = split_msg[3].strip() if len(split_msg) > 3 else None
         amount = int(split_msg[4].strip()) if len(split_msg) > 4 else 0
-        self._boost_add(side_idx, stat, -amount)
+        assert amount != 0, "Why is boost amount 0???"
+        prop = _STAT_ABBREV_TO_BOOST_PROP.get(stat)
+        assert prop is not None, f"Could not parse stat for boost: {stat}"
+        oak.boost(side, opp_side, prop, -amount)
+
+    def status(self, split_msg):
+        side, _ = self.sides(split_msg)
+        dur, _ = self.durations(split_msg)
+        status_str = split_msg[3].strip() if len(split_msg) > 3 else ""
+        byte: int = _STATUS_BYTE.get(status_str, None)
+        assert byte is not None, "Bad status string lookup"
+        side.stored().status = byte
+        # dur.sleep()
+        # TODO maybe init sleep duration to 1?
 
     def setboost(self, split_msg):
-        side_idx = 1 if self._is_opponent(split_msg) else 0
-        stat = split_msg[3].strip() if len(split_msg) > 3 else ""
-        amount = int(split_msg[4].strip()) if len(split_msg) > 4 else 0
-        self._boost_set(side_idx, stat, amount)
+        assert False
+        # side_idx = 1 if self._is_opponent(split_msg) else 0
+        # stat = split_msg[3].strip() if len(split_msg) > 3 else ""
+        # amount = int(split_msg[4].strip()) if len(split_msg) > 4 else 0
+        # self._boost_set(side_idx, stat, amount)
 
     def clearnegativeboost(self, split_msg):
         side_idx = 1 if self._is_opponent(split_msg) else 0
@@ -395,29 +372,18 @@ class PSBattle:
         self._clear_boosts(0)
         self._clear_boosts(1)
 
-    def status(self, split_msg):
-        side_idx = 1 if self._is_opponent(split_msg) else 0
-        status_str = split_msg[3].strip() if len(split_msg) > 3 else ""
-        storage_slot = self._active_slot[side_idx]
-        byte = _STATUS_BYTE.get(status_str, 0)
-        if status_str == constants.SLEEP:
-            # rest gives 3 hidden turns
-            if len(split_msg) > 4 and split_msg[4].strip() == "[from] move: Rest":
-                byte = 0x04 | 3
-            else:
-                byte = 0x04
-        self._set_status(side_idx, storage_slot, byte)
-
     def curestatus(self, split_msg):
+        assert False, "Start curestatus now pls"
         side_idx = 1 if self._is_opponent(split_msg) else 0
         # try to find the right storage slot from ident; fall back to active
         ident = split_msg[2] if len(split_msg) > 2 else ""
-        slot = (
-            self._resolve_slot(side_idx, ident)
-            if ident
-            else self._active_slot[side_idx]
-        )
-        self._set_status(side_idx, slot, 0)
+        slot = None
+        # slot = (
+        #     self._resolve_slot(side_idx, ident)
+        #     if ident
+        #     else self._active_slot[side_idx]
+        # )
+        # TODO replace _set_status
 
     def start_volatile_status(self, split_msg):
         u_vol, u_vol_priv, *_ = self.volatiles(split_msg)
@@ -458,7 +424,7 @@ class PSBattle:
             self._set_vol(side_idx, leech_seed=False)
         elif vol == constants.PARTIALLY_TRAPPED:
             self._set_vol(side_idx, binding=False)
-            self._bind_turns[side_idx] = 0
+            # self._bind_turns[side_idx] = 0
         elif vol == "mustrecharge":
             self._set_vol(side_idx, recharging=False)
         elif vol == constants.REFLECT:
@@ -501,7 +467,7 @@ class PSBattle:
         effect = split_msg[3]
         if effect.lower().startswith("move: "):
             move_name = normalize_name(effect.split(":")[-1])
-            if move_name in WRAP_MOVES:
+            if move_name in BINDING_MOVES:
                 self._set_vol(side_idx, binding=True)
 
     def prepare(self, split_msg):
@@ -528,7 +494,7 @@ class PSBattle:
                 ov = battle.side(other_idx).active.volatiles()
                 if ov.binding:
                     ov.binding = False
-                    self._bind_turns[other_idx] = 0
+                    # self._bind_turns[other_idx] = 0
 
         if reason == constants.SLEEP:
             # dec rest turns; cure on wake
@@ -550,7 +516,6 @@ class PSBattle:
         if len(split_msg) > 2:
             try:
                 self.public.turn = int(split_msg[2])
-                self.private.turn = int(split_msg[2])
             except ValueError:
                 pass
 
@@ -583,7 +548,7 @@ class PSBattle:
         "-fail": fail,
         "-heal": heal_or_damage,
         "-damage": heal_or_damage,
-        "-sethp": sethp,
+        "-sethp": sethp,  # TODO just proxy for heal_or_damage
         "move": move,
         "-setboost": setboost,
         "-boost": boost,
@@ -633,26 +598,26 @@ def _parse_details(details: str):
     return species, level
 
 
-def _parse_condition(condition: str):
+def _parse_condition(condition: str) -> tuple[int, int, str | None]:
     """Return (hp, max_hp, status_str) from a condition string like '100/200 brn' or 'fnt'."""
     if not condition or constants.FNT in condition:
-        return 0, 0, None
+        return (0, 0, None)
     parts = condition.split("/")
     try:
         hp = int(parts[0])
     except ValueError:
-        return 0, 0, None
+        return (0, 0, None)
     max_hp = 0
     status_str = None
     if len(parts) > 1:
         rhs = parts[1].split()
-        try:
-            max_hp = int(rhs[0])
-        except (ValueError, IndexError):
-            pass
+        # try:
+        max_hp = int(rhs[0])
+        # except (ValueError, IndexError):
+        #     pass
         if len(rhs) > 1:
             status_str = rhs[1]
-    return hp, max_hp, status_str
+    return (hp, max_hp, status_str)
 
 
 def _status_byte(status_str: str | None, hp: int = 1) -> int:

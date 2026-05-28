@@ -22,9 +22,9 @@ import websockets.asyncio.client
 
 import src.constants as constants
 from src.config import Config, SaveReplay, BotModes, Format, init_logging
-from src.battle import Battle, Player
-from src.search import perform_searches_and_select_move
+from src.battle import PSBattle, PSPlayer, normalize_name
 from src.teams import TeamPredictor, to_packed
+from src.search import Player, Search
 
 logger = logging.getLogger(__name__)
 
@@ -199,12 +199,12 @@ class PSWebsocketClient:
 
 
 # ---------------------------------------------------------------------------
-# Battle loop helpers
+# PSBattle loop helpers
 # ---------------------------------------------------------------------------
 
 
-def _format_decision(battle: Battle, decision: str) -> list[str]:
-    return [decision, str(battle.rqid)]
+def _format_decision(battle: PSBattle, decision: str) -> tuple[str, str]:
+    return (decision, str(battle.rqid))
 
 
 def _battle_finished(tag: str, msg: str) -> bool:
@@ -215,13 +215,14 @@ def _battle_finished(tag: str, msg: str) -> bool:
     )
 
 
-async def _pick_move(battle: Battle, predictor: TeamPredictor) -> list[str]:
+async def _pick_move(battle: PSBattle, predictor: TeamPredictor) -> tuple[str, str]:
     loop = asyncio.get_event_loop()
-    with concurrent.futures.ThreadPoolExecutor() as pool:
-        decision = await loop.run_in_executor(
-            pool, perform_searches_and_select_move, deepcopy(battle), predictor
-        )
-    return _format_decision(battle, decision)
+    # with concurrent.futures.ThreadPoolExecutor() as pool:
+    #     decision = await loop.run_in_executor(
+    #         pool, perform_searches_and_select_move, deepcopy(battle), predictor
+    #     )
+    # return _format_decision(battle, decision)
+    return _format_decision(battle, "/choose move 1")
 
 
 async def _get_battle_tag_and_opponent(client: PSWebsocketClient) -> tuple[str, str]:
@@ -242,7 +243,7 @@ async def _get_battle_tag_and_opponent(client: PSWebsocketClient) -> tuple[str, 
             return tag, p2
 
 
-async def _wait_for_first_request(client: PSWebsocketClient, battle: Battle) -> None:
+async def _wait_for_first_request(client: PSWebsocketClient, battle: PSBattle) -> None:
     while True:
         msg = await client.receive_message()
         for line in msg.split("\n"):
@@ -256,32 +257,32 @@ async def _run_battle(
     client: PSWebsocketClient, fmt: Format, predictor: TeamPredictor
 ) -> str | None:
     tag, opp_name = await _get_battle_tag_and_opponent(client)
-
-    p1 = Player(user=Config.username)
-    p2 = Player(user=opp_name)
-    battle = Battle(tag, p1, p2)
+    p1 = PSPlayer(user=Config.username)
+    p2 = PSPlayer(user=opp_name)
+    battle = PSBattle(tag, p1, p2)
     battle.format = fmt.value
 
     # identify our slot: |player|p1|username|... or |player|p2|username|...
     # We are always the one whose username matches Config.username
-    while True:
+    while battle.us is None:
         msg = await client.receive_message()
         for line in msg.split("\n"):
             parts = line.split("|")
             if len(parts) >= 4 and parts[1] == "player":
                 slot, uname = parts[2], parts[3]
+                print(f"Player parsing:  slot{slot}, uname{uname}, total{parts}")
                 if normalize_name(uname) == normalize_name(Config.username):
-                    battle.p1.user = slot  # our slot (p1 or p2)
-                    battle.p2.user = constants.ID_LOOKUP[slot]
-                    break
-        else:
-            if constants.START_STRING in msg:
-                # already past player lines; default to p1
-                battle.p1.user = "p1"
-                battle.p2.user = "p2"
-            else:
-                continue
-        break
+                    if slot == "p1":
+                        battle.us = "p1"
+                        pass
+                    elif slot == "p2":
+                        battle.us = "p2"
+                        battle.p1, battle.p2 = battle.p2, battle.p1
+                    else:
+                        assert (
+                            False
+                        ), f"Bad slot deduction, expected p1/p2 but got {slot}"
+                    print(f"US ========== {battle.us}!!!!!!!!!")
 
     # wait for |start| (may already be in msg from above)
     while True:
@@ -299,7 +300,7 @@ async def _run_battle(
     await _wait_for_first_request(client, battle)
     battle.process_msg_lines_and_clear()
 
-    await asyncio.sleep(random.randint(3, 7))
+    # await asyncio.sleep(random.randint(3, 7))
     await client.send_message(tag, ["/timer on"])
 
     if not battle.wait:
@@ -309,6 +310,7 @@ async def _run_battle(
     # main battle loop
     while True:
         msg = await client.receive_message()
+
         if _battle_finished(tag, msg):
             winner = (
                 msg.split(constants.WIN_STRING)[-1].split("\n")[0].strip()
@@ -351,7 +353,8 @@ async def main() -> None:
 
     wins = losses = ties = battles_run = 0
 
-    predictor = TeamPredictor(Config.teams)
+    user_teams = TeamPredictor(Config.teams)
+    predictor = TeamPredictor(Config.predictor_teams, Config.predictor_ratio)
 
     top_team: list[Oak.Set] = predictor.teams[0]
 

@@ -1,4 +1,4 @@
-python run.py \
+python -i run.py \
 --websocket-uri ws://localhost:8000/showdown/websocket \
 --ps-username 'foul-oak' \
 --ps-password '123123' \

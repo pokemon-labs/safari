@@ -7,30 +7,18 @@ from logging.handlers import RotatingFileHandler
 from typing import Optional, Literal
 
 
+# How Safari selects its final move from the search grid
 class Policy(Enum):
-    argmax = "x"
-    nash = "n"
-    empirical = "e"
+    argmax = auto()
+    nash = auto()
+    empirical = auto()
+    bayesian_nash = auto()
 
 
 class CustomFormatter(logging.Formatter):
     def format(self, record):
         lvl = "{}".format(record.levelname)
         return "{} {}".format(lvl.ljust(8), record.msg)
-
-
-class CustomRotatingFileHandler(RotatingFileHandler):
-    def __init__(self, file_name, **kwargs):
-        self.base_dir = "logs"
-        if not os.path.exists(self.base_dir):
-            os.mkdir(self.base_dir)
-
-        super().__init__("{}/{}".format(self.base_dir, file_name), **kwargs)
-
-    def do_rollover(self, new_file_name):
-        new_file_name = new_file_name.replace("/", "_")
-        self.baseFilename = "{}/{}".format(self.base_dir, new_file_name)
-        self.doRollover()
 
 
 def init_logging(level, log_to_file):
@@ -47,13 +35,6 @@ def init_logging(level, log_to_file):
     stdout_handler.setFormatter(CustomFormatter())
     logger.addHandler(stdout_handler)
     Config.stdout_log_handler = stdout_handler
-
-    if log_to_file:
-        file_handler = CustomRotatingFileHandler("init.log")
-        file_handler.setLevel(logging.DEBUG)  # file logs are always debug
-        file_handler.setFormatter(CustomFormatter())
-        logger.addHandler(file_handler)
-        Config.file_log_handler = file_handler
 
 
 class SaveReplay(Enum):
@@ -93,8 +74,10 @@ class _Config:
     # Path to teams file used for set predictor (opponent model).
     # For each battle loop iteration we uniformly sample a team from this file
     # and use it for the challenge/ladder request.
-    user_teams: str
     # determinization grid dimensions
+    teams: str
+    predictor_teams: str
+
     p1_types: int = 1
     p2_types: int = 1
     # policy_mode controls move selection from MCTS output
@@ -105,7 +88,6 @@ class _Config:
     log_level: str
     log_to_file: bool
     stdout_log_handler: logging.StreamHandler
-    file_log_handler: Optional[CustomRotatingFileHandler]
 
     def configure(self):
         parser = argparse.ArgumentParser()
@@ -160,15 +142,20 @@ class _Config:
         )
         parser.add_argument(
             "--teams",
+            type=str,
+            default=None,
+            help="Path to team file to use for the agent",
+        )
+        parser.add_argument(
+            "--predictor-teams",
+            type=str,
             default=None,
             help="Path to team file for set predictor",
         )
         parser.add_argument(
-            "--team-name",
-            default=None,
-            help="Which team to use (user_teams). Can be a filename or foldername relative to "
-            "./teams/teams/. If a foldername, a random team from that folder is chosen each battle. "
-            "If not set, defaults to the --pokemon-format value.",
+            "--predictor-ratio",
+            default=1,
+            help="Ratio of probability from first to last team in the predictor team file",
         )
         parser.add_argument(
             "--p1-types",
@@ -185,8 +172,7 @@ class _Config:
         parser.add_argument(
             "--policy-mode",
             type=str,
-            default="x",
-            choices=["x", "n", "e"],
+            default=Policy.bayesian_nash,
             help="Move selection policy: x=argmax, n=nash, e=empirical (default: x)",
         )
         parser.add_argument(
@@ -224,7 +210,8 @@ class _Config:
         self.policy_mode = Policy(args.policy_mode)
         self.run_count = args.run_count
         self.teams = args.teams
-        self.user_teams = args.team_name or self.format.value
+        self.predictor_teams = args.predictor_teams
+        self.predictor_ratio = args.predictor_ratio
         self.user_to_challenge = args.user_to_challenge
         self.save_replay = SaveReplay[args.save_replay]
         self.room_name = args.room_name
