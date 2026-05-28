@@ -325,6 +325,16 @@ class PSBattle:
             # TODO
             # oak.decrement_pp(side.stored().moves, move)
             # oak.decrement_pp(side.active.moves, move)
+            for i in range(4):
+                ms: oak.MoveSlot = side.stored().move(i)
+                if ms.id == move:
+                    assert ms.pp > 0, "Used move with tracked pp=0"
+                    ms.pp = max(0, ms.pp - 1)
+            for i in range(4):
+                ms: oak.MoveSlot = side.active.move(i)
+                if ms.id == move:
+                    assert ms.pp > 0, "Used move with tracked pp=0"
+                    ms.pp = max(0, ms.pp - 1)
 
     def boost(self, split_msg):
         side, opp_side = self.sides(split_msg)
@@ -434,24 +444,19 @@ class PSBattle:
             assert False, f"Prepare unexpected move: {move_name}"
 
     def cant(self, split_msg):
-        side_idx = 1 if self._is_opponent(split_msg) else 0
-        other_idx = 1 - side_idx
+        side, opp_side = self.sides(split_msg)
+        dur, _ = self.get_durations(split_msg)
         if len(split_msg) < 4:
             return
         reason = split_msg[3].strip()
 
         if reason == "recharge":
-            self._set_vol(side_idx, recharging=False)
-
-        if reason == constants.PARALYZED:
+            side.active.recharging = False
+        elif reason == constants.PARALYZED:
             # gen1: full paralysis releases partial trap on other side
-            for battle in (self.public, self.private):
-                ov = battle.side(other_idx).active.volatiles()
-                if ov.binding:
-                    ov.binding = False
-                    # self._bind_turns[other_idx] = 0
-
-        if reason == constants.SLEEP:
+            side.active.volatiles().binding = False
+            dur.binding = 0
+        elif reason == constants.SLEEP:
             # dec rest turns; cure on wake
             storage_slot = self._active_slot[side_idx]
             for battle in (self.public, self.private):
@@ -463,6 +468,8 @@ class PSBattle:
                     pkmn.status = (status & ~0x07) | new_turns
                     if new_turns == 0:
                         pkmn.status = 0
+        else:
+            assert False, f"Unsupported reason for cant {reason}"
 
     def upkeep(self, _split_msg):
         pass

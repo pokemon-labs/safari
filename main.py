@@ -47,7 +47,6 @@ MAX_TYPES = 2
 
 
 def matching_to_player(side: oak.Side, matching: list) -> Player:
-    top = matching[:MAX_TYPES]
     teams = [team for team, _ in top]
     # logits are unnormalized; convert to probabilities via softmax-style normalization
     import math
@@ -59,8 +58,9 @@ def matching_to_player(side: oak.Side, matching: list) -> Player:
     return Player(side, teams, omega)
 
 
-p1_player = matching_to_player(battle.public.side(0), p1_matching)
-p2_player = matching_to_player(battle.public.side(1), p2_matching)
+p1_player = matching_to_player(battle.public.side(0), p1_matching[:MAX_TYPES])
+p2_player = matching_to_player(battle.public.side(1), p2_matching[:MAX_TYPES])
+
 
 search = Search(battle, p1_player, p2_player)
 search.init_battles()

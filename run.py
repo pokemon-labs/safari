@@ -23,7 +23,7 @@ import websockets.asyncio.client
 import src.constants as constants
 from src.config import Config, SaveReplay, BotModes, Format, init_logging
 from src.battle import PSBattle, PSPlayer, normalize_name
-from src.teams import TeamPredictor, to_packed
+from src.teams import TeamPredictor, to_packed, get_teams_and_probs, team_to_string
 from src.search import Player, Search
 
 logger = logging.getLogger(__name__)
@@ -216,13 +216,28 @@ def _battle_finished(tag: str, msg: str) -> bool:
 
 
 async def _pick_move(battle: PSBattle, predictor: TeamPredictor) -> tuple[str, str]:
-    loop = asyncio.get_event_loop()
-    # with concurrent.futures.ThreadPoolExecutor() as pool:
-    #     decision = await loop.run_in_executor(
-    #         pool, perform_searches_and_select_move, deepcopy(battle), predictor
-    #     )
-    # return _format_decision(battle, decision)
-    return _format_decision(battle, "/choose move 1")
+    p1_teams, p1_probs = get_teams_and_probs(
+        battle.public.side(0), predictor, Config.p1_types, battle.team
+    )
+    p2_teams, p2_probs = get_teams_and_probs(
+        battle.public.side(1), predictor, Config.p2_types
+    )
+
+    for team, prob in zip(p1_teams, p1_probs):
+        print(f"{prob} - ", team_to_string(team))
+    print("Opp teams")
+    for team, prob in zip(p2_teams, p2_probs):
+        print(f"{prob} - ", team_to_string(team))
+
+    p1_player = Player(battle.public.side(0), p1_teams, p1_probs)
+    p2_player = Player(battle.public.side(1), p2_teams, p2_probs)
+    search = Search(battle, p1_player, p2_player)
+    search.init_battles()
+    search.run()
+    a, b = search.solve()
+    print(a)
+    print(b)
+    return _format_decision(battle, decision)
 
 
 async def _get_battle_tag_and_opponent(client: PSWebsocketClient) -> tuple[str, str]:
