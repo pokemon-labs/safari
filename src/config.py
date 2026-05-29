@@ -63,7 +63,6 @@ class _Config:
     avatar: str
     bot_mode: BotModes
     format: Format
-    smogon_stats: str | None = None
     budget: str
     eval: str
     bandit: str
@@ -111,11 +110,6 @@ class _Config:
             "--format",
             required=True,
             type=Format,
-        )
-        parser.add_argument(
-            "--smogon-stats-format",
-            default=None,
-            help="Overwrite which smogon stats are used to infer unknowns. If not set, defaults to the --pokemon-format value.",
         )
         parser.add_argument(
             "--budget",
@@ -200,7 +194,6 @@ class _Config:
         self.avatar = args.ps_avatar
         self.bot_mode = BotModes[args.bot_mode]
         self.format = args.format
-        self.smogon_stats = args.smogon_stats_format
         self.budget = args.budget
         self.eval = args.eval
         self.bandit = args.bandit

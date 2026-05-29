@@ -87,7 +87,6 @@ class PSBattle:
         self.tag = tag
         self.p1 = p1
         self.p2 = p2
-        print(f"PSBattle ctor: p1: {self.p1.user}, p2: {self.p2.user}")
         self.us: str | None = None  # "p1" if we are p1, p2 otherwise.
         # I think we are always p1 if we send a challenge and p2 if accepting. And random if ladder?
 
@@ -229,7 +228,6 @@ class PSBattle:
         side, opp_side = self.sides(split_msg)
         details = split_msg[3] if len(split_msg) > 3 else ""  # Jynx
         condition = split_msg[4] if len(split_msg) > 4 else ""  # 100/100
-        print(f"details: {details}; cond: {condition}")
 
         species_name, level = _parse_details(details)
 
@@ -261,9 +259,6 @@ class PSBattle:
         order[index] = index + 1
         order[0], order[index] = order[index], order[0]
         side.order = order
-
-        print(f"new order: {side.order}")
-
         oak.switch_in(side.pokemon(index), side.active)
 
     def faint(self, split_msg):

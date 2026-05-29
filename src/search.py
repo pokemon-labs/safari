@@ -37,7 +37,6 @@ class Player:
         return next((i for i in range(n) if f(i)), None)
 
     def modify(self, index: int, dest: oak.Side) -> None:
-        print("modify: start")
         team = self.teams[index]
         order = list(dest.order)
 
@@ -81,9 +80,9 @@ def get_agent(p1: Player, p2: Player, t1: int, t2: int) -> Oak.Agent:
     Maybe less iterations for unlikely stuff? Etc
     More iterations for the p1 type 0 (our actual team)
     """
-    bandit = "pexp3-0.1-0.1"
-    eval = "/home/user/rl7/current.battle.net"
-    budget = "10s"
+    bandit = Config.bandit
+    eval = Config.eval
+    budget = Config.budget
     matrix_ucb = ""
     return (budget, bandit, eval, matrix_ucb)
 
@@ -117,7 +116,6 @@ class Search:
         import pickle
 
         pickle.dumps(_search_mp_worker)
-        print("Start Searches", len(self.indices()))
         with ProcessPoolExecutor(max_workers=4) as ex:
             futures = {
                 ex.submit(
@@ -130,7 +128,6 @@ class Search:
                 ): (i, j)
                 for i, j in self.indices()
             }
-        print("End Searches")
 
         for future, pair in futures.items():
             out = future.result()

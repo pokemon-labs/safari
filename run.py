@@ -203,16 +203,26 @@ class PSWebsocketClient:
 # ---------------------------------------------------------------------------
 
 
-def _format_decision(battle: PSBattle, decision: str) -> tuple[str, str]:
-    return (decision, str(battle.rqid))
-
-
 def _battle_finished(tag: str, msg: str) -> bool:
     return (
         msg.startswith(f">{tag}")
         and (constants.WIN_STRING in msg or constants.TIE_STRING in msg)
         and constants.CHAT_STRING not in msg
     )
+
+
+def parse_pkmn_choice(c: int) -> str:
+    choice_type = c & 3
+    choice_data = c >> 2
+    if choice_type == 0:
+        return "/choose pass"
+    elif choice_type == 1:
+        return f"/choose move {choice_data or 1}"
+    elif choice_type == 2:
+        assert choice_data > 0, "Idt switch index can ever by 0"
+        return f"/choose switch {choice_data or 1}"
+    else:
+        assert False, f"Could not parse pkmn_choice: {c} = {choice_type}, {choice_data}"
 
 
 async def _pick_move(battle: PSBattle, predictor: TeamPredictor) -> tuple[str, str]:
@@ -223,11 +233,12 @@ async def _pick_move(battle: PSBattle, predictor: TeamPredictor) -> tuple[str, s
         battle.public.side(1), predictor, Config.p2_types
     )
 
-    for team, prob in zip(p1_teams, p1_probs):
-        print(f"{prob} - ", team_to_string(team))
-    print("Opp teams")
-    for team, prob in zip(p2_teams, p2_probs):
-        print(f"{prob} - ", team_to_string(team))
+    # print("Out teams")
+    # for team, prob in zip(p1_teams, p1_probs):
+    #     print(f"{prob} - ", team_to_string(team))
+    # print("Opp teams")
+    # for team, prob in zip(p2_teams, p2_probs):
+    #     print(f"{prob} - ", team_to_string(team))
 
     p1_player = Player(battle.public.side(0), p1_teams, p1_probs)
     p2_player = Player(battle.public.side(1), p2_teams, p2_probs)
@@ -243,17 +254,25 @@ async def _pick_move(battle: PSBattle, predictor: TeamPredictor) -> tuple[str, s
     def labels(output):
         [oak.policy_dim_labels[x] for x in output.p1_actions]
 
-    for i in range(search.p1.n):
-        for j in range(search.p2.n):
-            key = (i, j)
-            prob = short(search.p1.omega[i] * search.p2.omega[j])
-            print(f"Type {i}, {j}, probability: {prob}")
-            print("Battle:\n", oak.battle_string(search.battles[key], battle.durations))
-            print(search.outputs[key]["visit_matrix"])
-            print("Strategies:")
-            print([short(_) for _ in a[i]])
-            print([short(_) for _ in b[j]])
-    return _format_decision(battle, decision)
+    # for i in range(search.p1.n):
+    #     for j in range(search.p2.n):
+    #         key = (i, j)
+    #         prob = short(search.p1.omega[i] * search.p2.omega[j])
+    #         print(f"Type {i}, {j}, probability: {prob}")
+    #         print("Battle:\n", oak.battle_string(search.battles[key], battle.durations))
+    #         print(search.outputs[key]["visit_matrix"])
+    #         print("Strategies:")
+    #         print([short(_) for _ in a[i]])
+    #         print([short(_) for _ in b[j]])
+
+    # choose p1 move
+    eps = 1e-3
+    actual_strategy = [float(x) if float(x) > eps else 0 for x in a[0]]
+    as_sum = sum(actual_strategy)
+    actual_strategy = [x / as_sum for x in actual_strategy]
+    c = random.choices(search.outputs[(0, 0)]["p1_choices"], weights=actual_strategy, k=1)[0]
+
+    return (parse_pkmn_choice(c), str(battle.rqid))
 
 
 async def _get_battle_tag_and_opponent(client: PSWebsocketClient) -> tuple[str, str]:
