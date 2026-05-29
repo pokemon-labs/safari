@@ -235,8 +235,24 @@ async def _pick_move(battle: PSBattle, predictor: TeamPredictor) -> tuple[str, s
     search.init_battles()
     search.run()
     a, b = search.solve()
-    print(a)
-    print(b)
+    import oak
+
+    def short(x):
+        return int(1000 * x) / 1000
+
+    def labels(output):
+        [oak.policy_dim_labels[x] for x in output.p1_actions]
+
+    for i in range(search.p1.n):
+        for j in range(search.p2.n):
+            key = (i, j)
+            prob = short(search.p1.omega[i] * search.p2.omega[j])
+            print(f"Type {i}, {j}, probability: {prob}")
+            print("Battle:\n", oak.battle_string(search.battles[key], battle.durations))
+            print(search.outputs[key]["visit_matrix"])
+            print("Strategies:")
+            print([short(_) for _ in a[i]])
+            print([short(_) for _ in b[j]])
     return _format_decision(battle, decision)
 
 

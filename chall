@@ -8,8 +8,8 @@ python run.py \
 --predictor-teams ./teams150 \
 --teams ./teams1 \
 --run-count 1 \
---p1-types 1 \
---p2-types 1 \
+--p1-types 2 \
+--p2-types 2 \
 --budget 3000ms \
 --eval /home/user/rl7/current.battle.net \
 --bandit pexp3-1.0-0.1 \

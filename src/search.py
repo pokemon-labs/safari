@@ -23,7 +23,6 @@ type Type = tuple[Team, float]
 class Player:
     """
     A proxy for BayesNash player that encaps all oak calls
-
     """
 
     def __init__(self, side: oak.Side, teams: list[Team], omega: list[float]) -> None:
@@ -32,26 +31,47 @@ class Player:
         self.side: oak.Side = side
         self.teams = teams
         self.omega = omega
+        self.team_length = 6
 
     def _find(self, n: int, f) -> int | None:
         return next((i for i in range(n) if f(i)), None)
 
     def modify(self, index: int, dest: oak.Side) -> None:
+        print("modify: start")
         team = self.teams[index]
-        for s in team:
-            assert s.species
-            dest_pokemon: oak.Pokemon | None = None
-            present = self._find(6, lambda i: dest.pokemon(i).species == s.species)
-            if present is None:
-                empty = self._find(6, lambda i: dest.pokemon(i).species == 0)
+        order = list(dest.order)
+
+        for slot in range(1, self.team_length + 1):
+            index = slot - 1
+            i = order[index]
+            if i:
+                pokemon = dest.pokemon(i - 1)
+                assert pokemon.species, "Empty pokemon has non-zero slot tihngy"
+                # find set
+                matching = self._find(
+                    self.team_length, lambda i: team[i].species == pokemon.species
+                )
                 assert (
-                    empty is not None
-                ), f"Failed to find empty slot for {oak.species_id(s.species)}"
-                dest_pokemon = dest.pokemon(empty)
+                    matching is not None
+                ), "Pokemon does not match any set in the team"
+                oak.complete_pokemon_from_set(pokemon, team[matching])
             else:
-                dest_pokemon = dest.pokemon(present)
-            # This handles stats, pp, etc
-            oak.complete_pokemon_from_set(dest_pokemon, s)
+                first_missing_set_index = self._find(
+                    self.team_length,
+                    lambda i: all(
+                        team[i].species != dest.pokemon(k).species
+                        for k in range(self.team_length)
+                    ),
+                )  # find first team index where mon is not present
+                assert (
+                    first_missing_set_index is not None
+                ), "Found empty slot but no sets are free to fill it"
+                pokemon = dest.pokemon(index)
+                oak.complete_pokemon_from_set(pokemon, team[first_missing_set_index])
+                order[index] = slot
+
+        dest.order = order
+        oak.copy_moves_to_active(dest.stored(), dest.active)
 
 
 def get_agent(p1: Player, p2: Player, t1: int, t2: int) -> Oak.Agent:
@@ -104,7 +124,8 @@ class Search:
                     _search_mp_worker,
                     self.battles[(i, j)].bytes(),
                     self.battle.durations.bytes(),
-                    self.battle.result,
+                    oak.parse_result(self.battles[(i, j)]),
+                    # 80,
                     *get_agent(self.p1, self.p2, i, j),
                 ): (i, j)
                 for i, j in self.indices()
