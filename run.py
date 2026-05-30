@@ -397,13 +397,13 @@ async def main() -> None:
 
         if winner == Config.username:
             wins += 1
-            logger.info(f"won with {team_file}")
+            logger.info(f"won with {team_to_string(selected_team)}")
         elif winner is None:
             ties += 1
-            logger.info(f"tied with {team_file}")
+            logger.info(f"tied with {team_to_string(selected_team)}")
         else:
             losses += 1
-            logger.info(f"lost with {team_file}")
+            logger.info(f"lost with {team_to_string(selected_team)}")
 
         logger.info(f"W:{wins} L:{losses} T:{ties}")
         battles_run += 1

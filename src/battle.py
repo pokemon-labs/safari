@@ -148,9 +148,6 @@ class PSBattle:
                 self.msg_lines.append(line)
 
     def process_msg_lines_and_clear(self):
-        print("Message Lines:")
-        for line in self.msg_lines:
-            print(line)
         for line in self.msg_lines:
             split_msg = line.split("|")
             if len(split_msg) < 2:
@@ -164,6 +161,7 @@ class PSBattle:
                     print(
                         f"|{action}|: \n{oak.battle_string(self.public, self.durations)}"
                     )
+                    print(self.public.side(0).order, self.public.side(1).order)
         self.msg_lines.clear()
 
     # -----------------------------------------------------------------------
@@ -222,43 +220,48 @@ class PSBattle:
         species: int = oak.id_to_species(species_name)
         assert 0 < species <= 151, f"Failed to parse species {species_name}"
 
+        order = list(side.order)
         index: int | None = None
-        for i in range(6):
-            pokemon = side.pokemon(i)
-            if pokemon.species == species:
-                index = i
-                break
-        if index is None:
-            for i in range(6):
-                pokemon = side.pokemon(i)
-                if pokemon.species == 0:
-                    index = i
+        slot: int = 0
+        # use the information to reveal prior to the switch being executed
+        for s in range(1, 7):
+            i = order[s - 1]
+            if i:
+                # we are looking through the revealed slots
+                pokemon = side.pokemon(i - 1)
+                if pokemon.species == species:
+                    slot = s
+                    index = i - 1
                     break
-            assert index is not None, "New species but no empty slots"
-            s = oak.Set()
-            s.species = species
-            s.level = 100  # TODO actually parse
-            oak.complete_pokemon_from_set(side.pokemon(index), s)
-            assert side.order[index] == 0, "Unexpected slot in order"
+            else:
+                # we have hit the end of revealed without finding the species, add it
+                slot = s
+                index = slot - 1
+                order[index] = slot 
+
+                s = oak.Set()
+                s.species = species
+                s.level = 100  # TODO actually parse
+                oak.complete_pokemon_from_set(side.pokemon(index), s)
+                break
+        assert index is not None, "Failed to find incoming or an empty slot for it"
 
         # Update order
-        order = list(side.order)
-        order[index] = index + 1
-        order[0], order[index] = order[index], order[0]
+        order[0], order[slot - 1] = order[slot - 1], order[0]
         side.order = order
 
         # Durations
         old_sleep = duration.sleep(0)
-        duration.set_sleep(0, duration.sleep(index))
-        duration.set_sleep(index, old_sleep)
+        duration.set_sleep(0, duration.sleep(slot - 1))
+        duration.set_sleep(slot - 1, old_sleep)
         duration.confusion = 0
         duration.disable = 0
         duration.attacking = 0
         duration.binding = 0
 
-        # use raw index instead of stored()
-        oak.switch_in(side.pokemon(index), side.active)
-        opp_side.active.volatiles.binding = False  # found in mechanics
+        # Clears active, then sets species, moves, types, stats
+        oak.switch_in(side.stored(), side.active)
+        opp_side.active.volatiles().binding = False  # found in mechanics
 
     def faint(self, split_msg):
         side, _ = self.sides(split_msg)
@@ -292,6 +295,10 @@ class PSBattle:
 
         if status_str:
             if status_str == constants.PARALYZED:
+                side.stored().status = _STATUS_BYTE[status_str]
+            elif status_str == constants.SLEEP:
+                side.stored().status = _STATUS_BYTE[status_str]
+            elif status_str == constants.FROZEN:
                 side.stored().status = _STATUS_BYTE[status_str]
             else:
                 assert False, status_str
@@ -368,7 +375,6 @@ class PSBattle:
         from_str = split_msg[4].strip() if len(split_msg) > 4 else None
         byte: int = _STATUS_BYTE.get(status_str, None)
         assert byte is not None, "Bad status string lookup"
-        print(f"Status from: {from_str}")
         if from_str == "Rest":
             side.stored().status = _STATUS_BYTE["rest"]
         else:
@@ -403,22 +409,19 @@ class PSBattle:
         # self._clear_boosts(1)
 
     def curestatus(self, split_msg):
-        assert False, "Start curestatus now pls"
-        side_idx = 1 if self._is_opponent(split_msg) else 0
-        # try to find the right storage slot from ident; fall back to active
-        ident = split_msg[2] if len(split_msg) > 2 else ""
-        slot = None
-        # slot = (
-        #     self._resolve_slot(side_idx, ident)
-        #     if ident
-        #     else self._active_slot[side_idx]
-        # )
-        # TODO replace _set_status
+        side, _ = self.sides(split_msg)
+        side.stored().status = 0
 
     def start_volatile_status(self, split_msg):
+        active, _ = self.actives(split_msg)
         vol, _ = self.volatiles(split_msg)
         s = normalize_name(split_msg[3].split(":")[-1]) if len(split_msg) > 3 else None
         assert s is not None
+        if s == "substitute":
+            vol.substitute = True
+            vol.substitute_hp = int(active.stats().hp / 4) or 1
+        else:
+            assert False, f"Bad volatile {s}"
 
     def end_volatile_status(self, split_msg):
         vol, _ = self.volatiles(split_msg)
@@ -427,6 +430,9 @@ class PSBattle:
 
         if s == "mustrecharge":
             vol.recharging = False
+        elif s == "substitute":
+            vol.substitute = False
+            vol.substitute_hp = 0
         else:
             assert False, f"Bad volatile {s}"
 
@@ -471,6 +477,8 @@ class PSBattle:
             # gen1: full paralysis releases partial trap on other side
             side.active.volatiles().binding = False
             dur.binding = 0
+        elif reason == constants.FROZEN:
+            pass
         elif reason == constants.SLEEP:
             dur.set_sleep(0, dur.sleep(0) + 1)
         elif reason == "partiallytrapped":
