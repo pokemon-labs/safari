@@ -162,6 +162,8 @@ class TeamPredictor:
         legal_sets = self.sets.clone()
         selection_prob = 1
         for s in team:
+            if len(s) > 1:
+                print(s)
             matching_sets: list[tuple[oak.Set, Probability]] = legal_sets.get_matching(
                 s
             )

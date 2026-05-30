@@ -350,6 +350,7 @@ class PSBattle:
                 side.stored().status = _STATUS_BYTE[status_str]
             elif status_str == constants.SLEEP:
                 side.stored().status = _STATUS_BYTE[status_str]
+                duration.set_sleep(0, 1)  # TODO does it ever resend this?
             elif status_str == constants.FROZEN:
                 side.stored().status = _STATUS_BYTE[status_str]
             else:
@@ -463,6 +464,10 @@ class PSBattle:
     def curestatus(self, split_msg):
         side, _ = self.sides(split_msg)
         side.stored().status = 0
+        if len(split_msg) >= 4:
+            if split_msg == constants.SLEEP:
+                dur, _ = self.get_durations(split_msg)
+                dur.set_sleep(0, 0)
 
     def start_volatile_status(self, split_msg):
         active, _ = self.actives(split_msg)
