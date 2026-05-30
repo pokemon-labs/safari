@@ -8,7 +8,14 @@ from copy import deepcopy
 
 from src.config import Config, Policy
 from src.battle import PSBattle
-from src.teams import TeamPredictor, Team, side_to_team, team_to_string, set_to_string
+from src.teams import (
+    TeamPredictor,
+    Team,
+    side_to_team,
+    team_to_string,
+    set_to_string,
+    Probability,
+)
 import src.bayes_nash
 
 import numpy as np
@@ -16,19 +23,18 @@ import oak
 
 logger = logging.getLogger(__name__)
 
-# A "type" is a fully-revealed oak.Battle side paired with its probability weight.
-type Type = tuple[Team, float]
-
 
 class Player:
     """
     A proxy for BayesNash player that encaps all oak calls
     """
 
-    def __init__(self, side: oak.Side, teams: list[Team], omega: list[float]) -> None:
+    def __init__(
+        self, side: oak.Side, teams: list[Team], omega: list[Probability]
+    ) -> None:
         self.n = len(teams)
         assert len(omega) == self.n
-        self.side: oak.Side = side
+        self.side = side
         self.teams = teams
         self.omega = omega
         self.team_length = 6
@@ -87,7 +93,8 @@ def get_agent(p1: Player, p2: Player, t1: int, t2: int) -> Oak.Agent:
     return (budget, bandit, eval, matrix_ucb)
 
 
-def _search_mp_worker(*args):
+# we need this wrapper for ProcessPool pickling
+def _oak_search_mp(*args):
     return oak.search_mp(*args)
 
 
@@ -115,15 +122,14 @@ class Search:
     def run(self):
         import pickle
 
-        pickle.dumps(_search_mp_worker)
+        pickle.dumps(_oak_search_mp)
         with ProcessPoolExecutor(max_workers=4) as ex:
             futures = {
                 ex.submit(
-                    _search_mp_worker,
+                    _oak_search_mp,
                     self.battles[(i, j)].bytes(),
                     self.battle.durations.bytes(),
                     oak.parse_result(self.battles[(i, j)]),
-                    # 80,
                     *get_agent(self.p1, self.p2, i, j),
                 ): (i, j)
                 for i, j in self.indices()
@@ -182,3 +188,45 @@ class Search:
             p2_cur,
         ) = solver.run(10000, 1.0, 1.0)
         return (p1_avg, p2_avg)
+
+    def parse_pkmn_choice(self, c: int) -> str:
+        side = self.battles[(0, 0)].side(0)
+
+        choice_type = c & 3
+        choice_data = c >> 2
+        if choice_type == 0:
+            return "/choose pass"
+        elif choice_type == 1:
+            # TODO this happens with binding, but I think showdown still expects move 1?
+            if choice_data == 0:
+                return "/choose move 1"
+
+            # is forced
+            vol = side.active.volatiles()
+            if vol.recharging or vol.rage or vol.thrashing or vol.charging:
+                assert (
+                    choice_data == 1
+                ), "is_forced but choice data is not one. Likely a parsing error of the actives"
+                return "/choose move 1"
+
+            # struggle
+            if not any(
+                side.active.move(i).id and side.active.move(i).pp for i in range(4)
+            ):
+                return "/choose move 1"
+
+            move = side.active.move(choice_data - 1)
+            # e.g. /choose move psychic
+            assert move.pp > 0, "Using move with no pp"
+            return f"/choose move {oak.move_id(move.id)}"
+        elif choice_type == 2:
+            assert 1 < choice_data <= 6
+            index = side.order[choice_data - 1] - 1
+            assert index >= 0, f"Bad switch : {choice_data}"
+            species = side.pokemon(index).species
+            assert species, "Trying to switch to empty slot (no species anyway)"
+            return f"/choose switch {oak.species_id(species)}"
+        else:
+            assert (
+                False
+            ), f"Could not parse pkmn_choice: {c} = {choice_type}, {choice_data}"

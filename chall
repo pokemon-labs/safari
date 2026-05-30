@@ -10,7 +10,7 @@ python run.py \
 --run-count 1 \
 --p1-types 2 \
 --p2-types 2 \
---budget 3000ms \
+--budget 1000ms \
 --eval /home/user/rl7/current.battle.net \
 --bandit pexp3-1.0-0.1 \
 --log-level DEBUG

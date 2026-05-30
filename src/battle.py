@@ -202,22 +202,10 @@ class PSBattle:
             return False
         return not split_msg[2].startswith(self.us)
 
-    # def _boost_set(self, side_idx: int, stat: str, value: int):
-    # prop = _STAT_ABBREV_TO_BOOST_PROP.get(stat)
-    # assert prop is not None
-    # b = battle.side(side_idx).active.boosts()
-    # setattr(b, prop, max(-6, min(6, value)))
-
     def _clear_boosts(self, side_idx: int):
         for battle in (self.public, self.private):
             b = battle.side(side_idx).active.boosts()
             b.atk = b.def_ = b.spe = b.spc = b.acc = b.eva = 0
-
-    def _set_vol(self, side_idx: int, **kwargs):
-        for battle in (self.public, self.private):
-            v = battle.side(side_idx).active.volatiles()
-            for attr, val in kwargs.items():
-                setattr(v, attr, val)
 
     # -----------------------------------------------------------------------
     # Protocol handlers
@@ -226,13 +214,13 @@ class PSBattle:
     def switch_or_drag(self, split_msg: Msg) -> None:
         # TODO also permute sleep durations
         side, opp_side = self.sides(split_msg)
+        duration, _ = self.get_durations(split_msg)
         details = split_msg[3] if len(split_msg) > 3 else ""  # Jynx
         condition = split_msg[4] if len(split_msg) > 4 else ""  # 100/100
 
         species_name, level = _parse_details(details)
-
         species: int = oak.id_to_species(species_name)
-        assert 0 < species <= 151
+        assert 0 < species <= 151, f"Failed to parse species {species_name}"
 
         index: int | None = None
         for i in range(6):
@@ -254,12 +242,23 @@ class PSBattle:
             assert side.order[index] == 0, "Unexpected slot in order"
 
         # Update order
-        # TODO does this even work? order takes the slot but we are passing the raw index
         order = list(side.order)
         order[index] = index + 1
         order[0], order[index] = order[index], order[0]
         side.order = order
+
+        # Durations
+        old_sleep = duration.sleep(0)
+        duration.set_sleep(0, duration.sleep(index))
+        duration.set_sleep(index, old_sleep)
+        duration.confusion = 0
+        duration.disable = 0
+        duration.attacking = 0
+        duration.binding = 0
+
+        # use raw index instead of stored()
         oak.switch_in(side.pokemon(index), side.active)
+        opp_side.active.volatiles.binding = False  # found in mechanics
 
     def faint(self, split_msg):
         side, _ = self.sides(split_msg)
@@ -275,15 +274,27 @@ class PSBattle:
         hp = None
         if is_opp:
             # Opp is taking damage
-            hp = int(max_hp * hp_or_percent / max_hp_or_percent)
+            if max_hp_or_percent == 0:
+                hp = 0
+            else:
+                hp = int(max_hp * hp_or_percent / max_hp_or_percent)
         else:
             hp = hp_or_percent
-        assert hp != 0, "Maybe this is wrong, prolly is and theres ALSO a faint"
         side.stored().hp = hp
 
-        if status_str:
-            pass  # Showodown will also pass a status thing so IDK
+        # SLEEP = "slp"
+        # BURN = "brn"
+        # FROZEN = "frz"
+        # PARALYZED = "par"
+        # POISON = "psn"
+        # TOXIC = "tox"
+        # TOXIC_COUNT = "toxic_count"
 
+        if status_str:
+            if status_str == constants.PARALYZED:
+                side.stored().status = _STATUS_BYTE[status_str]
+            else:
+                assert False, status_str
         # gen1: hitting self in confusion releases opponent binding
         # other_idx = 1 - side_idx
         # if len(split_msg) > 4 and "[from] confusion" in split_msg[-1]:
@@ -295,7 +306,8 @@ class PSBattle:
         self.heal_or_damage(split_msg)
 
     def fail(self, _split_msg):
-        assert False, "not impl"
+        # Reasons: lkiss sleeping mon
+        pass
 
     def move(self, split_msg):
         side, opp_side = self.sides(split_msg)
@@ -353,9 +365,14 @@ class PSBattle:
         side, _ = self.sides(split_msg)
         dur, _ = self.get_durations(split_msg)
         status_str = split_msg[3].strip() if len(split_msg) > 3 else ""
+        from_str = split_msg[4].strip() if len(split_msg) > 4 else None
         byte: int = _STATUS_BYTE.get(status_str, None)
         assert byte is not None, "Bad status string lookup"
-        side.stored().status = byte
+        print(f"Status from: {from_str}")
+        if from_str == "Rest":
+            side.stored().status = _STATUS_BYTE["rest"]
+        else:
+            side.stored().status = byte
         # dur.sleep()
         # TODO maybe init sleep duration to 1?
 
@@ -375,12 +392,15 @@ class PSBattle:
                     setattr(b, attr, 0)
 
     def clearboost(self, split_msg):
-        side_idx = 1 if self._is_opponent(split_msg) else 0
-        self._clear_boosts(side_idx)
+        assert False
+        # side_idx = 1 if self._is_opponent(split_msg) else 0
+        # self._clear_boosts(side_idx)
 
     def clearallboost(self, _split_msg):
-        self._clear_boosts(0)
-        self._clear_boosts(1)
+        assert False
+        # Haze zeros the boosts, copies stored stats into active, clears volatiles, and
+        # self._clear_boosts(0)
+        # self._clear_boosts(1)
 
     def curestatus(self, split_msg):
         assert False, "Start curestatus now pls"
@@ -446,23 +466,16 @@ class PSBattle:
         reason = split_msg[3].strip()
 
         if reason == "recharge":
-            side.active.recharging = False
+            side.active.volatiles().recharging = False
         elif reason == constants.PARALYZED:
             # gen1: full paralysis releases partial trap on other side
             side.active.volatiles().binding = False
             dur.binding = 0
         elif reason == constants.SLEEP:
-            # dec rest turns; cure on wake
-            storage_slot = self._active_slot[side_idx]
-            for battle in (self.public, self.private):
-                pkmn = battle.side(side_idx).pokemon(storage_slot)
-                status = pkmn.status
-                turns = status & 0x07
-                if turns > 0:
-                    new_turns = turns - 1
-                    pkmn.status = (status & ~0x07) | new_turns
-                    if new_turns == 0:
-                        pkmn.status = 0
+            dur.set_sleep(0, dur.sleep(0) + 1)
+        elif reason == "partiallytrapped":
+            opp_side.active.volatiles().binding = True
+            # TODO set duration
         else:
             assert False, f"Unsupported reason for cant {reason}"
 
@@ -471,10 +484,7 @@ class PSBattle:
 
     def turn(self, split_msg):
         if len(split_msg) > 2:
-            try:
-                self.public.turn = int(split_msg[2])
-            except ValueError:
-                pass
+            self.public.turn = int(split_msg[2])
 
     def noinit(self, split_msg):
         if len(split_msg) > 3 and split_msg[2] == "rename":
@@ -575,9 +585,3 @@ def _parse_condition(condition: str) -> tuple[int, int, str | None]:
         if len(rhs) > 1:
             status_str = rhs[1]
     return (hp, max_hp, status_str)
-
-
-def _status_byte(status_str: str | None, hp: int = 1) -> int:
-    if not status_str or hp == 0:
-        return 0
-    return _STATUS_BYTE.get(status_str, 0)
