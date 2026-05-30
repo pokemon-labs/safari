@@ -17,6 +17,9 @@ from src.config import Config, SaveReplay, BotModes, Format, init_logging
 from src.battle import PSBattle, PSPlayer, normalize_name
 from src.teams import TeamPredictor, to_packed, get_teams_and_probs, team_to_string
 from src.search import Player, Search
+from src.vis import DebugViz
+
+_viz: DebugViz | None = None
 
 logger = logging.getLogger(__name__)
 
@@ -240,8 +243,15 @@ async def _pick_move(battle: PSBattle, predictor: TeamPredictor) -> tuple[str, s
     c = random.choices(
         output["p1_choices"][: output["m"]], weights=actual_strategy[: output["m"]], k=1
     )[0]
+    pending_move = search.parse_pkmn_choice(c)
 
-    return (search.parse_pkmn_choice(c), str(battle.rqid))
+    if _viz is not None:
+        _viz.push(battle, search, a, b, pending_move)
+        override = _viz.get_move_override()
+        if override is not None:
+            return (override, str(battle.rqid))
+
+    return (pending_move, str(battle.rqid))
 
 
 async def _get_battle_tag_and_opponent(client: PSWebsocketClient) -> tuple[str, str]:
@@ -371,6 +381,12 @@ async def main() -> None:
         await client.avatar(Config.avatar)
 
     wins = losses = ties = battles_run = 0
+
+    if Config.vis:
+        global _viz
+        _viz = DebugViz()
+        _viz.start()
+        logger.info("visualizer at http://localhost:8765")
 
     user_teams = TeamPredictor(Config.teams)
     predictor = TeamPredictor(Config.predictor_teams, Config.predictor_ratio)

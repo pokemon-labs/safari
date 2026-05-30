@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>safari debug</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0e0e10; --bg2: #18181b; --bg3: #222226;
+  --border: #2e2e35; --border2: #404048;
+  --text: #e8e8ec; --muted: #888892; --dim: #555560;
+  --blue: #378ADD; --blue-dim: #1a3a5c;
+  --green: #3dd68c; --amber: #f0a030;
+  --mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+  --sans: system-ui, sans-serif;
+}
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13px; }
+#root { display: flex; height: 100vh; overflow: hidden; }
+
+/* LEFT */
+#left { width: 340px; min-width: 220px; display: flex; flex-direction: column; border-right: 1px solid var(--border); }
+#left-top { flex: 1; overflow: auto; padding: 10px; }
+#left-bottom { padding: 8px 10px; border-top: 1px solid var(--border); font-size: 11px; }
+
+.panel-title { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+
+#matrix { display: grid; gap: 2px; }
+.ax-corner { font-size: 9px; color: var(--dim); display: flex; align-items: flex-end; justify-content: flex-end; padding: 2px; }
+.ax-col { font-size: 9px; color: var(--muted); text-align: center; padding: 2px 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ax-row { font-size: 9px; color: var(--muted); writing-mode: vertical-lr; text-align: center; padding: 2px; overflow: hidden; text-overflow: ellipsis; }
+
+.cell {
+  border: 1px solid var(--border); border-radius: 4px; padding: 4px 5px;
+  cursor: pointer; background: var(--bg2);
+  transition: border-color .1s, background .1s;
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+}
+.cell:hover { border-color: var(--border2); background: var(--bg3); }
+.cell.active { border-color: var(--blue); background: var(--blue-dim); }
+.cell .c-prob { font-size: 11px; font-weight: 600; font-family: var(--mono); }
+.cell .c-heat { height: 3px; border-radius: 2px; }
+
+/* RIGHT */
+#right { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+#search-panel { flex: 1; padding: 12px 14px; overflow: auto; border-bottom: 1px solid var(--border); }
+#battle-panel { height: 220px; display: flex; flex-direction: column; }
+#battle-header-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+#battle-repr { flex: 1; overflow: auto; padding: 10px 12px; font-family: var(--mono); font-size: 11px; white-space: pre; line-height: 1.6; background: var(--bg2); }
+
+/* stats grid */
+#stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 12px; }
+.stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
+.stat-card .s-label { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
+.stat-card .s-val { font-size: 20px; font-weight: 600; font-family: var(--mono); }
+.stat-card .s-sub { font-size: 10px; color: var(--dim); }
+
+/* policy section — two columns side by side */
+.policy-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.policy-col-title { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.pbar-row { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+.pbar-name { font-size: 10px; color: var(--muted); width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); }
+.pbar-track { flex: 1; height: 10px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+.pbar-fill { height: 100%; border-radius: 3px; transition: width .25s; }
+.pbar-fill.p1 { background: var(--blue); }
+.pbar-fill.p2 { background: #a060e0; }
+.pbar-pct { font-size: 10px; color: var(--muted); width: 32px; text-align: right; font-family: var(--mono); }
+
+/* manual move */
+#move-ctrl { display: flex; align-items: center; gap: 8px; }
+#manual-toggle { appearance: none; width: 32px; height: 18px; border-radius: 9px; background: var(--bg3); border: 1px solid var(--border2); cursor: pointer; position: relative; transition: background .2s; flex-shrink: 0; }
+#manual-toggle:checked { background: var(--amber); border-color: var(--amber); }
+#manual-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--muted); transition: left .2s; }
+#manual-toggle:checked::after { left: 16px; background: #fff; }
+#toggle-label { font-size: 11px; color: var(--muted); }
+#pending-move { font-family: var(--mono); font-size: 11px; color: var(--dim); margin-left: auto; }
+
+#manual-input-row { display: none; gap: 6px; padding: 6px 12px 8px; align-items: center; border-top: 1px solid var(--border); }
+#manual-input-row.visible { display: flex; }
+#move-input { flex: 1; background: var(--bg2); border: 1px solid var(--border2); border-radius: 4px; color: var(--text); font-family: var(--mono); font-size: 12px; padding: 5px 8px; outline: none; }
+#move-input:focus { border-color: var(--amber); }
+#send-btn { background: var(--amber); border: none; border-radius: 4px; color: #1a1000; font-weight: 600; font-size: 12px; padding: 5px 12px; cursor: pointer; }
+#send-btn:hover { filter: brightness(1.1); }
+
+/* status */
+#status { font-size: 10px; color: var(--dim); }
+.dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; background: var(--dim); }
+.dot.live { background: var(--green); }
+.dot.manual { background: var(--amber); }
+#no-sel { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--dim); font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="root">
+  <div id="left">
+    <div id="left-top">
+      <div class="panel-title">ω belief matrix <span id="dim-lbl" style="float:right;text-transform:none;letter-spacing:0;color:var(--dim)"></span></div>
+      <div id="matrix"></div>
+    </div>
+    <div id="left-bottom">
+      <div id="status"><span class="dot" id="dot"></span><span id="status-txt">connecting…</span></div>
+    </div>
+  </div>
+
+  <div id="right">
+    <div id="search-panel">
+      <div class="panel-title" id="search-title">search statistics</div>
+      <div id="right-content"><div id="no-sel">← select a type pair</div></div>
+    </div>
+    <div id="battle-panel">
+      <div id="battle-header-row">
+        <div class="panel-title" style="margin:0">battle state</div>
+        <div id="move-ctrl">
+          <input type="checkbox" id="manual-toggle">
+          <label id="toggle-label" for="manual-toggle">manual</label>
+          <span id="pending-move"></span>
+        </div>
+      </div>
+      <div id="battle-repr" style="color:var(--dim)">no battle loaded</div>
+      <div id="manual-input-row">
+        <input id="move-input" type="text" placeholder="/choose move 1" autocomplete="off">
+        <button id="send-btn">send</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const state = { sel: null, cells: {}, p1Types: [], p2Types: [], probs: [], pendingMove: '', manual: false };
+let ws, reconnTimer;
+const $ = id => document.getElementById(id);
+
+function heatColor(p) {
+  if (p < .04) return '#111318';
+  if (p < .10) return '#152040';
+  if (p < .20) return '#185FA5';
+  if (p < .35) return '#378ADD';
+  return '#85B7EB';
+}
+
+function buildMatrix() {
+  const { p1Types: p1, p2Types: p2, probs } = state;
+  const mat = $('matrix');
+  const m = p1.length, n = p2.length;
+  if (!m || !n) return;
+  $('dim-lbl').textContent = `${m}×${n}`;
+  const cw = Math.max(48, Math.min(90, Math.floor(260/n)));
+  mat.style.gridTemplateColumns = `22px ${Array(n).fill(cw+'px').join(' ')}`;
+  mat.innerHTML = '';
+
+  const corner = document.createElement('div');
+  corner.className = 'ax-corner'; corner.textContent = 'us\\opp'; mat.appendChild(corner);
+  p2.forEach(t => {
+    const d = document.createElement('div');
+    d.className = 'ax-col'; d.textContent = t; d.title = t; mat.appendChild(d);
+  });
+
+  p1.forEach((t1, i) => {
+    const rl = document.createElement('div');
+    rl.className = 'ax-row'; rl.textContent = t1; rl.title = t1; mat.appendChild(rl);
+    p2.forEach((_, j) => {
+      const p = (probs[i]||[])[j] || 0;
+      const key = `${i},${j}`;
+      const cell = document.createElement('div');
+      cell.className = 'cell' + (state.sel===key?' active':'');
+      cell.dataset.key = key;
+      cell.innerHTML = `<div class="c-prob">${(p*100).toFixed(1)}%</div><div class="c-heat" style="background:${heatColor(p)}"></div>`;
+      cell.addEventListener('click', () => { state.sel = key; buildMatrix(); renderRight(); });
+      mat.appendChild(cell);
+    });
+  });
+}
+
+function policyBars(actions, probs, cls) {
+  if (!actions || !actions.length) return '';
+  return actions.map((name, k) => {
+    const pct = ((probs[k]||0)*100).toFixed(1);
+    return `<div class="pbar-row">
+      <div class="pbar-name" title="${name}">${name}</div>
+      <div class="pbar-track"><div class="pbar-fill ${cls}" style="width:${pct}%"></div></div>
+      <div class="pbar-pct">${pct}%</div>
+    </div>`;
+  }).join('');
+}
+
+function renderRight() {
+  const key = state.sel;
+  if (!key) return;
+  const [i,j] = key.split(',').map(Number);
+  const d = state.cells[key] || {};
+  const t1 = state.p1Types[i]||`us[${i}]`;
+  const t2 = state.p2Types[j]||`opp[${j}]`;
+  const prob = (state.probs[i]||[])[j] || 0;
+  $('search-title').textContent = `${t1}  vs  ${t2}   ·   ω = ${(prob*100).toFixed(2)}%`;
+
+  const fmt = v => v != null ? Number(v).toFixed(3) : '—';
+
+  $('right-content').innerHTML = `
+    <div id="stats-grid">
+      <div class="stat-card"><div class="s-label">empirical value</div><div class="s-val">${fmt(d.empirical_value)}</div><div class="s-sub">avg leaf eval</div></div>
+      <div class="stat-card"><div class="s-label">nash value</div><div class="s-val">${fmt(d.nash_value)}</div><div class="s-sub">equilibrium</div></div>
+      <div class="stat-card"><div class="s-label">iterations</div><div class="s-val">${d.iterations ?? '—'}</div><div class="s-sub">search nodes</div></div>
+      <div class="stat-card"><div class="s-label">duration</div><div class="s-val">${d.duration_ms != null ? d.duration_ms+'ms' : '—'}</div><div class="s-sub">wall time</div></div>
+    </div>
+    <div class="policy-cols">
+      <div>
+        <div class="policy-col-title">p1 policy</div>
+        ${policyBars(d.p1_action_names, d.p1_nash||[], 'p1')}
+      </div>
+      <div>
+        <div class="policy-col-title">p2 policy</div>
+        ${policyBars(d.p2_action_names, d.p2_nash||[], 'p2')}
+      </div>
+    </div>`;
+
+  $('battle-repr').textContent = d.battle_repr || '(no battle repr)';
+  $('battle-repr').style.color = d.battle_repr ? 'var(--text)' : 'var(--dim)';
+}
+
+$('manual-toggle').addEventListener('change', e => {
+  state.manual = e.target.checked;
+  $('manual-input-row').classList.toggle('visible', state.manual);
+  $('dot').className = 'dot' + (state.manual ? ' manual' : ' live');
+  if (ws && ws.readyState===1) ws.send(JSON.stringify({type:'manual_mode', enabled: state.manual}));
+});
+
+$('send-btn').addEventListener('click', sendMove);
+$('move-input').addEventListener('keydown', e => { if (e.key==='Enter') sendMove(); });
+function sendMove() {
+  const val = $('move-input').value.trim();
+  if (!val || !ws || ws.readyState!==1) return;
+  ws.send(JSON.stringify({type:'move_override', move: val}));
+  $('move-input').value = '';
+}
+
+function updatePendingMove(m) {
+  $('pending-move').textContent = m ? `bot: ${m}` : '';
+}
+
+function connect() {
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen = () => {
+    $('dot').className = 'dot' + (state.manual ? ' manual' : ' live');
+    $('status-txt').textContent = 'connected';
+    clearTimeout(reconnTimer);
+  };
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (msg.type==='init' || msg.type==='update') {
+      if (msg.p1_types != null) state.p1Types = msg.p1_types;
+      if (msg.p2_types != null) state.p2Types = msg.p2_types;
+      if (msg.probs   != null) state.probs   = msg.probs;
+      if (msg.cells   != null) Object.assign(state.cells, msg.cells);
+      if (msg.pending_move !== undefined) updatePendingMove(msg.pending_move);
+      buildMatrix();
+      if (state.sel) renderRight();
+      $('status-txt').textContent = `turn ${msg.turn ?? '?'}  ·  ${new Date().toLocaleTimeString()}`;
+    }
+  };
+  ws.onclose = () => {
+    $('dot').className = 'dot';
+    $('status-txt').textContent = 'disconnected — retrying…';
+    reconnTimer = setTimeout(connect, 2000);
+  };
+  ws.onerror = () => ws.close();
+}
+connect();
+</script>
+</body>
+</html>

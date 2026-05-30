@@ -87,6 +87,7 @@ class _Config:
     log_level: str
     log_to_file: bool
     stdout_log_handler: logging.StreamHandler
+    vis: bool = False
 
     def configure(self):
         parser = argparse.ArgumentParser()
@@ -186,6 +187,11 @@ class _Config:
             action="store_true",
             help="When enabled, DEBUG logs will be written to a file in the logs/ directory",
         )
+        parser.add_argument(
+            "--vis",
+            action="store_true",
+            help="Launch the debug visualizer at http://localhost:8765",
+        )
 
         args = parser.parse_args()
         self.websocket_uri = args.websocket_uri
@@ -210,6 +216,7 @@ class _Config:
         self.room_name = args.room_name
         self.log_level = args.log_level
         self.log_to_file = args.log_to_file
+        self.vis = args.vis
 
         self.validate_config()
 
