@@ -16,6 +16,7 @@ import time
 import traceback
 from copy import deepcopy
 from collections import defaultdict
+from enum import Enum, auto
 
 import requests
 import websockets
@@ -50,7 +51,7 @@ class LoginError(Exception):
 # ---------------------------------------------------------------------------
 
 
-class Result(enum):
+class Result(Enum):
     win = auto()
     lose = auto()
     tie = auto()
@@ -275,7 +276,7 @@ async def _init_ps_battle(client: PSWebsocketClient) -> PSBattle:
             break
 
     # p1/p2 ordering
-    while battle.us is None:
+    while True:
         msg = await client.receive_message()
         for line in msg.split("\n"):
             parts = line.split("|")
@@ -300,6 +301,7 @@ async def _init_ps_battle(client: PSWebsocketClient) -> PSBattle:
                     battle.format = fmt.value
                     battle.team = selected_team
                     return battle
+    return PSBattle("", Player(), Player())
 
 
 async def _run_battle(
