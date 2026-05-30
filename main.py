@@ -16,7 +16,7 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-predictor = TeamPredictor(args.teams, 0.01)
+predictor = TeamPredictor(args.predictor_teams, 0.01)
 
 battle = PSBattle("", PSPlayer(), PSPlayer())
 

@@ -6,13 +6,79 @@ import logging
 from copy import deepcopy
 from dataclasses import dataclass
 
-import src.constants as constants
-
 logger = logging.getLogger(__name__)
 
 import oak
 
 type Msg = list[str]
+
+
+class CONSTANTS:
+    RQID = "rqid"
+    MOVES = "moves"
+    ABILITIES = "abilities"
+    FORCE_SWITCH = "forceSwitch"
+    WAIT = "wait"
+    TRAPPED = "trapped"
+    MAYBE_TRAPPED = "maybeTrapped"
+    ID = "id"
+    BASESTATS = "baseStats"
+    NAME = "name"
+    STATUS = "status"
+    TYPES = "types"
+    TYPE = "type"
+    WEIGHT = "weightkg"
+    SIDE = "side"
+    POKEMON = "pokemon"
+    FNT = "fnt"
+    TIME_LEFT = "Time left:"
+    DETAILS = "details"
+    IDENT = "ident"
+    ACTIVE = "active"
+    PRIORITY = "priority"
+    STATS = "stats"
+    BOOSTS = "boosts"
+    HITPOINTS = "hp"
+    ATTACK = "attack"
+    DEFENSE = "defense"
+    SPECIAL_ATTACK = "special-attack"
+    SPECIAL_DEFENSE = "special-defense"
+    SPEED = "speed"
+    ACCURACY = "accuracy"
+    EVASION = "evasion"
+    STAT_ABBREVIATION_LOOKUPS = {
+        "atk": ATTACK,
+        "def": DEFENSE,
+        "spa": SPECIAL_ATTACK,
+        "spd": SPECIAL_DEFENSE,
+        "spe": SPEED,
+        "accuracy": ACCURACY,
+        "evasion": EVASION,
+    }
+    PHYSICAL = "physical"
+    SPECIAL = "special"
+    CATEGOY = "category"
+    DAMAGING_CATEGORIES = [PHYSICAL, SPECIAL]
+    VOLATILE_STATUS = "volatileStatus"
+    LOCKED_MOVE = "lockedmove"
+    REFLECT = "reflect"
+    LIGHT_SCREEN = "lightscreen"
+    MIST = "mist"
+    CONFUSION = "confusion"
+    LEECH_SEED = "leechseed"
+    SUBSTITUTE = "substitute"
+    TRANSFORM = "transform"
+    PARTIALLY_TRAPPED = "partiallytrapped"
+    # non-volatile statuses
+    SLEEP = "slp"
+    BURN = "brn"
+    FROZEN = "frz"
+    PARALYZED = "par"
+    POISON = "psn"
+    TOXIC = "tox"
+    TOXIC_COUNT = "toxic_count"
+    NON_VOLATILE_STATUSES = {SLEEP, BURN, FROZEN, PARALYZED, POISON, TOXIC}
+    FIGHT = "fight"
 
 
 def normalize_name(name):
@@ -66,29 +132,12 @@ class PSPlayer:
     pokemon: int = 6
 
 
-def _species_id(name: str) -> int:
-    normalized = normalize_name(name)
-    for i, n in enumerate(oak.species_names):
-        if normalize_name(n) == normalized:
-            return i
-    return 0
-
-
-def _move_id(name: str) -> int:
-    normalized = normalize_name(name)
-    for i, n in enumerate(oak.move_names):
-        if normalize_name(n) == normalized:
-            return i
-    return 0
-
-
 class PSBattle:
     def __init__(self, tag: str, p1: PSPlayer, p2: PSPlayer):
         self.tag = tag
         self.p1 = p1
         self.p2 = p2
-        self.us: str | None = None  # "p1" if we are p1, p2 otherwise.
-        # I think we are always p1 if we send a challenge and p2 if accepting. And random if ladder?
+        self.us: str | None = None
 
         self.rules: list[str] = []
         self.format: str = ""
@@ -105,6 +154,14 @@ class PSBattle:
         self.force_switch: bool = False
         self.wait: bool = False
         self.time_remaining: int | None = None
+
+    def players(self) -> tuple[PSPlayer, PSPlayer]:
+        if self.us == "p1":
+            return self.p1, self.p2
+        elif self.us == "p2":
+            return self.p2, self.p1
+        else:
+            assert False, f"Invalid us value {self.us}"
 
     def sides(self, split_msg) -> tuple[oak.Side, oak.Side]:
         """Return (our_pub, our_priv, opp_pub, opp_priv) sides."""
@@ -163,10 +220,6 @@ class PSBattle:
                     )
                     print(self.public.side(0).order, self.public.side(1).order)
         self.msg_lines.clear()
-
-    # -----------------------------------------------------------------------
-    # Request
-    # -----------------------------------------------------------------------
 
     def parse_request(self, split_msg: list[str]):
         if len(split_msg) < 3:
@@ -237,7 +290,7 @@ class PSBattle:
                 # we have hit the end of revealed without finding the species, add it
                 slot = s
                 index = slot - 1
-                order[index] = slot 
+                order[index] = slot
 
                 s = oak.Set()
                 s.species = species

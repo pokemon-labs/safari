@@ -15,18 +15,25 @@ import random
 import time
 import traceback
 from copy import deepcopy
+from collections import defaultdict
 
 import requests
 import websockets
 import websockets.asyncio.client
 
-import src.constants as constants
 from src.config import Config, SaveReplay, BotModes, Format, init_logging
 from src.battle import PSBattle, PSPlayer, normalize_name
 from src.teams import TeamPredictor, to_packed, get_teams_and_probs, team_to_string
 from src.search import Player, Search
 
 logger = logging.getLogger(__name__)
+
+
+START_STRING = "|start"
+SWITCH_STRING = "switch"
+WIN_STRING = "|win|"
+TIE_STRING = "|tie"
+CHAT_STRING = "|c|"
 
 
 # ---------------------------------------------------------------------------
@@ -41,6 +48,13 @@ class LoginError(Exception):
 # ---------------------------------------------------------------------------
 # WebSocket client
 # ---------------------------------------------------------------------------
+
+
+class Result(enum):
+    win = auto()
+    lose = auto()
+    tie = auto()
+    error = auto()
 
 
 class PSWebsocketClient:
@@ -203,14 +217,6 @@ class PSWebsocketClient:
 # ---------------------------------------------------------------------------
 
 
-def _battle_finished(tag: str, msg: str) -> bool:
-    return (
-        msg.startswith(f">{tag}")
-        and (constants.WIN_STRING in msg or constants.TIE_STRING in msg)
-        and constants.CHAT_STRING not in msg
-    )
-
-
 async def _pick_move(battle: PSBattle, predictor: TeamPredictor) -> tuple[str, str]:
     p1_teams, p1_probs = get_teams_and_probs(
         battle.public.side(0), predictor, Config.p1_types, battle.team
@@ -218,13 +224,6 @@ async def _pick_move(battle: PSBattle, predictor: TeamPredictor) -> tuple[str, s
     p2_teams, p2_probs = get_teams_and_probs(
         battle.public.side(1), predictor, Config.p2_types
     )
-
-    # print("Out teams")
-    # for team, prob in zip(p1_teams, p1_probs):
-    #     print(f"{prob} - ", team_to_string(team))
-    # print("Opp teams")
-    # for team, prob in zip(p2_teams, p2_probs):
-    #     print(f"{prob} - ", team_to_string(team))
 
     p1_player = Player(battle.public.side(0), p1_teams, p1_probs)
     p2_player = Player(battle.public.side(1), p2_teams, p2_probs)
@@ -246,8 +245,20 @@ async def _pick_move(battle: PSBattle, predictor: TeamPredictor) -> tuple[str, s
     return (search.parse_pkmn_choice(c), str(battle.rqid))
 
 
-async def _get_battle_tag_and_opponent(client: PSWebsocketClient) -> tuple[str, str]:
-    tag = p1 = p2 = None
+async def _wait_for_first_request(client: PSWebsocketClient, battle: PSBattle) -> None:
+    while True:
+        msg = await client.receive_message()
+        for line in msg.split("\n"):
+            parts = line.split("|")
+            if len(parts) >= 3 and parts[1].strip() == "request" and parts[2].strip():
+                battle.parse_request(parts)
+                return
+
+
+async def _init_ps_battle(client: PSWebsocketClient) -> PSBattle:
+    # battle battle tag and opp name
+    tag = None
+    opp_name = None
     while True:
         msg = await client.receive_message()
         if msg.startswith(">"):
@@ -259,19 +270,36 @@ async def _get_battle_tag_and_opponent(client: PSWebsocketClient) -> tuple[str, 
         for line in lines:
             parts = line.split("|")
             if len(parts) >= 2 and parts[1] == "title":
-                p1, p2 = parts[2].split(" vs. ")
-        if tag and p1 and p2:
-            return tag, p2
+                _, opp_name = parts[2].split(" vs. ")
+        if tag and opp_name:
+            break
 
-
-async def _wait_for_first_request(client: PSWebsocketClient, battle: PSBattle) -> None:
-    while True:
+    # p1/p2 ordering
+    while battle.us is None:
         msg = await client.receive_message()
         for line in msg.split("\n"):
             parts = line.split("|")
-            if len(parts) >= 3 and parts[1].strip() == "request" and parts[2].strip():
-                battle.parse_request(parts)
-                return
+            if len(parts) >= 4 and parts[1] == "player":
+                slot, uname = parts[2], parts[3]
+                us = None
+                if normalize_name(uname) == normalize_name(Config.username):
+                    if slot == "p1":
+                        us = "p1"
+                        p1 = PSPlayer(user=Config.username)
+                        p2 = PSPlayer(user=opp_name)
+                    elif slot == "p2":
+                        us = "p2"
+                        p2 = PSPlayer(user=Config.username)
+                        p1 = PSPlayer(user=opp_name)
+                    else:
+                        assert (
+                            False
+                        ), f"Bad slot deduction, expected p1/p2 but got {slot}"
+                    battle = PSBattle(tag, p1, p2)
+                    battle.us = us
+                    battle.format = fmt.value
+                    battle.team = selected_team
+                    return battle
 
 
 async def _run_battle(
@@ -279,38 +307,15 @@ async def _run_battle(
     fmt: Format,
     predictor: TeamPredictor,
     selected_team: Team,
-) -> str | None:
+) -> Result:
 
-    tag, opp_name = await _get_battle_tag_and_opponent(client)
-    p1 = PSPlayer(user=Config.username)
-    p2 = PSPlayer(user=opp_name)
-    battle = PSBattle(tag, p1, p2)
-    battle.format = fmt.value
-    battle.team = selected_team
-    while battle.us is None:
-        msg = await client.receive_message()
-        for line in msg.split("\n"):
-            parts = line.split("|")
-            if len(parts) >= 4 and parts[1] == "player":
-                slot, uname = parts[2], parts[3]
-                print(f"Player parsing:  slot{slot}, uname{uname}, total{parts}")
-                if normalize_name(uname) == normalize_name(Config.username):
-                    if slot == "p1":
-                        battle.us = "p1"
-                        pass
-                    elif slot == "p2":
-                        battle.us = "p2"
-                        battle.p1, battle.p2 = battle.p2, battle.p1
-                    else:
-                        assert (
-                            False
-                        ), f"Bad slot deduction, expected p1/p2 but got {slot}"
+    battle: PSBattle = await _init_ps_battle(client)
 
     # wait for |start| (may already be in msg from above)
     while True:
-        if constants.START_STRING in msg:
+        if START_STRING in msg:
             battle.started = True
-            after_start = msg.split(constants.START_STRING, 1)[1].strip()
+            after_start = msg.split(START_STRING, 1)[1].strip()
             battle.msg_lines = [
                 m
                 for m in after_start.split("\n")
@@ -324,41 +329,45 @@ async def _run_battle(
 
     # await client.send_message(tag, ["/timer on"])
 
-    # TODO ask pmarg why this is here
     if not battle.wait:
         move = await _pick_move(battle, predictor)
         await client.send_message(tag, move)
 
-    # main battle loop
+    msg: Msg | None = None
     while True:
         msg = await client.receive_message()
-
-        if _battle_finished(tag, msg):
-            winner = (
-                msg.split(constants.WIN_STRING)[-1].split("\n")[0].strip()
-                if constants.WIN_STRING in msg
-                else None
-            )
-            logger.info(f"winner: {winner}")
-            cfg = Config
-            if (
-                cfg.save_replay == SaveReplay.always
-                or (cfg.save_replay == SaveReplay.on_loss and winner != cfg.username)
-                or (cfg.save_replay == SaveReplay.on_win and winner == cfg.username)
-            ):
-                await client.save_replay(tag)
-            await client.leave_battle(tag)
-            return winner
+        if (
+            msg.startswith(f">{tag}")
+            and (WIN_STRING in msg or TIE_STRING in msg)
+            and CHAT_STRING not in msg
+        ):
+            break
 
         action_required = battle.update(msg)
         if action_required and not battle.wait:
             move = await _pick_move(battle, predictor)
             await client.send_message(tag, move)
 
+    winner = (
+        msg.split(WIN_STRING)[-1].split("\n")[0].strip() if WIN_STRING in msg else None
+    )
+    logger.info(f"winner: {winner}")
+    cfg = Config
+    if (
+        cfg.save_replay == SaveReplay.always
+        or (cfg.save_replay == SaveReplay.on_loss and winner != cfg.username)
+        or (cfg.save_replay == SaveReplay.on_win and winner == cfg.username)
+    ):
+        await client.save_replay(tag)
+    await client.leave_battle(tag)
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
+    # TODO error handling/tracking
+    if winner == Config.username:
+        return Result.win
+    elif winner is None:
+        return Result.win
+    else:
+        return Result.lose
 
 
 async def main() -> None:
@@ -369,15 +378,16 @@ async def main() -> None:
         Config.username, Config.password, Config.websocket_uri
     )
     Config.user_id = await client.login()
-
     if Config.avatar is not None:
         await client.avatar(Config.avatar)
 
-    wins = losses = ties = battles_run = 0
-
     user_teams = TeamPredictor(Config.teams)
     predictor = TeamPredictor(Config.predictor_teams, Config.predictor_ratio)
+    logger.info(
+        f"Loaded {len(user_teams.teams)} agent teams. \nLoaded {len(predictor.teams)} predictor teams."
+    )
 
+    record = defaultdict(lambda: 0)
     while True:
 
         selected_team = random.choice(user_teams.teams)
@@ -393,19 +403,11 @@ async def main() -> None:
         else:
             raise ValueError(f"unknown bot mode: {mode}")
 
-        winner = await _run_battle(client, Config.format, predictor, selected_team)
-
-        if winner == Config.username:
-            wins += 1
-            logger.info(f"won with {team_to_string(selected_team)}")
-        elif winner is None:
-            ties += 1
-            logger.info(f"tied with {team_to_string(selected_team)}")
-        else:
-            losses += 1
-            logger.info(f"lost with {team_to_string(selected_team)}")
-
-        logger.info(f"W:{wins} L:{losses} T:{ties}")
+        result = await _run_battle(client, Config.format, predictor, selected_team)
+        record[result] += 1
+        logger.info(
+            f"W{record[Result.win]}, T{record[Result.tie]}, L{record[Result.loss]}"
+        )
         battles_run += 1
         if battles_run >= Config.run_count:
             break

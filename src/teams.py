@@ -102,6 +102,7 @@ class SetDict:
     def clone(self) -> SetDict:
         other = SetDict()
         other.sets = deepcopy(self.sets)
+        return other
 
     def remove_species(species: int):
         to_remove: list[oak.Set] = [s for s in self.sets if s.species == species]
@@ -125,6 +126,8 @@ class TeamPredictor:
         self.teams: list[Team] = [
             tuple(sorted_team(team)) for team in oak.load_teams(path)
         ]
+        print(len(self.teams))
+        assert len(self.teams) > 0, f"Failed to load any teams from {path}"
         assert all(len(team) <= 6 for team in self.teams)
         assert all(
             all(1 < s.species <= 151 and any(s.moves) for s in team)
