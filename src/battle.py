@@ -13,7 +13,7 @@ import oak
 type Msg = list[str]
 
 
-class CONSTANTS:
+class constants:
     RQID = "rqid"
     MOVES = "moves"
     ABILITIES = "abilities"
@@ -140,7 +140,6 @@ class PSBattle:
         self.us: str | None = None
 
         self.rules: list[str] = []
-        self.format: str = ""
 
         self.team: Team | None = None
         self.public = oak.Battle(bytes(384))

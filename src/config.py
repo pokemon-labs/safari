@@ -213,9 +213,6 @@ class _Config:
 
         self.validate_config()
 
-    def requires_team(self) -> bool:
-        return self.format != Format.randombattle
-
     def validate_config(self):
         if self.bot_mode == BotModes.challenge_user:
             assert (

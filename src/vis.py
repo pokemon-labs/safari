@@ -498,6 +498,7 @@ if __name__ == "__main__":
     viz.start()
     print("Visualizer running at http://localhost:8765  (Ctrl-C to stop)")
 
+    # Types are actually teams ({Species, Move[4]}[6]), not single species.
     p1 = ["Starmie", "Alakazam", "Lapras"]
     p2 = ["Gengar", "Tauros", "Snorlax", "Chansey"]
     moves = ["Blizzard", "Surf", "Psychic", "Thunder Wave", "Recover"]

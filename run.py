@@ -256,7 +256,7 @@ async def _wait_for_first_request(client: PSWebsocketClient, battle: PSBattle) -
                 return
 
 
-async def _init_ps_battle(client: PSWebsocketClient) -> PSBattle:
+async def _init_ps_battle(client: PSWebsocketClient, team: Team) -> PSBattle:
     # battle battle tag and opp name
     tag = None
     opp_name = None
@@ -298,20 +298,18 @@ async def _init_ps_battle(client: PSWebsocketClient) -> PSBattle:
                         ), f"Bad slot deduction, expected p1/p2 but got {slot}"
                     battle = PSBattle(tag, p1, p2)
                     battle.us = us
-                    battle.format = fmt.value
-                    battle.team = selected_team
+                    battle.team = team
                     return battle
     return PSBattle("", Player(), Player())
 
 
 async def _run_battle(
     client: PSWebsocketClient,
-    fmt: Format,
     predictor: TeamPredictor,
     selected_team: Team,
 ) -> Result:
 
-    battle: PSBattle = await _init_ps_battle(client)
+    battle: PSBattle = await _init_ps_battle(client, selected_team)
 
     # wait for |start| (may already be in msg from above)
     while True:
@@ -405,7 +403,7 @@ async def main() -> None:
         else:
             raise ValueError(f"unknown bot mode: {mode}")
 
-        result = await _run_battle(client, Config.format, predictor, selected_team)
+        result = await _run_battle(client, predictor, selected_team)
         record[result] += 1
         logger.info(
             f"W{record[Result.win]}, T{record[Result.tie]}, L{record[Result.loss]}"
