@@ -6,714 +6,584 @@
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg: #1a1a2e; --bg2: #16213e; --bg3: #0f3460;
-  --panel: #1e1e30; --panel2: #252540;
-  --border: #2a2a4a; --border2: #3a3a5a;
-  --text: #e8e8f0; --muted: #8888aa; --dim: #55556a;
-  --blue: #4a9eff; --blue-dim: #1a3060;
-  --green: #3ddc84; --amber: #f0b030; --red: #ff6b6b;
-  --p1: #4a9eff; --p2: #b060f0;
-  --hp-green: #3ddc84; --hp-yellow: #f0b030; --hp-red: #ff4444;
+  --bg: #0d0d14; --bg2: #13131f; --bg3: #1a1a2a;
+  --panel: #111120; --panel2: #1c1c2e;
+  --border: #252538; --border2: #363658;
+  --text: #e0e0f0; --muted: #7070a0; --dim: #404060;
+  --p1: #4a9eff; --p2: #c060f0;
+  --green: #3ddc84; --amber: #f0b030; --red: #ff5555;
   --mono: 'Cascadia Code', 'Fira Code', monospace;
   --sans: 'Segoe UI', system-ui, sans-serif;
 }
-html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13px; overflow: hidden; }
-#root { display: grid; grid-template-columns: 200px 1fr 320px; grid-template-rows: 100vh; height: 100vh; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 12px; overflow: hidden; }
 
-/* ===== LEFT: TYPE SELECTOR ===== */
-#left { display: flex; flex-direction: column; border-right: 1px solid var(--border); background: var(--panel); overflow: hidden; }
-#left-header { padding: 10px 12px 6px; border-bottom: 1px solid var(--border); }
-#left-header .panel-title { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
-#types-container { display: flex; flex: 1; overflow: hidden; }
-.type-col { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 6px 4px; gap: 3px; }
+#root {
+  display: grid;
+  grid-template-columns: 160px 1fr 280px;
+  height: 100vh;
+}
+
+/* ── PANEL TITLE ── */
+.ptitle {
+  font-size: 9px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 6px;
+}
+
+/* ══════════════════════════════════════════
+   LEFT — type selectors
+══════════════════════════════════════════ */
+#left {
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--border); background: var(--panel);
+  overflow: hidden;
+}
+#left-header { padding: 8px 10px 4px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+
+#types-wrap {
+  flex: 1; display: grid; grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+}
+.type-col { display: flex; flex-direction: column; overflow-y: auto; padding: 4px 3px; gap: 3px; }
 .type-col:first-child { border-right: 1px solid var(--border); }
-.type-col-header { font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-align: center; padding: 4px 0 6px; flex-shrink: 0; }
+.type-col-hdr {
+  font-size: 8px; letter-spacing: .08em; text-transform: uppercase;
+  text-align: center; padding: 3px 0 5px; flex-shrink: 0;
+}
 
 .type-btn {
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  padding: 5px 3px; border-radius: 6px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 4px 2px; border-radius: 5px; cursor: pointer;
   border: 1px solid var(--border); background: var(--bg2);
-  transition: all .15s; position: relative; flex-shrink: 0;
+  transition: all .12s; flex-shrink: 0;
 }
 .type-btn:hover { border-color: var(--border2); background: var(--panel2); }
-.type-btn.selected-p1 { border-color: var(--p1); background: rgba(74,158,255,.12); box-shadow: 0 0 0 1px var(--p1) inset; }
-.type-btn.selected-p2 { border-color: var(--p2); background: rgba(176,96,240,.12); box-shadow: 0 0 0 1px var(--p2) inset; }
-.type-btn .type-sprites { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px; }
-.type-btn .type-sprite { width: 24px; height: 24px; image-rendering: pixelated; object-fit: contain; }
-.type-btn .type-label { font-size: 9px; color: var(--muted); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px; }
-.type-btn .type-prob { font-size: 9px; font-family: var(--mono); color: var(--dim); }
-.type-btn.selected-p1 .type-prob, .type-btn.selected-p1 .type-label { color: var(--p1); }
-.type-btn.selected-p2 .type-prob, .type-btn.selected-p2 .type-label { color: var(--p2); }
+.type-btn.sel-p1 { border-color: var(--p1); background: rgba(74,158,255,.1); box-shadow: 0 0 0 1px var(--p1) inset; }
+.type-btn.sel-p2 { border-color: var(--p2); background: rgba(192,96,240,.1); box-shadow: 0 0 0 1px var(--p2) inset; }
+.type-btn .t-sprites { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px; max-width: 54px; }
+.type-btn .t-sprite { width: 20px; height: 20px; image-rendering: pixelated; object-fit: contain; }
+.type-btn .t-label { font-size: 8px; color: var(--muted); text-align: center; max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.type-btn.sel-p1 .t-label { color: var(--p1); }
+.type-btn.sel-p2 .t-label { color: var(--p2); }
 
-#left-bottom { padding: 8px 10px; border-top: 1px solid var(--border); font-size: 11px; }
-#status { font-size: 10px; color: var(--dim); display: flex; align-items: center; gap: 5px; }
-.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dim); flex-shrink: 0; }
+#left-foot { padding: 6px 8px; border-top: 1px solid var(--border); font-size: 10px; flex-shrink: 0; }
+#status { display: flex; align-items: center; gap: 5px; color: var(--dim); font-size: 9px; }
+.dot { width: 5px; height: 5px; border-radius: 50%; background: var(--dim); flex-shrink: 0; }
 .dot.live { background: var(--green); box-shadow: 0 0 4px var(--green); }
 .dot.manual { background: var(--amber); }
 
-/* ===== CENTER: MAIN CONTENT ===== */
-#center { display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
-
-/* --- EV MATRIX --- */
-#matrix-section { padding: 10px 12px 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-#matrix-section .panel-title { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
-#matrix-values-row { display: flex; gap: 16px; align-items: center; }
-.mv-card { font-size: 10px; color: var(--muted); }
-.mv-card span { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--text); }
-
-#ev-matrix { display: grid; gap: 2px; }
-.ev-corner { }
-.ev-col-hdr { font-size: 9px; color: var(--muted); text-align: center; padding: 1px 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ev-row-hdr { font-size: 9px; color: var(--muted); display: flex; align-items: center; justify-content: flex-end; padding-right: 3px; overflow: hidden; white-space: nowrap; }
-.ev-cell {
-  border-radius: 3px; cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 3px 4px; gap: 1px; min-height: 32px;
-  border: 1px solid transparent; transition: border-color .1s;
-  position: relative;
+/* ══════════════════════════════════════════
+   CENTER — EV matrix (action × action) + battle
+══════════════════════════════════════════ */
+#center {
+  display: flex; flex-direction: column; overflow: hidden; background: var(--bg);
 }
-.ev-cell:hover { border-color: rgba(255,255,255,.2); }
-.ev-cell.active { border: 2px solid white !important; }
-.ev-cell .ev-val { font-size: 10px; font-family: var(--mono); font-weight: 700; color: rgba(0,0,0,.85); line-height: 1; }
-.ev-cell .ev-iters { font-size: 8px; color: rgba(0,0,0,.55); font-family: var(--mono); }
 
-/* --- BATTLE VIEW --- */
-#battle-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-#battle-arena { flex: 1; display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(180deg, #0d1117 0%, #1a1a2e 100%); position: relative; min-height: 0; overflow: hidden; }
+/* top bar */
+#center-header {
+  display: flex; align-items: center; gap: 16px;
+  padding: 7px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  background: var(--panel);
+}
+#center-header .ptitle { margin: 0; }
+#matrix-label { font-size: 10px; color: var(--text); font-family: var(--mono); font-weight: 600; }
+.hval { font-size: 9px; color: var(--muted); }
+.hval span { font-family: var(--mono); color: var(--text); font-weight: 600; }
 
-/* Pokemon battle layout - Showdown-style */
-.battle-side { display: flex; align-items: flex-end; gap: 6px; padding: 6px 10px; }
-.battle-side.p2-side { flex-direction: row-reverse; justify-content: flex-end; padding-top: 8px; }
-.battle-side.p1-side { flex-direction: row; padding-bottom: 4px; }
+/* EV matrix fills most of center */
+#matrix-wrap {
+  flex: 1; overflow: auto; padding: 12px 14px;
+  display: flex; align-items: center; justify-content: center;
+}
 
-.active-pokemon { display: flex; flex-direction: column; align-items: center; gap: 2px; position: relative; }
-.active-pokemon img { image-rendering: pixelated; }
-.p2-side .active-pokemon img { width: 80px; height: 80px; }
-.p1-side .active-pokemon img { width: 80px; height: 80px; transform: scaleX(-1); }
+#ev-matrix {
+  display: grid;
+  /* set dynamically */
+}
 
-.hp-bar-wrap { width: 90px; }
-.hp-bar-label { display: flex; justify-content: space-between; font-size: 9px; color: var(--muted); margin-bottom: 1px; }
-.hp-bar-name { font-size: 9px; color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 64px; }
-.hp-track { height: 5px; background: #333; border-radius: 3px; overflow: hidden; }
+/* matrix header cells */
+.mh-corner { /* top-left blank */ }
+.mh-col {
+  font-size: 9px; color: var(--muted); text-align: center;
+  padding: 2px 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  writing-mode: horizontal-tb;
+  max-width: 80px;
+}
+.mh-row {
+  font-size: 9px; color: var(--muted);
+  display: flex; align-items: center; justify-content: flex-end;
+  padding-right: 5px; overflow: hidden; white-space: nowrap;
+  max-width: 100px;
+}
+
+.ev-cell {
+  border-radius: 4px; cursor: default;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: 1px solid transparent; transition: border-color .1s;
+  min-height: 40px; min-width: 50px; padding: 3px 4px;
+}
+.ev-cell .ev-v { font-size: 11px; font-family: var(--mono); font-weight: 700; line-height: 1; }
+.ev-cell .ev-n { font-size: 8px; font-family: var(--mono); opacity: .6; }
+.ev-cell.diag { outline: 2px solid rgba(255,255,255,.25); outline-offset: -2px; }
+
+/* battle strip at bottom of center */
+#battle-strip {
+  height: 140px; flex-shrink: 0;
+  display: flex; align-items: stretch;
+  border-top: 1px solid var(--border); background: var(--bg2);
+  overflow: hidden;
+}
+#battle-arena {
+  flex: 1; display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 16px; background: linear-gradient(180deg, #0a0a16 0%, #111128 100%);
+  gap: 8px;
+}
+.ba-side { display: flex; align-items: flex-end; gap: 6px; }
+.ba-side.p2 { flex-direction: row-reverse; }
+
+.active-poke { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.active-poke img { width: 72px; height: 72px; image-rendering: pixelated; }
+.active-poke.p1 img { transform: scaleX(-1); }
+
+.hp-block { width: 80px; }
+.hp-name { font-size: 9px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hp-nums { font-size: 8px; color: var(--muted); display: flex; justify-content: space-between; margin: 1px 0; }
+.hp-track { height: 4px; background: #222; border-radius: 3px; overflow: hidden; }
 .hp-fill { height: 100%; border-radius: 3px; transition: width .4s; }
 
-.bench-pokemon { display: flex; flex-direction: column; align-items: center; gap: 1px; cursor: default; position: relative; }
-.bench-pokemon img { width: 36px; height: 36px; image-rendering: pixelated; opacity: .85; }
-.bench-pokemon img.fainted { opacity: .25; filter: grayscale(100%); }
-.bench-pokemon .bench-hp { width: 34px; height: 3px; background: #333; border-radius: 2px; overflow: hidden; }
-.bench-pokemon .bench-hp-fill { height: 100%; border-radius: 2px; }
-
-/* Move tooltip */
-.move-tooltip {
-  position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
-  background: rgba(0,0,0,.92); border: 1px solid var(--border2);
-  border-radius: 5px; padding: 5px 8px; font-size: 10px;
-  white-space: nowrap; pointer-events: none; z-index: 100;
-  color: var(--text); display: none;
+.bench-row { display: flex; gap: 4px; align-items: flex-end; }
+.bench-mon { display: flex; flex-direction: column; align-items: center; gap: 1px; position: relative; }
+.bench-mon img { width: 32px; height: 32px; image-rendering: pixelated; }
+.bench-mon img.ko { opacity: .2; filter: grayscale(1); }
+.bench-bar { width: 30px; height: 3px; background: #222; border-radius: 2px; overflow: hidden; }
+.bench-bar-fill { height: 100%; border-radius: 2px; }
+.bench-tip {
+  display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,.9); border: 1px solid var(--border2);
+  border-radius: 4px; padding: 3px 6px; font-size: 9px; white-space: nowrap;
+  z-index: 10; color: var(--text); pointer-events: none;
 }
-.bench-pokemon:hover .move-tooltip { display: block; }
+.bench-mon:hover .bench-tip { display: block; }
 
-/* Move display for active mon */
-.active-moves { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 2px; }
-.move-chip {
-  font-size: 8px; font-family: var(--mono);
-  background: rgba(255,255,255,.07); border: 1px solid var(--border2);
-  border-radius: 3px; padding: 1px 4px; color: var(--muted);
-  cursor: default; position: relative;
+#battle-ctrl {
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: 6px 10px; min-width: 120px; border-left: 1px solid var(--border);
 }
-.move-chip:hover .move-tooltip { display: block; }
-.move-chip .move-tooltip { bottom: 110%; }
-
-/* Status badge */
-.status-badge {
-  font-size: 8px; font-family: var(--mono); font-weight: 700;
-  border-radius: 2px; padding: 1px 3px; line-height: 1;
+#turn-lbl { font-size: 9px; color: var(--muted); font-family: var(--mono); }
+#pending-lbl { font-size: 9px; color: var(--dim); font-family: var(--mono); word-break: break-all; }
+.manual-row { display: flex; align-items: center; gap: 5px; }
+#manual-toggle {
+  appearance: none; width: 28px; height: 15px; border-radius: 8px;
+  background: var(--bg3); border: 1px solid var(--border2); cursor: pointer;
+  position: relative; transition: background .2s;
 }
-.status-brn { background: #cc6600; color: #fff; }
-.status-frz { background: #66aaff; color: #000; }
-.status-par { background: #ccaa00; color: #000; }
-.status-psn, .status-tox { background: #aa44cc; color: #fff; }
-.status-slp { background: #888; color: #fff; }
-
-#battle-divider { height: 1px; background: var(--border); flex-shrink: 0; }
-
-/* bottom turn + move ctrl */
-#battle-controls { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-top: 1px solid var(--border); flex-shrink: 0; background: var(--panel); }
-.turn-badge { font-size: 10px; color: var(--muted); font-family: var(--mono); }
-#pending-move { font-size: 11px; color: var(--dim); font-family: var(--mono); }
-.spacer { flex: 1; }
-#manual-toggle { appearance: none; width: 30px; height: 17px; border-radius: 9px; background: var(--bg3); border: 1px solid var(--border2); cursor: pointer; position: relative; transition: background .2s; }
 #manual-toggle:checked { background: var(--amber); border-color: var(--amber); }
-#manual-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: var(--muted); transition: left .2s; }
-#manual-toggle:checked::after { left: 15px; background: #fff; }
-#toggle-label { font-size: 11px; color: var(--muted); }
-#manual-input-row { display: none; gap: 6px; padding: 4px 12px 6px; align-items: center; border-top: 1px solid var(--border); }
-#manual-input-row.visible { display: flex; }
-#move-input { flex: 1; background: var(--bg2); border: 1px solid var(--border2); border-radius: 4px; color: var(--text); font-family: var(--mono); font-size: 12px; padding: 4px 8px; outline: none; }
+#manual-toggle::after {
+  content: ''; position: absolute; top: 1px; left: 1px;
+  width: 11px; height: 11px; border-radius: 50%;
+  background: var(--muted); transition: left .2s;
+}
+#manual-toggle:checked::after { left: 14px; background: #fff; }
+#tog-lbl { font-size: 9px; color: var(--muted); }
+#manual-row2 { display: none; padding: 4px 8px; border-top: 1px solid var(--border); align-items: center; gap: 5px; }
+#manual-row2.vis { display: flex; }
+#move-input {
+  flex: 1; background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: 3px; color: var(--text); font-family: var(--mono);
+  font-size: 11px; padding: 3px 6px; outline: none;
+}
 #move-input:focus { border-color: var(--amber); }
-#send-btn { background: var(--amber); border: none; border-radius: 4px; color: #1a1000; font-weight: 700; font-size: 12px; padding: 4px 12px; cursor: pointer; }
+#send-btn {
+  background: var(--amber); border: none; border-radius: 3px;
+  color: #1a1000; font-weight: 700; font-size: 11px;
+  padding: 3px 10px; cursor: pointer;
+}
 
-/* ===== RIGHT: SEARCH STATS ===== */
-#right { display: flex; flex-direction: column; border-left: 1px solid var(--border); background: var(--panel); overflow: hidden; }
-#right-header { padding: 10px 12px 6px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-#right-header .panel-title { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
-#cell-title { font-size: 11px; color: var(--text); margin-top: 3px; font-family: var(--mono); }
-#right-content { flex: 1; overflow-y: auto; padding: 10px 12px; }
+/* ══════════════════════════════════════════
+   RIGHT — strategies
+══════════════════════════════════════════ */
+#right {
+  display: flex; flex-direction: column;
+  border-left: 1px solid var(--border); background: var(--panel);
+  overflow: hidden;
+}
+#right-header { padding: 8px 12px 5px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+#cell-lbl { font-size: 10px; color: var(--text); font-family: var(--mono); margin-top: 2px; }
+#right-body { flex: 1; overflow-y: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 8px; }
 
-#stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
-.stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
-.stat-card .s-label { font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 2px; }
-.stat-card .s-val { font-size: 18px; font-weight: 700; font-family: var(--mono); }
-.stat-card .s-sub { font-size: 9px; color: var(--dim); }
+#stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.scard { background: var(--bg2); border: 1px solid var(--border); border-radius: 5px; padding: 6px 8px; }
+.scard .sl { font-size: 8px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.scard .sv { font-size: 17px; font-weight: 700; font-family: var(--mono); line-height: 1.2; }
+.scard .ss { font-size: 8px; color: var(--dim); }
 
-.policy-col-title { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 5px; }
-.pbar-row { display: flex; align-items: center; gap: 5px; margin-bottom: 3px; }
-.pbar-name { font-size: 9px; color: var(--muted); width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); }
-.pbar-track { flex: 1; height: 8px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
-.pbar-fill { height: 100%; border-radius: 3px; transition: width .25s; }
+.pol-title { font-size: 8px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+.pbar { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; }
+.pbar-name { font-size: 9px; font-family: var(--mono); color: var(--muted); width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pbar-track { flex: 1; height: 7px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+.pbar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
 .pbar-fill.p1 { background: var(--p1); }
 .pbar-fill.p2 { background: var(--p2); }
-.pbar-pct { font-size: 9px; color: var(--muted); width: 30px; text-align: right; font-family: var(--mono); }
-
-.section-title { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 10px 0 5px; border-top: 1px solid var(--border); padding-top: 8px; }
-#no-sel { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--dim); font-size: 12px; }
+.pbar-pct { font-size: 8px; color: var(--muted); width: 28px; text-align: right; font-family: var(--mono); }
+.divider { height: 1px; background: var(--border); margin: 4px 0; }
+#no-sel { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--dim); font-size: 11px; }
 </style>
 </head>
 <body>
 <div id="root">
 
-  <!-- LEFT: TYPE SELECTOR -->
-  <div id="left">
-    <div id="left-header">
-      <div class="panel-title">Types</div>
+<!-- ── LEFT ── -->
+<div id="left">
+  <div id="left-header"><div class="ptitle">TYPES</div></div>
+  <div id="types-wrap">
+    <div class="type-col" id="p1-col">
+      <div class="type-col-hdr" style="color:var(--p1)">P1</div>
     </div>
-    <div id="types-container">
-      <div class="type-col" id="p1-col">
-        <div class="type-col-header" style="color:var(--p1)">P1</div>
-      </div>
-      <div class="type-col" id="p2-col">
-        <div class="type-col-header" style="color:var(--p2)">P2</div>
-      </div>
-    </div>
-    <div id="left-bottom">
-      <div id="status"><span class="dot" id="dot"></span><span id="status-txt">connecting…</span></div>
+    <div class="type-col" id="p2-col">
+      <div class="type-col-hdr" style="color:var(--p2)">P2</div>
     </div>
   </div>
-
-  <!-- CENTER -->
-  <div id="center">
-    <!-- EV MATRIX -->
-    <div id="matrix-section">
-      <div class="panel-title">
-        <span>EV matrix <span id="dim-lbl" style="color:var(--dim);font-size:9px;text-transform:none;letter-spacing:0"></span></span>
-        <div id="matrix-values-row">
-          <div class="mv-card">Empirical: <span id="mv-empirical">—</span></div>
-          <div class="mv-card">Nash: <span id="mv-nash">—</span></div>
-        </div>
-      </div>
-      <div id="ev-matrix"></div>
-    </div>
-
-    <!-- BATTLE -->
-    <div id="battle-section">
-      <div id="battle-arena">
-        <!-- P2 (opponent, top, front sprites) -->
-        <div class="battle-side p2-side" id="p2-battle-side"></div>
-        <div id="battle-divider"></div>
-        <!-- P1 (us, bottom, back sprites) -->
-        <div class="battle-side p1-side" id="p1-battle-side"></div>
-      </div>
-      <div id="battle-controls">
-        <span class="turn-badge" id="turn-badge">turn 0</span>
-        <span id="pending-move"></span>
-        <span class="spacer"></span>
-        <input type="checkbox" id="manual-toggle">
-        <label id="toggle-label" for="manual-toggle">manual</label>
-      </div>
-      <div id="manual-input-row">
-        <input id="move-input" type="text" placeholder="/choose move 1" autocomplete="off">
-        <button id="send-btn">send</button>
-      </div>
-    </div>
+  <div id="left-foot">
+    <div id="status"><span class="dot" id="dot"></span><span id="status-txt">connecting…</span></div>
   </div>
-
-  <!-- RIGHT: SEARCH STATS -->
-  <div id="right">
-    <div id="right-header">
-      <div class="panel-title">Strategies</div>
-      <div id="cell-title">—</div>
-    </div>
-    <div id="right-content"><div id="no-sel">← select a type pair</div></div>
-  </div>
-
 </div>
 
+<!-- ── CENTER ── -->
+<div id="center">
+  <div id="center-header">
+    <div class="ptitle" style="margin:0">EV MATRIX</div>
+    <div id="matrix-label">—</div>
+    <div style="flex:1"></div>
+    <div class="hval">EMPIRICAL&nbsp;<span id="hv-emp">—</span></div>
+    <div class="hval">NASH&nbsp;<span id="hv-nash">—</span></div>
+  </div>
+
+  <div id="matrix-wrap">
+    <div id="ev-matrix"></div>
+  </div>
+
+  <div id="battle-strip">
+    <div id="battle-arena">
+      <div class="ba-side p2" id="ba-p2"></div>
+      <div style="width:1px;height:80%;background:var(--border);flex-shrink:0"></div>
+      <div class="ba-side p1" id="ba-p1"></div>
+    </div>
+    <div id="battle-ctrl">
+      <div id="turn-lbl">turn —</div>
+      <div id="pending-lbl"></div>
+      <div class="manual-row">
+        <input type="checkbox" id="manual-toggle">
+        <label id="tog-lbl" for="manual-toggle">manual</label>
+      </div>
+    </div>
+  </div>
+  <div id="manual-row2">
+    <input id="move-input" type="text" placeholder="/choose move 1" autocomplete="off">
+    <button id="send-btn">send</button>
+  </div>
+</div>
+
+<!-- ── RIGHT ── -->
+<div id="right">
+  <div id="right-header">
+    <div class="ptitle">STRATEGIES</div>
+    <div id="cell-lbl">—</div>
+  </div>
+  <div id="right-body">
+    <div id="no-sel">← select a type pair</div>
+  </div>
+</div>
+
+</div><!-- #root -->
+
 <script>
-// =====================================================================
+// ─────────────────────────────────────────────────────────
 // State
-// =====================================================================
-const state = {
-  sel: null,
-  cells: {},
-  p1Types: [],   // string labels
-  p2Types: [],
-  p1Teams: [],   // list of list of species_id strings (populated from battle_repr parsing or cells)
-  p2Teams: [],
-  probs: [],
-  pendingMove: '',
-  turn: 0,
-  selP1: 0,
-  selP2: 0,
-  battle: null,  // parsed battle data for selected cell
+// ─────────────────────────────────────────────────────────
+const S = {
+  cells: {}, p1Types: [], p2Types: [], probs: [],
+  pendingMove: '', turn: 0,
+  selP1: 0, selP2: 0,
 };
 let ws, reconnTimer;
 const $ = id => document.getElementById(id);
 
-// =====================================================================
-// Sprite helpers
-// =====================================================================
-const SPRITE_BASE = 'https://play.pokemonshowdown.com/sprites';
-
-function spriteUrl(speciesId, back = false) {
-  if (!speciesId) return '';
-  const folder = back ? 'gen1back' : 'gen1';
-  // Showdown sprite IDs are lowercase, no spaces
-  const sid = speciesId.toLowerCase().replace(/[^a-z0-9]/g, '');
-  return `${SPRITE_BASE}/${folder}/${sid}.png`;
+const SPRITE = 'https://play.pokemonshowdown.com/sprites';
+function spriteUrl(sid, back) {
+  if (!sid) return '';
+  const id = sid.toLowerCase().replace(/[^a-z0-9]/g,'');
+  return `${SPRITE}/${back?'gen1back':'gen1'}/${id}.png`;
+}
+function mkImg(sid, back, sz) {
+  const i = document.createElement('img');
+  i.src = spriteUrl(sid, back); i.width = sz; i.height = sz;
+  i.style.imageRendering = 'pixelated';
+  i.onerror = () => i.style.display='none';
+  return i;
 }
 
-function makeSprite(speciesId, back = false, size = 80) {
-  const img = document.createElement('img');
-  img.src = spriteUrl(speciesId, back);
-  img.width = size; img.height = size;
-  img.style.imageRendering = 'pixelated';
-  img.onerror = () => { img.style.display = 'none'; };
-  return img;
+function hpCol(pct) {
+  if (pct > 50) return 'var(--green)';
+  if (pct > 20) return 'var(--amber)';
+  return 'var(--red)';
 }
 
-// =====================================================================
-// HP color
-// =====================================================================
-function hpColor(pct) {
-  if (pct > 50) return 'var(--hp-green)';
-  if (pct > 20) return 'var(--hp-yellow)';
-  return 'var(--hp-red)';
-}
-
-function statusBadge(statusStr) {
-  if (!statusStr || statusStr === 'ok') return '';
-  const cls = `status-${statusStr.toLowerCase().replace(/\s.*/,'')}`;
-  return `<span class="status-badge ${cls}">${statusStr.toUpperCase().slice(0,3)}</span>`;
-}
-
-// =====================================================================
-// EV matrix color grading  [0,1] → green spectrum
-// =====================================================================
+// ─────────────────────────────────────────────────────────
+// EV color  [0,1] → red‥grey‥green
+// ─────────────────────────────────────────────────────────
 function evColor(v) {
-  // 0 = bad (red-ish), 0.5 = neutral (grey), 1 = good (green)
-  if (v == null || isNaN(v)) return { bg: '#1e1e30', text: '#888' };
-  const clamped = Math.max(0, Math.min(1, v));
-  // lerp: 0 → deep red, 0.5 → grey-blue, 1 → deep green
+  if (v == null || isNaN(v)) return { bg: 'var(--bg3)', fg: 'var(--dim)' };
+  const t = Math.max(0, Math.min(1, v));
   let r, g, b;
-  if (clamped < 0.5) {
-    const t = clamped / 0.5;
-    r = Math.round(180 - t * 50);
-    g = Math.round(40 + t * 80);
-    b = Math.round(40 + t * 60);
+  if (t < 0.5) {
+    const x = t / 0.5;
+    r = Math.round(180 - x*30); g = Math.round(40+x*70); b = Math.round(40+x*50);
   } else {
-    const t = (clamped - 0.5) / 0.5;
-    r = Math.round(130 - t * 90);
-    g = Math.round(120 + t * 110);
-    b = Math.round(100 - t * 50);
+    const x = (t-0.5)/0.5;
+    r = Math.round(150-x*100); g = Math.round(110+x*110); b = Math.round(90-x*40);
   }
-  const lightness = 0.2989*r + 0.5870*g + 0.1140*b;
-  const textColor = lightness > 100 ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.9)';
-  return { bg: `rgb(${r},${g},${b})`, text: textColor };
+  const lum = .299*r + .587*g + .114*b;
+  return { bg: `rgb(${r},${g},${b})`, fg: lum>100 ? 'rgba(0,0,0,.85)' : 'rgba(255,255,255,.9)' };
 }
 
-// =====================================================================
-// Build EV matrix
-// =====================================================================
-function buildEVMatrix() {
-  const { selP1, selP2, p1Types: p1, p2Types: p2, cells } = state;
-  const mat = $('ev-matrix');
-  if (!p1.length || !p2.length) { mat.innerHTML = ''; return; }
+// ─────────────────────────────────────────────────────────
+// Active cell data
+// ─────────────────────────────────────────────────────────
+function activeCell() {
+  return S.cells[`${S.selP1},${S.selP2}`] || {};
+}
 
-  $('dim-lbl').textContent = `${p1.length}×${p2.length}`;
-  const n = p2.length;
-  // header col + n data cols
-  const colW = Math.max(36, Math.min(70, Math.floor(580 / (n + 1))));
-  mat.style.gridTemplateColumns = `40px ${Array(n).fill(colW+'px').join(' ')}`;
+// ─────────────────────────────────────────────────────────
+// EV matrix — rows = p1 actions, cols = p2 actions
+// ─────────────────────────────────────────────────────────
+function buildMatrix() {
+  const d = activeCell();
+  const mat = $('ev-matrix');
   mat.innerHTML = '';
 
-  // corner
-  const corner = document.createElement('div');
-  corner.className = 'ev-corner'; mat.appendChild(corner);
+  const p1a = d.p1_action_names || [];
+  const p2a = d.p2_action_names || [];
+  const em  = d.empirical_matrix || [];
 
-  // col headers (P2 types)
-  p2.forEach((t, j) => {
-    const d = document.createElement('div');
-    d.className = 'ev-col-hdr';
-    d.textContent = `P2T${j+1}${selP2===j ? String.fromCharCode(97) : ''}`;
-    d.title = t;
-    if (j === selP2) d.style.color = 'var(--p2)';
-    mat.appendChild(d);
+  if (!p1a.length || !p2a.length) {
+    mat.innerHTML = '<div style="color:var(--dim);font-size:11px">no data for this type pair</div>';
+    $('matrix-label').textContent = '—';
+    $('hv-emp').textContent = '—';
+    $('hv-nash').textContent = '—';
+    return;
+  }
+
+  const M = p1a.length, N = p2a.length;
+  $('matrix-label').textContent = `P1T${S.selP1+1} vs P2T${S.selP2+1}  ·  ${M}×${N}`;
+  $('hv-emp').textContent  = d.empirical_value?.toFixed(3) ?? '—';
+  $('hv-nash').textContent = d.nash_value?.toFixed(3) ?? '—';
+
+  // Figure out cell size to fill available space nicely
+  const maxW = Math.min(90, Math.max(52, Math.floor((window.innerWidth - 160 - 280 - 120) / (N+1))));
+  const maxH = Math.min(70, Math.max(40, Math.floor((window.innerHeight - 200) / (M+1))));
+
+  // col header width (row label) + N data cols
+  mat.style.gridTemplateColumns = `110px ${Array(N).fill(maxW+'px').join(' ')}`;
+
+  // corner
+  mat.appendChild(Object.assign(document.createElement('div'), { className: 'mh-corner' }));
+
+  // col headers (p2 actions)
+  p2a.forEach((name, j) => {
+    const d2 = document.createElement('div');
+    d2.className = 'mh-col'; d2.textContent = name; d2.title = name;
+    mat.appendChild(d2);
   });
 
-  // rows (P1 types)
-  p1.forEach((t1, i) => {
+  // rows
+  p1a.forEach((rname, i) => {
     const rl = document.createElement('div');
-    rl.className = 'ev-row-hdr';
-    rl.textContent = `P1T${i+1}${selP1===i ? String.fromCharCode(97) : ''}`;
-    rl.title = t1;
-    if (i === selP1) rl.style.color = 'var(--p1)';
+    rl.className = 'mh-row'; rl.textContent = rname; rl.title = rname;
     mat.appendChild(rl);
 
-    p2.forEach((_, j) => {
-      const key = `${i},${j}`;
-      const d = cells[key] || {};
-      const ev = d.empirical_value;
-      const { bg, text } = evColor(ev);
-      const iters = d.iterations;
-
+    p2a.forEach((_, j) => {
+      const v = (em[i] || [])[j];
+      const { bg, fg } = evColor(v);
       const cell = document.createElement('div');
-      cell.className = 'ev-cell' + (state.sel === key ? ' active' : '');
-      cell.style.background = bg;
-      cell.dataset.key = key;
-
-      if (ev != null) {
-        cell.innerHTML = `<div class="ev-val" style="color:${text}">${ev.toFixed(2)}</div>` +
-          (iters ? `<div class="ev-iters" style="color:${text}">${fmtNum(iters)}</div>` : '');
+      cell.className = 'ev-cell' + (i===j ? ' diag' : '');
+      cell.style.cssText = `background:${bg};min-height:${maxH}px;min-width:${maxW}px`;
+      if (v != null) {
+        cell.innerHTML =
+          `<div class="ev-v" style="color:${fg}">${v.toFixed(2)}</div>`;
       }
-
-      cell.addEventListener('click', () => {
-        state.sel = key;
-        buildEVMatrix();
-        renderRight();
-        updateBattleFromCell(key);
-      });
       mat.appendChild(cell);
     });
   });
-
-  // Update global EV/Nash values for selected cell
-  if (state.sel && cells[state.sel]) {
-    const d = cells[state.sel];
-    $('mv-empirical').textContent = d.empirical_value?.toFixed(3) ?? '—';
-    $('mv-nash').textContent = d.nash_value?.toFixed(3) ?? '—';
-  }
 }
 
-function fmtNum(n) {
-  if (n >= 1000000) return (n/1000000).toFixed(1)+'M';
-  if (n >= 1000) return (n/1000).toFixed(1)+'k';
-  return String(n);
-}
+// ─────────────────────────────────────────────────────────
+// Type selector
+// ─────────────────────────────────────────────────────────
+function buildTypes() {
+  const p1Col = $('p1-col'), p2Col = $('p2-col');
+  const h1 = p1Col.querySelector('.type-col-hdr');
+  const h2 = p2Col.querySelector('.type-col-hdr');
+  p1Col.innerHTML = ''; p1Col.appendChild(h1);
+  p2Col.innerHTML = ''; p2Col.appendChild(h2);
 
-// =====================================================================
-// Build type selector buttons
-// =====================================================================
-function buildTypeButtons() {
-  const p1Col = $('p1-col');
-  const p2Col = $('p2-col');
-
-  // Keep header
-  const p1Hdr = p1Col.querySelector('.type-col-header');
-  const p2Hdr = p2Col.querySelector('.type-col-header');
-  p1Col.innerHTML = ''; p1Col.appendChild(p1Hdr);
-  p2Col.innerHTML = ''; p2Col.appendChild(p2Hdr);
-
-  state.p1Types.forEach((label, i) => {
-    const btn = makeTypeButton(label, i, 'p1', state.p1Teams[i] || []);
-    if (i === state.selP1) btn.classList.add('selected-p1');
-    btn.addEventListener('click', () => {
-      state.selP1 = i;
-      // auto-select matching cell
-      const newKey = `${i},${state.selP2}`;
-      state.sel = newKey;
-      buildTypeButtons();
-      buildEVMatrix();
-      renderRight();
-      updateBattleFromCell(newKey);
-    });
+  S.p1Types.forEach((label, i) => {
+    const btn = mkTypeBtn(label, i, 'p1');
+    if (i === S.selP1) btn.classList.add('sel-p1');
+    btn.onclick = () => { S.selP1 = i; refresh(); };
     p1Col.appendChild(btn);
   });
-
-  state.p2Types.forEach((label, j) => {
-    const btn = makeTypeButton(label, j, 'p2', state.p2Teams[j] || []);
-    if (j === state.selP2) btn.classList.add('selected-p2');
-    btn.addEventListener('click', () => {
-      state.selP2 = j;
-      const newKey = `${state.selP1},${j}`;
-      state.sel = newKey;
-      buildTypeButtons();
-      buildEVMatrix();
-      renderRight();
-      updateBattleFromCell(newKey);
-    });
+  S.p2Types.forEach((label, j) => {
+    const btn = mkTypeBtn(label, j, 'p2');
+    if (j === S.selP2) btn.classList.add('sel-p2');
+    btn.onclick = () => { S.selP2 = j; refresh(); };
     p2Col.appendChild(btn);
   });
 }
 
-function makeTypeButton(label, idx, player, teamSpecies) {
+function mkTypeBtn(label, idx, player) {
   const btn = document.createElement('div');
   btn.className = 'type-btn';
-
-  // Sprite cluster
-  const spritesDiv = document.createElement('div');
-  spritesDiv.className = 'type-sprites';
-  const maxSprites = Math.min(teamSpecies.length, 6);
-  for (let k = 0; k < maxSprites; k++) {
-    const img = makeSprite(teamSpecies[k], false, 22);
-    img.className = 'type-sprite';
-    spritesDiv.appendChild(img);
-  }
-  // If no species info yet, show placeholder boxes
-  if (maxSprites === 0) {
-    for (let k = 0; k < 3; k++) {
-      const ph = document.createElement('div');
-      ph.style.cssText = 'width:22px;height:22px;background:var(--border);border-radius:2px;';
-      spritesDiv.appendChild(ph);
-    }
-  }
-
-  const labelDiv = document.createElement('div');
-  labelDiv.className = 'type-label';
-  labelDiv.textContent = label;
-  labelDiv.title = label;
-
-  btn.appendChild(spritesDiv);
-  btn.appendChild(labelDiv);
+  // sprite cluster from label (e.g. "jynx+5")
+  const leadId = label.split('+')[0];
+  const sp = document.createElement('div'); sp.className = 't-sprites';
+  const img = mkImg(leadId, false, 20); img.className = 't-sprite'; sp.appendChild(img);
+  const lbl = document.createElement('div'); lbl.className = 't-label'; lbl.textContent = label; lbl.title = label;
+  btn.appendChild(sp); btn.appendChild(lbl);
   return btn;
 }
 
-// =====================================================================
-// Battle display — parse battle_repr string
-// =====================================================================
-// battle_repr from oak.battle_string — we parse what we can from it
-// Format is showdown protocol-ish text. We'll do simple extraction.
-function parseBattleRepr(repr) {
+// ─────────────────────────────────────────────────────────
+// Right panel
+// ─────────────────────────────────────────────────────────
+function buildRight() {
+  const d = activeCell();
+  $('cell-lbl').textContent = `P1T${S.selP1+1} vs P2T${S.selP2+1}`;
+
+  if (!d.p1_action_names) {
+    $('right-body').innerHTML = '<div id="no-sel">no data</div>';
+    return;
+  }
+
+  const fmt = v => v!=null ? Number(v).toFixed(3) : '—';
+  const fmtN = n => n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'k':String(n??'—');
+
+  const pol = (names, probs, cls) => (names||[]).map((n,k) => {
+    const pct = ((probs?.[k]||0)*100).toFixed(1);
+    return `<div class="pbar">
+      <div class="pbar-name" title="${n}">${n}</div>
+      <div class="pbar-track"><div class="pbar-fill ${cls}" style="width:${pct}%"></div></div>
+      <div class="pbar-pct">${pct}%</div>
+    </div>`;
+  }).join('');
+
+  $('right-body').innerHTML = `
+    <div id="stats-grid">
+      <div class="scard"><div class="sl">Empirical</div><div class="sv">${fmt(d.empirical_value)}</div><div class="ss">avg leaf eval</div></div>
+      <div class="scard"><div class="sl">Nash</div><div class="sv">${fmt(d.nash_value)}</div><div class="ss">equilibrium</div></div>
+      <div class="scard"><div class="sl">Iterations</div><div class="sv">${fmtN(d.iterations)}</div><div class="ss">nodes</div></div>
+      <div class="scard"><div class="sl">Duration</div><div class="sv">${d.duration_ms!=null?d.duration_ms+'ms':'—'}</div><div class="ss">wall time</div></div>
+    </div>
+    <div class="pol-title" style="color:var(--p1)">P1 POLICY — ${S.p1Types[S.selP1]||'—'}</div>
+    ${pol(d.p1_action_names, d.p1_nash, 'p1')}
+    <div class="divider"></div>
+    <div class="pol-title" style="color:var(--p2)">P2 POLICY — ${S.p2Types[S.selP2]||'—'}</div>
+    ${pol(d.p2_action_names, d.p2_nash, 'p2')}`;
+}
+
+// ─────────────────────────────────────────────────────────
+// Battle strip — parse battle_repr
+// ─────────────────────────────────────────────────────────
+function buildBattle() {
+  const d = activeCell();
+  const repr = d.battle_repr || '';
+  const parsed = parseBattle(repr);
+  renderSide($('ba-p2'), parsed?.p2, 'p2');
+  renderSide($('ba-p1'), parsed?.p1, 'p1');
+}
+
+function parseBattle(repr) {
   if (!repr) return null;
-  const lines = repr.split('\n');
-  const result = {
-    p1: { active: null, bench: [] },
-    p2: { active: null, bench: [] },
-  };
-
-  // Try to extract pokemon info from repr
-  // Oak battle_string format varies; do best-effort extraction
-  let currentSide = null;
-  for (const line of lines) {
+  const result = { p1: { active:null, bench:[] }, p2: { active:null, bench:[] } };
+  let side = null;
+  for (const line of repr.split('\n')) {
     const l = line.trim();
-    if (l.startsWith('p1') || l.includes('Side 0') || l.includes('Player 1')) currentSide = 'p1';
-    else if (l.startsWith('p2') || l.includes('Side 1') || l.includes('Player 2')) currentSide = 'p2';
-
-    // Look for pokemon patterns: "Pikachu 45/45" or similar
-    const hpMatch = l.match(/([A-Za-z][a-z]+(?:[A-Z][a-z]+)?)\s+(\d+)\/(\d+)/);
-    if (hpMatch && currentSide) {
-      const [, name, hp, maxhp] = hpMatch;
-      const mon = { name, hp: parseInt(hp), maxhp: parseInt(maxhp), pct: Math.round(parseInt(hp)/parseInt(maxhp)*100), moves: [], status: '' };
-      const side = result[currentSide];
-      if (!side.active) side.active = mon;
-      else if (side.bench.length < 5) side.bench.push(mon);
+    if (/side.?0|player.?1|^p1/i.test(l)) side = 'p1';
+    else if (/side.?1|player.?2|^p2/i.test(l)) side = 'p2';
+    const m = l.match(/([A-Z][a-zA-Z]+)\s+(\d+)\/(\d+)/);
+    if (m && side) {
+      const mon = { name:m[1], hp:+m[2], maxhp:+m[3], pct:Math.round(+m[2]/+m[3]*100) };
+      const s = result[side];
+      if (!s.active) s.active = mon; else if (s.bench.length < 5) s.bench.push(mon);
     }
   }
   return result;
 }
 
-function renderBattle(battleData) {
-  if (!battleData) {
-    $('p1-battle-side').innerHTML = '<div style="color:var(--dim);font-size:11px;padding:8px">No battle data</div>';
-    $('p2-battle-side').innerHTML = '';
-    return;
-  }
-
-  renderBattleSide('p1', battleData.p1, true);
-  renderBattleSide('p2', battleData.p2, false);
-}
-
-function renderBattleSide(player, sideData, isBack) {
-  const el = $(`${player}-battle-side`);
+function renderSide(el, side, player) {
   el.innerHTML = '';
-
-  const active = sideData?.active;
-  const bench = sideData?.bench || [];
-
+  const isBack = player === 'p1';
+  const active = side?.active;
   if (active) {
     const div = document.createElement('div');
-    div.className = 'active-pokemon';
-
-    const img = makeSprite(active.name, isBack, 80);
-    div.appendChild(img);
-
-    // HP bar
-    const hpWrap = document.createElement('div');
-    hpWrap.className = 'hp-bar-wrap';
-    const pct = active.pct ?? 100;
-    hpWrap.innerHTML = `
-      <div class="hp-bar-label">
-        <span class="hp-bar-name">${active.name}</span>
-        ${active.status ? statusBadge(active.status) : ''}
-      </div>
-      <div class="hp-bar-label" style="color:var(--dim)">
-        <span>${active.hp ?? '?'}/${active.maxhp ?? '?'}</span>
-        <span>${pct}%</span>
-      </div>
-      <div class="hp-track"><div class="hp-fill" style="width:${pct}%;background:${hpColor(pct)}"></div></div>`;
-    div.appendChild(hpWrap);
-
-    // Moves
-    if (active.moves?.length) {
-      const movesDiv = document.createElement('div');
-      movesDiv.className = 'active-moves';
-      active.moves.forEach(m => {
-        const chip = document.createElement('div');
-        chip.className = 'move-chip';
-        chip.textContent = m.name;
-        chip.innerHTML += `<div class="move-tooltip">${m.name} · PP ${m.pp}</div>`;
-        movesDiv.appendChild(chip);
-      });
-      div.appendChild(movesDiv);
-    }
-
+    div.className = `active-poke ${player}`;
+    div.appendChild(mkImg(active.name, isBack, 72));
+    const hp = document.createElement('div'); hp.className = 'hp-block';
+    hp.innerHTML = `<div class="hp-name">${active.name}</div>
+      <div class="hp-nums"><span>${active.hp}/${active.maxhp}</span><span>${active.pct}%</span></div>
+      <div class="hp-track"><div class="hp-fill" style="width:${active.pct}%;background:${hpCol(active.pct)}"></div></div>`;
+    div.appendChild(hp);
     el.appendChild(div);
   }
-
-  // Bench
-  bench.forEach(mon => {
-    const div = document.createElement('div');
-    div.className = 'bench-pokemon';
-
-    const img = makeSprite(mon.name, isBack, 36);
-    if (mon.hp === 0) img.className = 'fainted';
-    div.appendChild(img);
-
-    const bpct = mon.pct ?? 100;
-    const bHp = document.createElement('div');
-    bHp.className = 'bench-hp';
-    bHp.innerHTML = `<div class="bench-hp-fill" style="width:${bpct}%;background:${hpColor(bpct)}"></div>`;
-    div.appendChild(bHp);
-
-    // Tooltip with moves
-    const tooltip = document.createElement('div');
-    tooltip.className = 'move-tooltip';
-    tooltip.textContent = `${mon.name} · ${mon.hp}/${mon.maxhp} HP`;
-    div.appendChild(tooltip);
-
-    el.appendChild(div);
-  });
-}
-
-function updateBattleFromCell(key) {
-  const d = state.cells[key] || {};
-  const parsed = parseBattleRepr(d.battle_repr);
-  renderBattle(parsed);
-}
-
-// =====================================================================
-// Right panel — search stats
-// =====================================================================
-function renderRight() {
-  const key = state.sel;
-  if (!key) return;
-  const [i, j] = key.split(',').map(Number);
-  const d = state.cells[key] || {};
-  const t1 = state.p1Types[i] || `P1T${i+1}`;
-  const t2 = state.p2Types[j] || `P2T${j+1}`;
-
-  $('cell-title').textContent = `P1T${i+1}a vs P2T${j+1}a`;
-
-  const fmt = v => v != null ? Number(v).toFixed(3) : '—';
-
-  $('right-content').innerHTML = `
-    <div id="stats-grid">
-      <div class="stat-card">
-        <div class="s-label">empirical val</div>
-        <div class="s-val" style="color:${evColor(d.empirical_value).bg}">${fmt(d.empirical_value)}</div>
-        <div class="s-sub">avg leaf eval</div>
-      </div>
-      <div class="stat-card">
-        <div class="s-label">nash value</div>
-        <div class="s-val">${fmt(d.nash_value)}</div>
-        <div class="s-sub">equilibrium</div>
-      </div>
-      <div class="stat-card">
-        <div class="s-label">iterations</div>
-        <div class="s-val">${d.iterations != null ? fmtNum(d.iterations) : '—'}</div>
-        <div class="s-sub">search nodes</div>
-      </div>
-      <div class="stat-card">
-        <div class="s-label">duration</div>
-        <div class="s-val">${d.duration_ms != null ? d.duration_ms+'ms' : '—'}</div>
-        <div class="s-sub">wall time</div>
-      </div>
-    </div>
-    <div>
-      <div class="policy-col-title" style="color:var(--p1)">P1 policy — ${t1}</div>
-      ${policyBars(d.p1_action_names, d.p1_nash || [], 'p1')}
-    </div>
-    <div class="section-title"></div>
-    <div>
-      <div class="policy-col-title" style="color:var(--p2)">P2 policy — ${t2}</div>
-      ${policyBars(d.p2_action_names, d.p2_nash || [], 'p2')}
-    </div>`;
-}
-
-function policyBars(actions, probs, cls) {
-  if (!actions || !actions.length) return '<div style="color:var(--dim);font-size:11px">no data</div>';
-  return actions.map((name, k) => {
-    const pct = ((probs[k] || 0) * 100).toFixed(1);
-    const pctNum = parseFloat(pct);
-    return `<div class="pbar-row">
-      <div class="pbar-name" title="${name}">${name}</div>
-      <div class="pbar-track"><div class="pbar-fill ${cls}" style="width:${pct}%"></div></div>
-      <div class="pbar-pct">${pct}%</div>
-    </div>`;
-  }).join('');
-}
-
-// =====================================================================
-// Extract team species from cells for type buttons
-// =====================================================================
-function extractTeamSprites() {
-  // Try to pull species from battle_repr lines for each type combo
-  // We map p1 type i → union of species seen in cells (i, *)
-  const p1Species = state.p1Types.map(() => new Set());
-  const p2Species = state.p2Types.map(() => new Set());
-
-  for (const [key, d] of Object.entries(state.cells)) {
-    if (!d.battle_repr) continue;
-    const [i, j] = key.split(',').map(Number);
-    const parsed = parseBattleRepr(d.battle_repr);
-    if (!parsed) continue;
-    const addMons = (sideData, speciesSet) => {
-      if (sideData.active) speciesSet.add(sideData.active.name);
-      sideData.bench.forEach(m => speciesSet.add(m.name));
-    };
-    if (i < p1Species.length) addMons(parsed.p1, p1Species[i]);
-    if (j < p2Species.length) addMons(parsed.p2, p2Species[j]);
+  const bench = side?.bench || [];
+  if (bench.length) {
+    const row = document.createElement('div'); row.className = 'bench-row';
+    bench.forEach(mon => {
+      const d = document.createElement('div'); d.className = 'bench-mon';
+      const img = mkImg(mon.name, isBack, 32);
+      if (mon.hp === 0) img.className = 'ko';
+      d.appendChild(img);
+      const bar = document.createElement('div'); bar.className = 'bench-bar';
+      bar.innerHTML = `<div class="bench-bar-fill" style="width:${mon.pct}%;background:${hpCol(mon.pct)}"></div>`;
+      d.appendChild(bar);
+      const tip = document.createElement('div'); tip.className = 'bench-tip';
+      tip.textContent = `${mon.name} · ${mon.hp}/${mon.maxhp}`;
+      d.appendChild(tip);
+      row.appendChild(d);
+    });
+    el.appendChild(row);
   }
-
-  // Also parse from type labels themselves (e.g. "charizard+2")
-  state.p1Teams = p1Species.map((s, i) => {
-    if (s.size > 0) return [...s];
-    return extractFromLabel(state.p1Types[i] || '');
-  });
-  state.p2Teams = p2Species.map((s, j) => {
-    if (s.size > 0) return [...s];
-    return extractFromLabel(state.p2Types[j] || '');
-  });
 }
 
-function extractFromLabel(label) {
-  // e.g. "charizard+2" → ["charizard"]
-  const parts = label.split('+')[0].split('/');
-  return parts.filter(Boolean);
+// ─────────────────────────────────────────────────────────
+// Refresh all
+// ─────────────────────────────────────────────────────────
+function refresh() {
+  buildTypes();
+  buildMatrix();
+  buildRight();
+  buildBattle();
 }
 
-// =====================================================================
+// ─────────────────────────────────────────────────────────
+// Manual move
+// ─────────────────────────────────────────────────────────
+$('manual-toggle').addEventListener('change', e => {
+  const on = e.target.checked;
+  $('manual-row2').classList.toggle('vis', on);
+  $('dot').className = 'dot' + (on?' manual':' live');
+  if (ws?.readyState===1) ws.send(JSON.stringify({type:'manual_mode', enabled:on}));
+});
+$('send-btn').onclick = sendMove;
+$('move-input').onkeydown = e => { if (e.key==='Enter') sendMove(); };
+function sendMove() {
+  const v = $('move-input').value.trim();
+  if (!v || ws?.readyState!==1) return;
+  ws.send(JSON.stringify({type:'move_override', move:v}));
+  $('move-input').value = '';
+}
+
+// ─────────────────────────────────────────────────────────
 // WebSocket
-// =====================================================================
+// ─────────────────────────────────────────────────────────
 function connect() {
   ws = new WebSocket(`ws://${location.host}/ws`);
   ws.onopen = () => {
@@ -723,31 +593,20 @@ function connect() {
   };
   ws.onmessage = e => {
     const msg = JSON.parse(e.data);
-    if (msg.type === 'init' || msg.type === 'update') {
-      if (msg.p1_types != null) state.p1Types = msg.p1_types;
-      if (msg.p2_types != null) state.p2Types = msg.p2_types;
-      if (msg.probs != null) state.probs = msg.probs;
-      if (msg.cells != null) Object.assign(state.cells, msg.cells);
-      if (msg.pending_move !== undefined) {
-        state.pendingMove = msg.pending_move;
-        $('pending-move').textContent = msg.pending_move ? `bot: ${msg.pending_move}` : '';
-      }
-      if (msg.turn != null) {
-        state.turn = msg.turn;
-        $('turn-badge').textContent = `turn ${msg.turn}`;
-      }
-
-      // Set default selection
-      if (state.sel == null && state.p1Types.length && state.p2Types.length) {
-        state.sel = '0,0';
-      }
-
-      extractTeamSprites();
-      buildTypeButtons();
-      buildEVMatrix();
-      if (state.sel) { renderRight(); updateBattleFromCell(state.sel); }
-      $('status-txt').textContent = `turn ${msg.turn ?? '?'} · ${new Date().toLocaleTimeString()}`;
+    if (msg.type !== 'init' && msg.type !== 'update') return;
+    if (msg.p1_types != null) S.p1Types = msg.p1_types;
+    if (msg.p2_types != null) S.p2Types = msg.p2_types;
+    if (msg.probs   != null) S.probs   = msg.probs;
+    if (msg.cells   != null) Object.assign(S.cells, msg.cells);
+    if (msg.pending_move !== undefined) {
+      S.pendingMove = msg.pending_move;
+      $('pending-lbl').textContent = msg.pending_move ? `bot: ${msg.pending_move}` : '';
     }
+    if (msg.turn != null) { S.turn = msg.turn; $('turn-lbl').textContent = `turn ${msg.turn}`; }
+    $('status-txt').textContent = `turn ${msg.turn??'?'} · ${new Date().toLocaleTimeString()}`;
+    // default selection
+    if (!S.p1Types.length) return;
+    refresh();
   };
   ws.onclose = () => {
     $('dot').className = 'dot';
@@ -756,76 +615,8 @@ function connect() {
   };
   ws.onerror = () => ws.close();
 }
-
-// =====================================================================
-// Manual move controls
-// =====================================================================
-$('manual-toggle').addEventListener('change', e => {
-  const on = e.target.checked;
-  $('manual-input-row').classList.toggle('visible', on);
-  $('dot').className = 'dot' + (on ? ' manual' : ' live');
-  if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'manual_mode', enabled: on }));
-});
-$('send-btn').addEventListener('click', sendMove);
-$('move-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendMove(); });
-function sendMove() {
-  const val = $('move-input').value.trim();
-  if (!val || !ws || ws.readyState !== 1) return;
-  ws.send(JSON.stringify({ type: 'move_override', move: val }));
-  $('move-input').value = '';
-}
-
-// =====================================================================
-// Init
-// =====================================================================
-
-// Demo data for visual testing (will be overwritten by real WS data)
-function loadDemoData() {
-  const demoP1 = ['charizard', 'blastoise', 'venusaur'];
-  const demoP2 = ['pikachu', 'mewtwo', 'gengar'];
-
-  state.p1Types = demoP1.map((s, i) => `${s}+5`);
-  state.p2Types = demoP2.map((s, i) => `${s}+5`);
-  state.p1Teams = demoP1.map(s => [s, 'rhydon', 'alakazam', 'snorlax', 'lapras', 'exeggutor']);
-  state.p2Teams = demoP2.map(s => [s, 'starmie', 'jolteon', 'dragonite', 'clefable', 'tauros']);
-  state.probs = [[.15,.10,.08],[.12,.18,.09],[.08,.11,.09]];
-
-  // Populate some cells
-  const names1 = ['move tackle','move water-gun','switch rhydon'];
-  const names2 = ['move thunderbolt','move surf','switch starmie'];
-  for (let i = 0; i < 3; i++) {
-    for (let j = 0; j < 3; j++) {
-      const ev = 0.3 + Math.random() * 0.4;
-      state.cells[`${i},${j}`] = {
-        empirical_value: ev,
-        nash_value: ev - 0.05 + Math.random() * 0.1,
-        iterations: Math.floor(500 + Math.random() * 2000),
-        duration_ms: Math.floor(100 + Math.random() * 400),
-        p1_action_names: names1,
-        p2_action_names: names2,
-        p1_nash: [0.67, 0.22, 0.11],
-        p2_nash: [0.45, 0.35, 0.20],
-        battle_repr: `Charizard 145/145\nRhydon 200/200\nAlakazam 135/135\nPikachu 35/35\nStarmie 130/130\nJolteon 130/130`,
-      };
-    }
-  }
-
-  state.sel = '0,0';
-  state.turn = 7;
-  $('turn-badge').textContent = 'turn 7';
-
-  extractTeamSprites();
-  buildTypeButtons();
-  buildEVMatrix();
-  renderRight();
-  updateBattleFromCell('0,0');
-}
-
 connect();
-
-// Show demo data while waiting for WS (will be replaced on connect)
-// Uncomment to show demo without server:
-// loadDemoData();
+window.addEventListener('resize', () => buildMatrix());
 </script>
 </body>
 </html>
