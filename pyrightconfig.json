@@ -1,4 +1,4 @@
 {
-  "stubPath": "stubs",
+  "stubPath": "info/stubs",
   "reportMissingModuleSource": "none"
 }
