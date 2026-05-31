@@ -125,6 +125,14 @@ def _team_labels(player) -> list[str]:
     return labels
 
 
+def _team_species(player) -> list[list[str]]:
+    """All species IDs for each team, in slot order."""
+    return [
+        [oak.species_id(s.species) for s in team if s.species]
+        for team in player.teams
+    ]
+
+
 # ---------------------------------------------------------------------------
 # DebugViz
 # ---------------------------------------------------------------------------
@@ -138,6 +146,10 @@ class DebugViz:
         self._data: dict = {
             "p1_types": [],
             "p2_types": [],
+            "p1_teams": [],
+            "p2_teams": [],
+            "p1_omega": [],
+            "p2_omega": [],
             "probs": [],
             "cells": {},
             "pending_move": "",
@@ -178,6 +190,8 @@ class DebugViz:
         """
         p1_labels = _team_labels(search.p1)
         p2_labels = _team_labels(search.p2)
+        p1_species = _team_species(search.p1)
+        p2_species = _team_species(search.p2)
         probs = _omega_matrix(search.p1.omega, search.p2.omega)
         cells = _extract_cells(search, p1_nash, p2_nash)
 
@@ -186,6 +200,10 @@ class DebugViz:
                 {
                     "p1_types": p1_labels,
                     "p2_types": p2_labels,
+                    "p1_teams": p1_species,
+                    "p2_teams": p2_species,
+                    "p1_omega": list(search.p1.omega),
+                    "p2_omega": list(search.p2.omega),
                     "probs": probs,
                     "cells": cells,
                     "pending_move": pending_move,
