@@ -3,8 +3,6 @@ import logging
 import os
 import sys
 from enum import Enum, auto
-from logging.handlers import RotatingFileHandler
-from typing import Optional, Literal
 
 
 # How Safari selects its final move from the search grid

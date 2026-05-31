@@ -15,50 +15,14 @@ type Msg = list[str]
 
 class constants:
     RQID = "rqid"
-    MOVES = "moves"
-    ABILITIES = "abilities"
     FORCE_SWITCH = "forceSwitch"
     WAIT = "wait"
-    TRAPPED = "trapped"
-    MAYBE_TRAPPED = "maybeTrapped"
-    ID = "id"
-    BASESTATS = "baseStats"
-    NAME = "name"
     STATUS = "status"
-    TYPES = "types"
-    TYPE = "type"
-    WEIGHT = "weightkg"
-    SIDE = "side"
-    POKEMON = "pokemon"
     FNT = "fnt"
     TIME_LEFT = "Time left:"
     DETAILS = "details"
     IDENT = "ident"
     ACTIVE = "active"
-    PRIORITY = "priority"
-    STATS = "stats"
-    BOOSTS = "boosts"
-    HITPOINTS = "hp"
-    ATTACK = "attack"
-    DEFENSE = "defense"
-    SPECIAL_ATTACK = "special-attack"
-    SPECIAL_DEFENSE = "special-defense"
-    SPEED = "speed"
-    ACCURACY = "accuracy"
-    EVASION = "evasion"
-    STAT_ABBREVIATION_LOOKUPS = {
-        "atk": ATTACK,
-        "def": DEFENSE,
-        "spa": SPECIAL_ATTACK,
-        "spd": SPECIAL_DEFENSE,
-        "spe": SPEED,
-        "accuracy": ACCURACY,
-        "evasion": EVASION,
-    }
-    PHYSICAL = "physical"
-    SPECIAL = "special"
-    CATEGOY = "category"
-    DAMAGING_CATEGORIES = [PHYSICAL, SPECIAL]
     VOLATILE_STATUS = "volatileStatus"
     LOCKED_MOVE = "lockedmove"
     REFLECT = "reflect"
@@ -77,8 +41,32 @@ class constants:
     POISON = "psn"
     TOXIC = "tox"
     TOXIC_COUNT = "toxic_count"
-    NON_VOLATILE_STATUSES = {SLEEP, BURN, FROZEN, PARALYZED, POISON, TOXIC}
     FIGHT = "fight"
+
+
+BINDING_MOVES = {"bind", "clamp", "firespin", "wrap"}
+
+# fmt: off
+_STATUS_BYTE = {
+    constants.SLEEP:     0b00000001,
+    constants.BURN:      0b00010000,
+    constants.FROZEN:    0b00100000,
+    constants.PARALYZED: 0b01000000,
+    constants.POISON:    0b00001000,
+    constants.TOXIC:     0b10001000,
+    "rest":              0b10000010, # This is Rest2 TODO check
+}
+# fmt: on
+
+_STAT_ABBREV_TO_BOOST_PROPERTY = {
+    "atk": "atk",
+    "def": "def",
+    "spa": "spc",
+    "spd": "non",  # Showdown sends boost msg for spa and spd so we just ignore spd
+    "spe": "spe",
+    "accuracy": "acc",
+    "evasion": "eva",
+}
 
 
 def normalize_name(name):
@@ -99,29 +87,38 @@ def normalize_name(name):
     )
 
 
-BINDING_MOVES = {"bind", "clamp", "firespin", "wrap"}
+def _parse_details(details: str) -> tuple[int, int]:
+    """Return (species_name_str, level_int) from a showdown details string."""
+    parts = details.split(",")
+    species = parts[0].strip()
+    level = 100
+    for part in parts[1:]:
+        p = part.strip()
+        if p.startswith("L"):
+            try:
+                level = int(p[1:])
+            except ValueError:
+                pass
+    return species, level
 
-# fmt: off
-_STATUS_BYTE = {
-    constants.SLEEP:     0b00000001,
-    constants.BURN:      0b00010000,
-    constants.FROZEN:    0b00100000,
-    constants.PARALYZED: 0b01000000,
-    constants.POISON:    0b00001000,
-    constants.TOXIC:     0b10001000,
-    "rest":              0b10000010, # This is Rest2 TODO check
-}
-# fmt: on
 
-_STAT_ABBREV_TO_BOOST_PROP = {
-    "atk": "atk",
-    "def": "def",
-    "spa": "spc",
-    "spd": "non",  # Showdown sends boost msg for spa and spd so we just ignore spd
-    "spe": "spe",
-    "accuracy": "acc",
-    "evasion": "eva",
-}
+def _parse_condition(condition: str) -> tuple[int, int, str | None]:
+    """Return (hp, max_hp, status_str) from a condition string like '100/200 brn' or 'fnt'."""
+    if not condition or constants.FNT in condition:
+        return (0, 0, None)
+    parts = condition.split("/")
+    try:
+        hp = int(parts[0])
+    except ValueError:
+        return (0, 0, None)
+    max_hp = 0
+    status_str = None
+    if len(parts) > 1:
+        rhs = parts[1].split()
+        max_hp = int(rhs[0])
+        if len(rhs) > 1:
+            status_str = rhs[1]
+    return (hp, max_hp, status_str)
 
 
 @dataclass
@@ -262,9 +259,8 @@ class PSBattle:
     # -----------------------------------------------------------------------
 
     def switch_or_drag(self, split_msg: Msg) -> None:
-        # TODO also permute sleep durations
         side, opp_side = self.sides(split_msg)
-        duration, _ = self.get_durations(split_msg)
+        duration, opp_duration = self.get_durations(split_msg)
         details = split_msg[3] if len(split_msg) > 3 else ""  # Jynx
         condition = split_msg[4] if len(split_msg) > 4 else ""  # 100/100
 
@@ -314,6 +310,8 @@ class PSBattle:
         # Clears active, then sets species, moves, types, stats
         oak.switch_in(side.stored(), side.active)
         opp_side.active.volatiles().binding = False  # found in mechanics
+        opp_duration.binding = 0
+
 
     def faint(self, split_msg):
         side, _ = self.sides(split_msg)
@@ -330,6 +328,7 @@ class PSBattle:
         if is_opp:
             # Opp is taking damage
             if max_hp_or_percent == 0:
+                assert hp_or_percent == 0, "hp is not 0 while max_hp is 0"
                 hp = 0
             else:
                 hp = int(max_hp * hp_or_percent / max_hp_or_percent)
@@ -337,20 +336,13 @@ class PSBattle:
             hp = hp_or_percent
         side.stored().hp = hp
 
-        # SLEEP = "slp"
-        # BURN = "brn"
-        # FROZEN = "frz"
-        # PARALYZED = "par"
-        # POISON = "psn"
-        # TOXIC = "tox"
-        # TOXIC_COUNT = "toxic_count"
-
         if status_str:
             if status_str == constants.PARALYZED:
                 side.stored().status = _STATUS_BYTE[status_str]
             elif status_str == constants.SLEEP:
                 side.stored().status = _STATUS_BYTE[status_str]
-                duration.set_sleep(0, 1)  # TODO does it ever resend this?
+                if duration.sleep(0) == 0:
+                    duration.set_sleep(0, 1)
             elif status_str == constants.FROZEN:
                 side.stored().status = _STATUS_BYTE[status_str]
             else:
@@ -363,7 +355,7 @@ class PSBattle:
 
     def sethp(self, split_msg):
         assert False, "Unused?"
-        self.heal_or_damage(split_msg)
+        # self.heal_or_damage(split_msg)
 
     def fail(self, _split_msg):
         # Reasons: lkiss sleeping mon
@@ -389,9 +381,6 @@ class PSBattle:
             s.moves = [oak.id_to_move(move_id), 0, 0, 0]
             oak.complete_pokemon_moves(side.stored(), s)
             oak.complete_active_moves(side.active, s)
-            # TODO
-            # oak.decrement_pp(side.stored().moves, move)
-            # oak.decrement_pp(side.active.moves, move)
             for i in range(4):
                 ms: oak.MoveSlot = side.stored().move(i)
                 if ms.id == move:
@@ -408,7 +397,7 @@ class PSBattle:
         stat: str | None = split_msg[3].strip() if len(split_msg) > 3 else None
         amount = int(split_msg[4].strip()) if len(split_msg) > 4 else 0
         assert amount != 0, "Why is boost amount 0???"
-        prop = _STAT_ABBREV_TO_BOOST_PROP.get(stat)
+        prop = _STAT_ABBREV_TO_BOOST_PROPERTY.get(stat)
         assert prop is not None, f"Could not parse stat for boost: {stat}"
         oak.boost(side, opp_side, prop, amount)
 
@@ -417,7 +406,7 @@ class PSBattle:
         stat: str | None = split_msg[3].strip() if len(split_msg) > 3 else None
         amount = int(split_msg[4].strip()) if len(split_msg) > 4 else 0
         assert amount != 0, "Why is boost amount 0???"
-        prop = _STAT_ABBREV_TO_BOOST_PROP.get(stat)
+        prop = _STAT_ABBREV_TO_BOOST_PROPERTY.get(stat)
         assert prop is not None, f"Could not parse stat for boost: {stat}"
         oak.boost(side, opp_side, prop, -amount)
 
@@ -608,45 +597,3 @@ class PSBattle:
         "turn": turn,
         "noinit": noinit,
     }
-
-
-# ---------------------------------------------------------------------------
-# Parsing helpers
-# ---------------------------------------------------------------------------
-
-
-def _parse_details(details: str):
-    """Return (species_name_str, level_int) from a showdown details string."""
-    parts = details.split(",")
-    species = parts[0].strip()
-    level = 100
-    for part in parts[1:]:
-        p = part.strip()
-        if p.startswith("L"):
-            try:
-                level = int(p[1:])
-            except ValueError:
-                pass
-    return species, level
-
-
-def _parse_condition(condition: str) -> tuple[int, int, str | None]:
-    """Return (hp, max_hp, status_str) from a condition string like '100/200 brn' or 'fnt'."""
-    if not condition or constants.FNT in condition:
-        return (0, 0, None)
-    parts = condition.split("/")
-    try:
-        hp = int(parts[0])
-    except ValueError:
-        return (0, 0, None)
-    max_hp = 0
-    status_str = None
-    if len(parts) > 1:
-        rhs = parts[1].split()
-        # try:
-        max_hp = int(rhs[0])
-        # except (ValueError, IndexError):
-        #     pass
-        if len(rhs) > 1:
-            status_str = rhs[1]
-    return (hp, max_hp, status_str)

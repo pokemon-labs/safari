@@ -13,4 +13,5 @@ python run.py \
 --budget 1000ms \
 --eval /home/user/rl7/current.battle.net \
 --bandit pexp3-1.0-0.1 \
---log-level DEBUG
+--log-level DEBUG \
+--vis
