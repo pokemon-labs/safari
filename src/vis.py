@@ -44,6 +44,7 @@ with open(_HTML_PATH) as _f:
 # Data extraction helpers
 # ---------------------------------------------------------------------------
 
+
 def _choice_name(choice: int, battle: oak.Battle) -> str:
     """Turn a raw pkmn_choice int into a human-readable string."""
     side = battle.side(0)
@@ -64,7 +65,9 @@ def _choice_name(choice: int, battle: oak.Battle) -> str:
     return f"choice({choice})"
 
 
-def _extract_cells(search: Search, p1_nash: list[list[float]], p2_nash: list[list[float]]) -> dict:
+def _extract_cells(
+    search: Search, p1_nash: list[list[float]], p2_nash: list[list[float]]
+) -> dict:
     """
     Build the cells dict from a completed Search.
 
@@ -90,14 +93,14 @@ def _extract_cells(search: Search, p1_nash: list[list[float]], p2_nash: list[lis
 
         cells[f"{i},{j}"] = {
             "empirical_value": float(out.get("empirical_value", 0.0)),
-            "nash_value":      float(out.get("nash_value", 0.0)),
-            "iterations":      int(out.get("iterations", 0)),
-            "duration_ms":     int(out.get("duration_ms", 0)),
+            "nash_value": float(out.get("nash_value", 0.0)),
+            "iterations": int(out.get("iterations", 0)),
+            "duration_ms": int(out.get("duration_ms", 0)),
             "p1_action_names": p1_action_names,
             "p2_action_names": p2_action_names,
-            "p1_nash":         p1_n,
-            "p2_nash":         p2_n,
-            "battle_repr":     oak.battle_string(battle, search.battle.durations),
+            "p1_nash": p1_n,
+            "p2_nash": p2_n,
+            "battle_repr": oak.battle_string(battle, search.battle.durations),
         }
     return cells
 
@@ -121,6 +124,7 @@ def _team_labels(player) -> list[str]:
 # ---------------------------------------------------------------------------
 # DebugViz
 # ---------------------------------------------------------------------------
+
 
 class DebugViz:
     def __init__(self, port: int = 8765, auto_open: bool = True):
@@ -159,9 +163,9 @@ class DebugViz:
 
     def push(
         self,
-        battle,           # PSBattle — for turn number
+        battle,  # PSBattle — for turn number
         search: Search,
-        p1_nash: list,    # from search.solve() — list of per-type strategies
+        p1_nash: list,  # from search.solve() — list of per-type strategies
         p2_nash: list,
         pending_move: str,
     ):
@@ -174,14 +178,16 @@ class DebugViz:
         cells = _extract_cells(search, p1_nash, p2_nash)
 
         with self._lock:
-            self._data.update({
-                "p1_types":    p1_labels,
-                "p2_types":    p2_labels,
-                "probs":       probs,
-                "cells":       cells,
-                "pending_move": pending_move,
-                "turn":        battle.public.turn,
-            })
+            self._data.update(
+                {
+                    "p1_types": p1_labels,
+                    "p2_types": p2_labels,
+                    "probs": probs,
+                    "cells": cells,
+                    "pending_move": pending_move,
+                    "turn": battle.public.turn,
+                }
+            )
             payload = json.dumps({"type": "update", **self._data})
 
         if self._loop:

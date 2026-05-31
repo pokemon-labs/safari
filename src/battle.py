@@ -312,7 +312,6 @@ class PSBattle:
         opp_side.active.volatiles().binding = False  # found in mechanics
         opp_duration.binding = 0
 
-
     def faint(self, split_msg):
         side, _ = self.sides(split_msg)
         side.stored().hp = 0

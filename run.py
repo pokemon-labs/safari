@@ -8,6 +8,7 @@ import random
 import time
 import traceback
 from copy import deepcopy
+from enum import Enum, auto
 
 import requests
 import websockets
@@ -280,6 +281,14 @@ async def _wait_for_first_request(client: PSWebsocketClient, battle: PSBattle) -
             if len(parts) >= 3 and parts[1].strip() == "request" and parts[2].strip():
                 battle.parse_request(parts)
                 return
+
+
+class Result(Enum):
+    none = auto()
+    win = auto()
+    loss = auto()
+    tie = auto()
+    error = auto()
 
 
 async def _run_battle(
