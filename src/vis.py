@@ -91,6 +91,9 @@ def _extract_cells(
         p1_n = list(p1_nash[i]) if i < len(p1_nash) else []
         p2_n = list(p2_nash[j]) if j < len(p2_nash) else []
 
+        empirical_matrix = out.get("empirical_matrix")
+        em_list = empirical_matrix[:m, :n].tolist() if empirical_matrix is not None else []
+
         cells[f"{i},{j}"] = {
             "empirical_value": float(out.get("empirical_value", 0.0)),
             "nash_value": float(out.get("nash_value", 0.0)),
@@ -100,6 +103,7 @@ def _extract_cells(
             "p2_action_names": p2_action_names,
             "p1_nash": p1_n,
             "p2_nash": p2_n,
+            "empirical_matrix": em_list,
             "battle_repr": oak.battle_string(battle, search.battle.durations),
         }
     return cells
