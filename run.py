@@ -7,6 +7,7 @@ import logging
 import random
 import time
 import traceback
+from collections import defaultdict
 from copy import deepcopy
 from enum import Enum, auto
 
@@ -25,24 +26,13 @@ _viz: DebugViz | None = None
 logger = logging.getLogger(__name__)
 
 START_STRING = "|start"
-SWITCH_STRING = "switch"
 WIN_STRING = "|win|"
 TIE_STRING = "|tie"
 CHAT_STRING = "|c|"
 
 
-# ---------------------------------------------------------------------------
-# Exceptions
-# ---------------------------------------------------------------------------
-
-
 class LoginError(Exception):
     pass
-
-
-# ---------------------------------------------------------------------------
-# WebSocket client
-# ---------------------------------------------------------------------------
 
 
 class PSWebsocketClient:
@@ -200,11 +190,6 @@ class PSWebsocketClient:
         await self.send_message(tag, ["/savereplay"])
 
 
-# ---------------------------------------------------------------------------
-# PSBattle loop helpers
-# ---------------------------------------------------------------------------
-
-
 def _battle_finished(tag: str, msg: str) -> bool:
     return (
         msg.startswith(f">{tag}")
@@ -220,13 +205,6 @@ async def _pick_move(battle: PSBattle, predictor: TeamPredictor) -> tuple[str, s
     p2_teams, p2_probs = get_teams_and_probs(
         battle.public.side(1), predictor, Config.p2_types
     )
-
-    # print("Out teams")
-    # for team, prob in zip(p1_teams, p1_probs):
-    #     print(f"{prob} - ", team_to_string(team))
-    # print("Opp teams")
-    # for team, prob in zip(p2_teams, p2_probs):
-    #     print(f"{prob} - ", team_to_string(team))
 
     p1_player = Player(battle.public.side(0), p1_teams, p1_probs)
     p2_player = Player(battle.public.side(1), p2_teams, p2_probs)
@@ -286,7 +264,7 @@ async def _wait_for_first_request(client: PSWebsocketClient, battle: PSBattle) -
 class Result(Enum):
     none = auto()
     win = auto()
-    loss = auto()
+    lose = auto()
     tie = auto()
     error = auto()
 
@@ -372,11 +350,6 @@ async def _run_battle(
             await client.send_message(tag, move)
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
-
-
 async def main() -> None:
     Config.configure()
     init_logging(Config.log_level, Config.log_to_file)
@@ -389,8 +362,6 @@ async def main() -> None:
     if Config.avatar is not None:
         await client.avatar(Config.avatar)
 
-    wins = losses = ties = battles_run = 0
-
     if Config.vis:
         global _viz
         _viz = DebugViz()
@@ -400,6 +371,8 @@ async def main() -> None:
     user_teams = TeamPredictor(Config.teams)
     predictor = TeamPredictor(Config.predictor_teams, Config.predictor_ratio)
 
+    battles_run = 0
+    result: dict[Result, int] = defaultdict(lambda: 0)
     while True:
 
         selected_team = random.choice(user_teams.teams)
@@ -418,16 +391,16 @@ async def main() -> None:
         winner = await _run_battle(client, Config.format, predictor, selected_team)
 
         if winner == Config.username:
-            wins += 1
+            record[Result.win] += 1
             logger.info(f"won with {team_to_string(selected_team)}")
         elif winner is None:
-            ties += 1
+            record[Result.tie] += 1
             logger.info(f"tied with {team_to_string(selected_team)}")
         else:
-            losses += 1
+            record[Result.lose] += 1
             logger.info(f"lost with {team_to_string(selected_team)}")
 
-        logger.info(f"W:{wins} L:{losses} T:{ties}")
+        # logger.info(f"W:{wins} L:{losses} T:{ties}")
         battles_run += 1
         if battles_run >= Config.run_count:
             break
