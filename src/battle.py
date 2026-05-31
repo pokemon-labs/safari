@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 import json
 import logging
-from copy import deepcopy
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -20,7 +19,6 @@ class constants:
     STATUS = "status"
     FNT = "fnt"
     TIME_LEFT = "Time left:"
-    DETAILS = "details"
     IDENT = "ident"
     ACTIVE = "active"
     VOLATILE_STATUS = "volatileStatus"

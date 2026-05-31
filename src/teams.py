@@ -3,8 +3,7 @@ from __future__ import annotations
 import math
 import random
 from copy import deepcopy
-from dataclasses import dataclass, field
-from typing import Iterator
+from dataclasses import dataclass
 from collections import defaultdict
 
 import oak
