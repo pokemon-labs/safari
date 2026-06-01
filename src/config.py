@@ -65,7 +65,7 @@ class _Config:
     eval: str
     bandit: str
     # parallelism is derived as p1_types * p2_types in configure()
-    parallelism: int = 16
+    parallelism: int
 
     run_count: int
     # Path to teams file used for set predictor (opponent model).
@@ -163,6 +163,10 @@ class _Config:
             help="Number of p2 determinization types (default: 1)",
         )
         parser.add_argument(
+            "--threads",
+            type=int,
+        )
+        parser.add_argument(
             "--policy-mode",
             type=str,
             default=Policy.bayesian_nash,
@@ -203,7 +207,7 @@ class _Config:
         self.bandit = args.bandit
         self.p1_types = args.p1_types or 1
         self.p2_types = args.p2_types or 1
-        self.parallelism = 16
+        self.parallelism = args.threads or self.p1_types * self.p2_types
         self.policy_mode = Policy(args.policy_mode)
         self.run_count = args.run_count
         self.teams = args.teams

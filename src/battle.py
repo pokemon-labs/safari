@@ -463,6 +463,10 @@ class PSBattle:
         if s == "substitute":
             vol.substitute = True
             vol.substitute_hp = int(active.stats().hp / 4) or 1
+        elif s == "reflect":
+            vol.reflect = True
+        elif s == "lightscreen":
+            vol.light_screen = True
         else:
             assert False, f"Bad volatile {s}"
 

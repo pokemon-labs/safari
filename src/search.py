@@ -126,7 +126,6 @@ class Search:
                     _oak_search_mp,
                     self.battles[(i, j)].bytes(),
                     self.battle.durations.bytes(),
-                    oak.parse_result(self.battles[(i, j)]),
                     *get_agent(self.p1, self.p2, i, j),
                 ): (i, j)
                 for i, j in self.indices()

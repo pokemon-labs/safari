@@ -92,7 +92,9 @@ def _extract_cells(
         p2_n = list(p2_nash[j]) if j < len(p2_nash) else []
 
         empirical_matrix = out.get("empirical_matrix")
-        em_list = empirical_matrix[:m, :n].tolist() if empirical_matrix is not None else []
+        em_list = (
+            empirical_matrix[:m, :n].tolist() if empirical_matrix is not None else []
+        )
 
         cells[f"{i},{j}"] = {
             "empirical_value": float(out.get("empirical_value", 0.0)),
@@ -128,8 +130,7 @@ def _team_labels(player) -> list[str]:
 def _team_species(player) -> list[list[str]]:
     """All species IDs for each team, in slot order."""
     return [
-        [oak.species_id(s.species) for s in team if s.species]
-        for team in player.teams
+        [oak.species_id(s.species) for s in team if s.species] for team in player.teams
     ]
 
 
