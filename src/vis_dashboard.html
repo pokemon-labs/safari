@@ -19,7 +19,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 #root {
   display: grid;
-  grid-template-columns: 320px 1fr 560px;
+  grid-template-columns: 380px 1fr 420px;
   height: 100vh;
 }
 
@@ -36,6 +36,17 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   display: flex; flex-direction: column;
   border-right: 1px solid var(--border); background: var(--panel);
   overflow: hidden;
+}
+#left-top { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+#battle-repr-wrap {
+  height: 45%; flex-shrink: 0; border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+#battle-repr-header { padding: 4px 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+#battle-repr-text {
+  flex: 1; overflow-y: auto; padding: 6px 8px;
+  font-family: var(--mono); font-size: 10px; line-height: 1.5;
+  color: var(--muted); white-space: pre; background: var(--bg);
 }
 #left-header { padding: 8px 10px 4px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 
@@ -106,16 +117,16 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 /* matrix header cells */
 .mh-corner { /* top-left blank */ }
 .mh-col {
-  font-size: 9px; color: var(--muted); text-align: center;
+  font-size: 11px; color: var(--muted); text-align: center;
   padding: 2px 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   writing-mode: horizontal-tb;
-  max-width: 80px;
+  max-width: 100px;
 }
 .mh-row {
-  font-size: 9px; color: var(--muted);
+  font-size: 11px; color: var(--muted);
   display: flex; align-items: center; justify-content: flex-end;
   padding-right: 5px; overflow: hidden; white-space: nowrap;
-  max-width: 100px;
+  max-width: 120px;
 }
 
 .ev-cell {
@@ -124,55 +135,19 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   border: 1px solid transparent; transition: border-color .1s;
   min-height: 40px; min-width: 50px; padding: 3px 4px;
 }
-.ev-cell .ev-v { font-size: 11px; font-family: var(--mono); font-weight: 700; line-height: 1; }
+.ev-cell .ev-v { font-size: 14px; font-family: var(--mono); font-weight: 700; line-height: 1; }
+.ev-cell .ev-visits { font-size: 9px; font-family: var(--mono); opacity: .65; margin-top: 2px; }
 .ev-cell .ev-n { font-size: 8px; font-family: var(--mono); opacity: .6; }
 .ev-cell.diag { outline: 2px solid rgba(255,255,255,.25); outline-offset: -2px; }
 
-/* battle strip at bottom of center */
-#battle-strip {
-  height: 140px; flex-shrink: 0;
-  display: flex; align-items: stretch;
-  border-top: 1px solid var(--border); background: var(--bg2);
-  overflow: hidden;
+/* bottom ctrl bar in center */
+#battle-ctrl-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 5px 12px; border-top: 1px solid var(--border);
+  background: var(--panel); flex-shrink: 0;
 }
-#battle-arena {
-  flex: 1; display: flex; align-items: center; justify-content: space-between;
-  padding: 6px 16px; background: linear-gradient(180deg, #0a0a16 0%, #111128 100%);
-  gap: 8px;
-}
-.ba-side { display: flex; align-items: flex-end; gap: 6px; }
-.ba-side.p2 { flex-direction: row-reverse; }
-
-.active-poke { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.active-poke img { width: 72px; height: 72px; image-rendering: pixelated; }
-.active-poke.p1 img { transform: scaleX(-1); }
-
-.hp-block { width: 80px; }
-.hp-name { font-size: 9px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hp-nums { font-size: 8px; color: var(--muted); display: flex; justify-content: space-between; margin: 1px 0; }
-.hp-track { height: 4px; background: #222; border-radius: 3px; overflow: hidden; }
-.hp-fill { height: 100%; border-radius: 3px; transition: width .4s; }
-
-.bench-row { display: flex; gap: 4px; align-items: flex-end; }
-.bench-mon { display: flex; flex-direction: column; align-items: center; gap: 1px; position: relative; }
-.bench-mon img { width: 32px; height: 32px; image-rendering: pixelated; }
-.bench-mon img.ko { opacity: .2; filter: grayscale(1); }
-.bench-bar { width: 30px; height: 3px; background: #222; border-radius: 2px; overflow: hidden; }
-.bench-bar-fill { height: 100%; border-radius: 2px; }
-.bench-tip {
-  display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
-  background: rgba(0,0,0,.9); border: 1px solid var(--border2);
-  border-radius: 4px; padding: 3px 6px; font-size: 9px; white-space: nowrap;
-  z-index: 10; color: var(--text); pointer-events: none;
-}
-.bench-mon:hover .bench-tip { display: block; }
-
-#battle-ctrl {
-  display: flex; flex-direction: column; justify-content: space-between;
-  padding: 6px 10px; min-width: 120px; border-left: 1px solid var(--border);
-}
-#turn-lbl { font-size: 9px; color: var(--muted); font-family: var(--mono); }
-#pending-lbl { font-size: 9px; color: var(--dim); font-family: var(--mono); word-break: break-all; }
+#turn-lbl { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+#pending-lbl { font-size: 10px; color: var(--dim); font-family: var(--mono); }
 .manual-row { display: flex; align-items: center; gap: 5px; }
 #manual-toggle {
   appearance: none; width: 28px; height: 15px; border-radius: 8px;
@@ -221,12 +196,12 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 .pol-title { font-size: 8px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
 .pbar { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; }
-.pbar-name { font-size: 9px; font-family: var(--mono); color: var(--muted); width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pbar-name { font-size: 11px; font-family: var(--mono); color: var(--muted); width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pbar-track { flex: 1; height: 7px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
 .pbar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
 .pbar-fill.p1 { background: var(--p1); }
 .pbar-fill.p2 { background: var(--p2); }
-.pbar-pct { font-size: 8px; color: var(--muted); width: 28px; text-align: right; font-family: var(--mono); }
+.pbar-pct { font-size: 11px; color: var(--muted); width: 36px; text-align: right; font-family: var(--mono); }
 .divider { height: 1px; background: var(--border); margin: 4px 0; }
 #no-sel { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--dim); font-size: 11px; }
 </style>
@@ -236,17 +211,23 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 <!-- ── LEFT ── -->
 <div id="left">
-  <div id="left-header"><div class="ptitle">TYPES</div></div>
-  <div id="types-wrap">
-    <div class="type-col" id="p1-col">
-      <div class="type-col-hdr" style="color:var(--p1)">P1</div>
+  <div id="left-top">
+    <div id="left-header"><div class="ptitle">TYPES</div></div>
+    <div id="types-wrap">
+      <div class="type-col" id="p1-col">
+        <div class="type-col-hdr" style="color:var(--p1)">P1</div>
+      </div>
+      <div class="type-col" id="p2-col">
+        <div class="type-col-hdr" style="color:var(--p2)">P2</div>
+      </div>
     </div>
-    <div class="type-col" id="p2-col">
-      <div class="type-col-hdr" style="color:var(--p2)">P2</div>
+    <div id="left-foot">
+      <div id="status"><span class="dot" id="dot"></span><span id="status-txt">connecting…</span></div>
     </div>
   </div>
-  <div id="left-foot">
-    <div id="status"><span class="dot" id="dot"></span><span id="status-txt">connecting…</span></div>
+  <div id="battle-repr-wrap">
+    <div id="battle-repr-header"><div class="ptitle" style="margin:0">BATTLE STATE</div></div>
+    <div id="battle-repr-text">no battle data</div>
   </div>
 </div>
 
@@ -264,19 +245,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <div id="ev-matrix"></div>
   </div>
 
-  <div id="battle-strip">
-    <div id="battle-arena">
-      <div class="ba-side p2" id="ba-p2"></div>
-      <div style="width:1px;height:80%;background:var(--border);flex-shrink:0"></div>
-      <div class="ba-side p1" id="ba-p1"></div>
-    </div>
-    <div id="battle-ctrl">
-      <div id="turn-lbl">turn —</div>
-      <div id="pending-lbl"></div>
-      <div class="manual-row">
-        <input type="checkbox" id="manual-toggle">
-        <label id="tog-lbl" for="manual-toggle">manual</label>
-      </div>
+  <div id="battle-ctrl-bar">
+    <span id="turn-lbl">turn —</span>
+    <span id="pending-lbl"></span>
+    <span style="flex:1"></span>
+    <div class="manual-row">
+      <input type="checkbox" id="manual-toggle">
+      <label id="tog-lbl" for="manual-toggle">manual</label>
     </div>
   </div>
   <div id="manual-row2">
@@ -325,12 +300,6 @@ function mkImg(sid, back, sz) {
   return i;
 }
 
-function hpCol(pct) {
-  if (pct > 50) return 'var(--green)';
-  if (pct > 20) return 'var(--amber)';
-  return 'var(--red)';
-}
-
 // ─────────────────────────────────────────────────────────
 // EV color  [0,1] → red‥grey‥green
 // ─────────────────────────────────────────────────────────
@@ -367,6 +336,7 @@ function buildMatrix() {
   const p1a = d.p1_action_names || [];
   const p2a = d.p2_action_names || [];
   const em  = d.empirical_matrix || [];
+  const vm  = d.visit_matrix || [];
 
   if (!p1a.length || !p2a.length) {
     mat.innerHTML = '<div style="color:var(--dim);font-size:11px">no data for this type pair</div>';
@@ -386,7 +356,7 @@ function buildMatrix() {
   const maxH = Math.min(70, Math.max(40, Math.floor((window.innerHeight - 200) / (M+1))));
 
   // col header width (row label) + N data cols
-  mat.style.gridTemplateColumns = `110px ${Array(N).fill(maxW+'px').join(' ')}`;
+  mat.style.gridTemplateColumns = `130px ${Array(N).fill(maxW+'px').join(' ')}`;
 
   // corner
   mat.appendChild(Object.assign(document.createElement('div'), { className: 'mh-corner' }));
@@ -406,13 +376,16 @@ function buildMatrix() {
 
     p2a.forEach((_, j) => {
       const v = (em[i] || [])[j];
+      const visits = (vm[i] || [])[j];
       const { bg, fg } = evColor(v);
       const cell = document.createElement('div');
       cell.className = 'ev-cell' + (i===j ? ' diag' : '');
       cell.style.cssText = `background:${bg};min-height:${maxH}px;min-width:${maxW}px`;
       if (v != null) {
+        const visitStr = visits != null ? Number(visits).toLocaleString() : '';
         cell.innerHTML =
-          `<div class="ev-v" style="color:${fg}">${v.toFixed(2)}</div>`;
+          `<div class="ev-v" style="color:${fg}">${v.toFixed(2)}</div>` +
+          (visitStr ? `<div class="ev-visits" style="color:${fg}">${visitStr}</div>` : '');
       }
       mat.appendChild(cell);
     });
@@ -514,63 +487,11 @@ function buildRight() {
 function buildBattle() {
   const d = activeCell();
   const repr = d.battle_repr || '';
-  const parsed = parseBattle(repr);
-  renderSide($('ba-p2'), parsed?.p2, 'p2');
-  renderSide($('ba-p1'), parsed?.p1, 'p1');
+  // Update the battle text repr in the left panel
+  const reprEl = $('battle-repr-text');
+  if (reprEl) reprEl.textContent = repr || 'no battle data';
 }
 
-function parseBattle(repr) {
-  if (!repr) return null;
-  const result = { p1: { active:null, bench:[] }, p2: { active:null, bench:[] } };
-  let side = null;
-  for (const line of repr.split('\n')) {
-    const l = line.trim();
-    if (/side.?0|player.?1|^p1/i.test(l)) side = 'p1';
-    else if (/side.?1|player.?2|^p2/i.test(l)) side = 'p2';
-    const m = l.match(/([A-Z][a-zA-Z]+)\s+(\d+)\/(\d+)/);
-    if (m && side) {
-      const mon = { name:m[1], hp:+m[2], maxhp:+m[3], pct:Math.round(+m[2]/+m[3]*100) };
-      const s = result[side];
-      if (!s.active) s.active = mon; else if (s.bench.length < 5) s.bench.push(mon);
-    }
-  }
-  return result;
-}
-
-function renderSide(el, side, player) {
-  el.innerHTML = '';
-  const isBack = player === 'p1';
-  const active = side?.active;
-  if (active) {
-    const div = document.createElement('div');
-    div.className = `active-poke ${player}`;
-    div.appendChild(mkImg(active.name, isBack, 72));
-    const hp = document.createElement('div'); hp.className = 'hp-block';
-    hp.innerHTML = `<div class="hp-name">${active.name}</div>
-      <div class="hp-nums"><span>${active.hp}/${active.maxhp}</span><span>${active.pct}%</span></div>
-      <div class="hp-track"><div class="hp-fill" style="width:${active.pct}%;background:${hpCol(active.pct)}"></div></div>`;
-    div.appendChild(hp);
-    el.appendChild(div);
-  }
-  const bench = side?.bench || [];
-  if (bench.length) {
-    const row = document.createElement('div'); row.className = 'bench-row';
-    bench.forEach(mon => {
-      const d = document.createElement('div'); d.className = 'bench-mon';
-      const img = mkImg(mon.name, isBack, 32);
-      if (mon.hp === 0) img.className = 'ko';
-      d.appendChild(img);
-      const bar = document.createElement('div'); bar.className = 'bench-bar';
-      bar.innerHTML = `<div class="bench-bar-fill" style="width:${mon.pct}%;background:${hpCol(mon.pct)}"></div>`;
-      d.appendChild(bar);
-      const tip = document.createElement('div'); tip.className = 'bench-tip';
-      tip.textContent = `${mon.name} · ${mon.hp}/${mon.maxhp}`;
-      d.appendChild(tip);
-      row.appendChild(d);
-    });
-    el.appendChild(row);
-  }
-}
 
 // ─────────────────────────────────────────────────────────
 // Refresh all
