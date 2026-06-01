@@ -296,6 +296,13 @@ class PSBattle:
         order[0], order[slot - 1] = order[slot - 1], order[0]
         side.order = order
 
+        # side.last_move_index = 1
+        # side.last_used_move = None
+        # opp_side.last_used_move = None
+
+        # Clears active, then sets species, moves, types, stats
+        oak.switch_in(side.stored(), side.active)
+        oak.status_modify(side.stored().status, side.active.stats())
         # Durations
         old_sleep = duration.sleep(0)
         duration.set_sleep(0, duration.sleep(slot - 1))
@@ -304,11 +311,10 @@ class PSBattle:
         duration.disable = 0
         duration.attacking = 0
         duration.binding = 0
-
-        # Clears active, then sets species, moves, types, stats
-        oak.switch_in(side.stored(), side.active)
         opp_side.active.volatiles().binding = False  # found in mechanics
-        opp_duration.binding = 0
+        # opp_duration.binding = 0 # not present in mechanics actually
+        if side.stored().status == _STATUS_BYTE[constants.TOXIC]:
+            side.stored().status = _STATUS_BYTE[constants.POISON]
 
     def faint(self, split_msg):
         side, _ = self.sides(split_msg)
@@ -317,6 +323,7 @@ class PSBattle:
     def heal_or_damage(self, split_msg):
         is_opp: bool = self._is_opponent(split_msg)
         side, opp_side = self.sides(split_msg)
+        duration, _ = self.get_durations(split_msg)
         condition: str | None = split_msg[3] if len(split_msg) > 3 else None
 
         max_hp = side.stored().stats().hp

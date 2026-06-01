@@ -84,8 +84,10 @@ def _extract_cells(
         p1_choices = out["p1_choices"][:m]
         p2_choices = out["p2_choices"][:n]
 
-        p1_action_names = [_choice_name(c, battle) for c in p1_choices]
-        p2_action_names = [_choice_name(c, battle) for c in p2_choices]
+        # p1_action_names = [_choice_name(c, battle) for c in p1_choices]
+        # p2_action_names = [_choice_name(c, battle) for c in p2_choices]
+        p1_action_names = [oak.choice_label(battle.side(0), c) for c in p1_choices]
+        p2_action_names = [oak.choice_label(battle.side(1), c) for c in p2_choices]
 
         # nash slices — already trimmed to m/n by solve()
         p1_n = list(p1_nash[i]) if i < len(p1_nash) else []

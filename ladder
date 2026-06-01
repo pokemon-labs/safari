@@ -1,0 +1,17 @@
+python run.py \
+--websocket-uri wss://sim3.psim.us/showdown/websocket \
+--ps-username 'foul-oak' \
+--ps-password '123123' \
+--bot-mode search_ladder \
+--format 'gen1ou' \
+--teams teams150 \
+--predictor-teams teams1500 \
+--run-count 1000 \
+--p1-types 4 \
+--p2-types 4 \
+--threads 16 \
+--budget 6000ms \
+--eval /home/user/apple \
+--bandit pexp3-0.1-0.1 \
+--vis \
+--log-level DEBUG

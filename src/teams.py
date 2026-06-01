@@ -103,13 +103,13 @@ class SetDict:
         other.sets = deepcopy(self.sets)
         return other
 
-    def remove_species(species: int):
+    def remove_species(self, species: int):
         to_remove: list[oak.Set] = [s for s in self.sets if s.species == species]
         for s in to_remove:
             del self.sets[s]
         self.renormalize()
 
-    def get_matching(s: oak.Set) -> list[oak.Set]:
+    def get_matching(self, s: oak.Set) -> list[oak.Set]:
         result = []
         for t in self.sets:
             if matches(s, t):
@@ -161,11 +161,7 @@ class TeamPredictor:
         legal_sets = self.sets.clone()
         selection_prob = 1
         for s in team:
-            if len(s) > 1:
-                print(s)
-            matching_sets: list[tuple[oak.Set, Probability]] = legal_sets.get_matching(
-                s
-            )
+            matching_sets = legal_sets.get_matching(s)
             selected = random.choices(
                 matching_sets, weights=[p for _, p in matching_sets]
             )[0]
