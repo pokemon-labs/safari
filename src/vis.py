@@ -95,10 +95,22 @@ def _extract_cells(
 
         # Both matrices are plain list[list] from pybind11 (std::array<std::array<...>>)
         raw_val = out.get("value_matrix")
-        em_list = [row[:n] for row in raw_val[:m]] if raw_val is not None else []
-
         raw_vis = out.get("visit_matrix")
-        vm_list = [row[:n] for row in raw_vis[:m]] if raw_vis is not None else []
+
+        # Normalize value by visits; None where unvisited (visits == 0)
+        em_list: list[list[float | None]] = []
+        vm_list: list[list[int]] = []
+        for ri in range(m):
+            ev_row, vis_row = [], []
+            for ci in range(n):
+                v = raw_vis[ri][ci] if raw_vis is not None else 0
+                vis_row.append(int(v))
+                if v == 0 or raw_val is None:
+                    ev_row.append(None)
+                else:
+                    ev_row.append(raw_val[ri][ci] / v)
+            em_list.append(ev_row)
+            vm_list.append(vis_row)
 
         cells[f"{i},{j}"] = {
             "empirical_value": float(out.get("empirical_value", 0.0)),
