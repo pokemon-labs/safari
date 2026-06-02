@@ -46,7 +46,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 #battle-repr-text {
   flex: 1; overflow-y: auto; padding: 6px 8px;
   font-family: var(--mono); font-size: 10px; line-height: 1.5;
-  color: var(--muted); white-space: pre; background: var(--bg);
+  color: #b0b0cc; white-space: pre; background: var(--bg);
 }
 #left-header { padding: 8px 10px 4px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 
@@ -54,7 +54,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   flex: 1; display: grid; grid-template-columns: 1fr 1fr;
   overflow: hidden;
 }
-.type-col { display: flex; flex-direction: column; overflow-y: auto; padding: 4px 3px; gap: 3px; }
+.type-col { display: flex; flex-direction: column; overflow: hidden; padding: 4px 3px; gap: 3px; flex: 1; justify-content: space-evenly; }
 .type-col:first-child { border-right: 1px solid var(--border); }
 .type-col-hdr {
   font-size: 8px; letter-spacing: .08em; text-transform: uppercase;
@@ -62,15 +62,15 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 
 .type-btn {
-  display: flex; flex-direction: row; align-items: center; gap: 0;
-  padding: 3px 5px; border-radius: 5px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0;
+  padding: 3px 4px 2px; border-radius: 5px; cursor: pointer;
   border: 1px solid var(--border); background: var(--bg2);
-  transition: all .12s; flex-shrink: 0; width: 100; min-width: 0;
+  transition: all .12s; flex-shrink: 0; width: 100%; min-width: 0;
 }
 .type-btn:hover { border-color: var(--border2); background: var(--panel2); }
 .type-btn.sel-p1 { border-color: var(--p1); background: rgba(74,158,255,.1); box-shadow: 0 0 0 1px var(--p1) inset; }
 .type-btn.sel-p2 { border-color: var(--p2); background: rgba(192,96,240,.1); box-shadow: 0 0 0 1px var(--p2) inset; }
-.type-btn .t-sprites { display: flex; flex-direction: row; align-items: center; flex-shrink: 0; gap: 0; }
+.type-btn .t-sprites { display: flex; flex-direction: row; align-items: center; flex-shrink: 0; gap: 0; width: 100%; }
 .type-btn .t-sprite {
   width: 40px; height: 30px; flex-shrink: 0;
   image-rendering: pixelated;
@@ -80,7 +80,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 .type-btn .t-omega {
   font-size: 9px; font-family: var(--mono); color: var(--muted);
-  white-space: nowrap; padding-left: 4px; flex-shrink: 0;
+  white-space: nowrap; padding: 1px 2px 0; flex-shrink: 0;
+  align-self: flex-end;
 }
 .type-btn.sel-p1 .t-omega { color: var(--p1); font-weight: 700; }
 .type-btn.sel-p2 .t-omega { color: var(--p2); font-weight: 700; }
@@ -123,13 +124,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 /* matrix header cells */
 .mh-corner { /* top-left blank */ }
 .mh-col {
-  font-size: 11px; color: var(--muted); text-align: center;
+  font-size: 11px; color: #c0c0d8; text-align: center;
   padding: 2px 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   writing-mode: horizontal-tb;
   max-width: 100px;
 }
 .mh-row {
-  font-size: 11px; color: var(--muted);
+  font-size: 11px; color: #c0c0d8;
   display: flex; align-items: center; justify-content: flex-end;
   padding-right: 5px; overflow: hidden; white-space: nowrap;
   max-width: 120px;
