@@ -67,6 +67,7 @@ def _choice_name(choice: int, battle: oak.Battle) -> str:
 
 def _battle_state(battle) -> dict:
     """Structured snapshot of the active pokemon on each side for sprite display."""
+
     def side_info(side_idx: int) -> dict:
         side = battle.side(side_idx)
         mon = side.stored()  # currently active (stored = the active slot)
@@ -74,13 +75,13 @@ def _battle_state(battle) -> dict:
         stats = mon.stats()
         return {
             "species_num": int(sp),
-            "species_id": oak.species_id(sp) if sp else "",
+            "species_id": oak.species_id(sp).lower() if sp else "",
             "hp": int(mon.hp),
             "maxhp": int(stats.hp),
             "status": mon.status_name() if mon.hp > 0 else "fnt",
         }
-    return {"p1": side_info(0), "p2": side_info(1)}
 
+    return {"p1": side_info(0), "p2": side_info(1)}
 
 
 def _extract_cells(

@@ -126,6 +126,12 @@ class _Config:
             type=str,
             help="Oak bandit algorithm",
         )
+        parser.add_argument(
+            "--matrix-ucb",
+            type=str,
+            default="",
+            help="Matrix UCB start/solve-interval/minimum-visit/ucb-c-param",
+        )
 
         parser.add_argument(
             "--run-count",
@@ -205,6 +211,7 @@ class _Config:
         self.budget = args.budget
         self.eval = args.eval
         self.bandit = args.bandit
+        self.matrix_ucb = args.matrix_ucb
         self.p1_types = args.p1_types or 1
         self.p2_types = args.p2_types or 1
         self.parallelism = args.threads or self.p1_types * self.p2_types

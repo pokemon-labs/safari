@@ -86,7 +86,7 @@ def get_agent(p1: Player, p2: Player, t1: int, t2: int) -> Oak.Agent:
     bandit = Config.bandit
     eval = Config.eval
     budget = Config.budget
-    matrix_ucb = ""
+    matrix_ucb = Config.matrix_ucb
     return (budget, bandit, eval, matrix_ucb)
 
 

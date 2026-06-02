@@ -245,8 +245,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .sprite-slot img {
   image-rendering: pixelated;
 }
-.sprite-slot.p2 img { width: 96px; height: 96px; }
-.sprite-slot.p1 img { width: 96px; height: 96px; }
+.sprite-slot.p2 img { width: 192; height: 192; }
+.sprite-slot.p1 img { width: 192; height: 192; }
 
 .sprite-hpbar {
   width: 140px;
@@ -673,6 +673,8 @@ function buildSpriteSlot(elId, state, isBack) {
 
   const img = document.createElement('img');
   img.src = imgUrl;
+  img.width = 192;
+  img.height = 192;
   img.onerror = () => img.style.display = 'none';
 
   // p2: hp bar on top, sprite below; p1: sprite on top, hp bar below
