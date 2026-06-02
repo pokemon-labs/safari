@@ -211,6 +211,20 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .pbar-pct { font-size: 11px; color: var(--muted); width: 36px; text-align: right; font-family: var(--mono); }
 .divider { height: 1px; background: var(--border); margin: 4px 0; }
 #no-sel { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--dim); font-size: 11px; }
+
+/* Policy mode selector */
+.mode-row {
+  display: flex; gap: 4px; margin-top: 4px; margin-bottom: 6px;
+}
+.mode-btn {
+  font-size: 9px; font-family: var(--mono); letter-spacing: .04em;
+  padding: 2px 7px; border-radius: 3px; cursor: pointer;
+  border: 1px solid var(--border2); background: var(--bg2);
+  color: var(--muted); transition: all .12s; text-transform: uppercase;
+}
+.mode-btn:hover { border-color: var(--border2); color: var(--text); background: var(--panel2); }
+.mode-btn.active-p1 { border-color: var(--p1); background: rgba(74,158,255,.15); color: var(--p1); font-weight: 700; }
+.mode-btn.active-p2 { border-color: var(--p2); background: rgba(192,96,240,.15); color: var(--p2); font-weight: 700; }
 </style>
 </head>
 <body>
@@ -289,6 +303,7 @@ const S = {
   p1Omega: [], p2Omega: [], probs: [],
   pendingMove: '', turn: 0,
   selP1: 0, selP2: 0,
+  p1Mode: 'nash', p2Mode: 'nash',  // 'nash' | 'empirical' | 'prior'
 };
 let ws, reconnTimer;
 const $ = id => document.getElementById(id);
@@ -455,6 +470,57 @@ function mkTypeBtn(label, idx, player) {
 // ─────────────────────────────────────────────────────────
 // Right panel
 // ─────────────────────────────────────────────────────────
+function policyData(d, player, mode) {
+  if (mode === 'empirical') return player === 'p1' ? d.p1_empirical : d.p2_empirical;
+  if (mode === 'prior')     return player === 'p1' ? d.p1_prior     : d.p2_prior;
+  return player === 'p1' ? d.p1_nash : d.p2_nash;
+}
+
+function buildPolicySection(d, player) {
+  const cls = player;
+  const mode = player === 'p1' ? S.p1Mode : S.p2Mode;
+  const names = player === 'p1' ? d.p1_action_names : d.p2_action_names;
+  const probs = policyData(d, player, mode);
+  const label = player === 'p1' ? S.p1Types[S.selP1] : S.p2Types[S.selP2];
+  const activeCls = `active-${player}`;
+
+  const wrap = document.createElement('div');
+
+  const title = document.createElement('div');
+  title.className = 'pol-title';
+  title.style.color = `var(--${player})`;
+  title.textContent = `${player.toUpperCase()} POLICY — ${label || '—'}`;
+  wrap.appendChild(title);
+
+  // Mode selector row
+  const modeRow = document.createElement('div');
+  modeRow.className = 'mode-row';
+  ['nash', 'empirical', 'prior'].forEach(m => {
+    const btn = document.createElement('div');
+    btn.className = 'mode-btn' + (mode === m ? ` ${activeCls}` : '');
+    btn.textContent = m;
+    btn.onclick = () => {
+      if (player === 'p1') S.p1Mode = m; else S.p2Mode = m;
+      buildRight();
+    };
+    modeRow.appendChild(btn);
+  });
+  wrap.appendChild(modeRow);
+
+  // Bars
+  (names || []).forEach((n, k) => {
+    const pct = ((probs?.[k] || 0) * 100).toFixed(1);
+    const row = document.createElement('div');
+    row.className = 'pbar';
+    row.innerHTML = `<div class="pbar-name" title="${n}">${n}</div>
+      <div class="pbar-track"><div class="pbar-fill ${cls}" style="width:${pct}%"></div></div>
+      <div class="pbar-pct">${pct}%</div>`;
+    wrap.appendChild(row);
+  });
+
+  return wrap;
+}
+
 function buildRight() {
   const d = activeCell();
   $('cell-lbl').textContent = `P1T${S.selP1+1} vs P2T${S.selP2+1}`;
@@ -467,27 +533,22 @@ function buildRight() {
   const fmt = v => v!=null ? Number(v).toFixed(3) : '—';
   const fmtN = n => n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'k':String(n??'—');
 
-  const pol = (names, probs, cls) => (names||[]).map((n,k) => {
-    const pct = ((probs?.[k]||0)*100).toFixed(1);
-    return `<div class="pbar">
-      <div class="pbar-name" title="${n}">${n}</div>
-      <div class="pbar-track"><div class="pbar-fill ${cls}" style="width:${pct}%"></div></div>
-      <div class="pbar-pct">${pct}%</div>
-    </div>`;
-  }).join('');
-
-  $('right-body').innerHTML = `
+  const body = $('right-body');
+  body.innerHTML = `
     <div id="stats-grid">
       <div class="scard"><div class="sl">Empirical</div><div class="sv">${fmt(d.empirical_value)}</div><div class="ss">avg leaf eval</div></div>
       <div class="scard"><div class="sl">Nash</div><div class="sv">${fmt(d.nash_value)}</div><div class="ss">equilibrium</div></div>
       <div class="scard"><div class="sl">Iterations</div><div class="sv">${fmtN(d.iterations)}</div><div class="ss">nodes</div></div>
       <div class="scard"><div class="sl">Duration</div><div class="sv">${d.duration_ms!=null?d.duration_ms+'sec':'—'}</div><div class="ss">wall time</div></div>
-    </div>
-    <div class="pol-title" style="color:var(--p1)">P1 POLICY — ${S.p1Types[S.selP1]||'—'}</div>
-    ${pol(d.p1_action_names, d.p1_nash, 'p1')}
-    <div class="divider"></div>
-    <div class="pol-title" style="color:var(--p2)">P2 POLICY — ${S.p2Types[S.selP2]||'—'}</div>
-    ${pol(d.p2_action_names, d.p2_nash, 'p2')}`;
+    </div>`;
+
+  body.appendChild(buildPolicySection(d, 'p1'));
+
+  const div = document.createElement('div');
+  div.className = 'divider';
+  body.appendChild(div);
+
+  body.appendChild(buildPolicySection(d, 'p2'));
 }
 
 // ─────────────────────────────────────────────────────────
