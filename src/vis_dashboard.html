@@ -70,8 +70,14 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .type-btn:hover { border-color: var(--border2); background: var(--panel2); }
 .type-btn.sel-p1 { border-color: var(--p1); background: rgba(74,158,255,.1); box-shadow: 0 0 0 1px var(--p1) inset; }
 .type-btn.sel-p2 { border-color: var(--p2); background: rgba(192,96,240,.1); box-shadow: 0 0 0 1px var(--p2) inset; }
-.type-btn .t-sprites { display: flex; flex-direction: row; align-items: center; flex-shrink: 0; }
-.type-btn .t-sprite { width: 24px; height: 24px; image-rendering: pixelated; object-fit: contain; flex-shrink: 0; }
+.type-btn .t-sprites { display: flex; flex-direction: row; align-items: center; flex-shrink: 0; gap: 0; }
+.type-btn .t-sprite {
+  width: 40px; height: 30px; flex-shrink: 0;
+  image-rendering: pixelated;
+  background-image: url('https://play.pokemonshowdown.com/sprites/pokemonicons-sheet.png');
+  background-repeat: no-repeat;
+  /* background-position set inline per pokemon */
+}
 .type-btn .t-omega {
   font-size: 9px; font-family: var(--mono); color: var(--muted);
   white-space: nowrap; padding-left: 4px; flex-shrink: 0;
@@ -286,18 +292,18 @@ const S = {
 let ws, reconnTimer;
 const $ = id => document.getElementById(id);
 
-const SPRITE = 'https://play.pokemonshowdown.com/sprites';
-function spriteUrl(sid, back) {
-  if (!sid) return '';
-  const id = sid.toLowerCase().replace(/[^a-z0-9]/g,'');
-  return `${SPRITE}/${back?'gen1back':'gen1'}/${id}.png`;
-}
-function mkImg(sid, back, sz) {
-  const i = document.createElement('img');
-  i.src = spriteUrl(sid, back); i.width = sz; i.height = sz;
-  i.style.imageRendering = 'pixelated';
-  i.onerror = () => i.style.display='none';
-  return i;
+// Chibi icon from pokemonicons-sheet.png
+// Each cell is 40x30px, 12 per row, index = national dex number
+function mkChibi(dexNum) {
+  const col = dexNum % 12;
+  const row = Math.floor(dexNum / 12);
+  const x = col * 40;
+  const y = row * 30;
+  const el = document.createElement('div');
+  el.className = 't-sprite';
+  el.style.backgroundPosition = `-${x}px -${y}px`;
+  el.title = `#${dexNum}`;
+  return el;
 }
 
 // ─────────────────────────────────────────────────────────
@@ -423,17 +429,16 @@ function mkTypeBtn(label, idx, player) {
   const btn = document.createElement('div');
   btn.className = 'type-btn';
 
-  // All sprites for this team
   const teams = player === 'p1' ? S.p1Teams : S.p2Teams;
   const omegas = player === 'p1' ? S.p1Omega : S.p2Omega;
-  const species = teams[idx] || [label.split('+')[0]];
+  // Each entry in teams[idx] is {num, id}; fall back to empty if not loaded yet
+  const species = teams[idx] || [];
 
   const sp = document.createElement('div');
   sp.className = 't-sprites';
-  species.forEach(sid => {
-    const img = mkImg(sid, false, 24);
-    img.className = 't-sprite';
-    sp.appendChild(img);
+  species.forEach(mon => {
+    const dexNum = typeof mon === 'object' ? mon.num : 0;
+    sp.appendChild(mkChibi(dexNum));
   });
 
   const omegaVal = omegas[idx];
