@@ -225,6 +225,69 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .mode-btn:hover { border-color: var(--border2); color: var(--text); background: var(--panel2); }
 .mode-btn.active-p1 { border-color: var(--p1); background: rgba(74,158,255,.15); color: var(--p1); font-weight: 700; }
 .mode-btn.active-p2 { border-color: var(--p2); background: rgba(192,96,240,.15); color: var(--p2); font-weight: 700; }
+
+/* ── Sprite battle display ── */
+#battle-sprite-view {
+  flex: 1; position: relative; overflow: hidden;
+  background: linear-gradient(180deg, #0a0c14 0%, #0d1020 55%, #131830 100%);
+  display: none;
+}
+#battle-sprite-view.active { display: block; }
+#battle-repr-text.hidden { display: none; }
+
+/* opponent: upper-right */
+.sprite-slot {
+  position: absolute; display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.sprite-slot.p2 { top: 12px; right: 24px; align-items: flex-end; }
+.sprite-slot.p1 { bottom: 12px; left: 24px; align-items: flex-start; }
+
+.sprite-slot img {
+  image-rendering: pixelated;
+}
+.sprite-slot.p2 img { width: 96px; height: 96px; }
+.sprite-slot.p1 img { width: 96px; height: 96px; }
+
+.sprite-hpbar {
+  width: 140px;
+}
+.sprite-hpbar .shp-name {
+  font-size: 11px; font-weight: 600; color: var(--text);
+  display: flex; justify-content: space-between; margin-bottom: 2px;
+}
+.sprite-hpbar .shp-name .shp-status {
+  font-size: 9px; font-family: var(--mono); font-weight: 700;
+  padding: 1px 3px; border-radius: 2px; margin-left: 4px;
+}
+.shp-status.brn { background: #cc5500; color: #fff; }
+.shp-status.frz { background: #4488ff; color: #000; }
+.shp-status.par { background: #ccaa00; color: #000; }
+.shp-status.psn, .shp-status.tox { background: #884acc; color: #fff; }
+.shp-status.slp { background: #666; color: #fff; }
+.shp-status.fnt { background: #444; color: #aaa; }
+.sprite-hpbar .shp-track {
+  height: 6px; background: rgba(0,0,0,.5); border-radius: 3px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,.1);
+}
+.sprite-hpbar .shp-fill {
+  height: 100%; border-radius: 3px; transition: width .5s;
+}
+.sprite-hpbar .shp-nums {
+  font-size: 9px; color: var(--muted); font-family: var(--mono);
+  margin-top: 2px; text-align: right;
+}
+
+/* display toggle in header */
+#battle-display-toggle {
+  display: flex; gap: 0; border: 1px solid var(--border2); border-radius: 4px; overflow: hidden;
+}
+.bdt-btn {
+  font-size: 9px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .04em;
+  padding: 2px 8px; cursor: pointer; background: var(--bg2); color: var(--muted);
+  border: none; transition: all .12s;
+}
+.bdt-btn:hover { background: var(--panel2); color: var(--text); }
+.bdt-btn.active { background: var(--bg3); color: var(--text); font-weight: 700; }
 </style>
 </head>
 <body>
@@ -247,8 +310,18 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     </div>
   </div>
   <div id="battle-repr-wrap">
-    <div id="battle-repr-header"><div class="ptitle" style="margin:0">BATTLE STATE</div></div>
-    <div id="battle-repr-text">no battle data</div>
+    <div id="battle-repr-header" style="display:flex;align-items:center;gap:8px">
+      <div class="ptitle" style="margin:0;flex:1">BATTLE STATE</div>
+      <div id="battle-display-toggle">
+        <div class="bdt-btn active" id="bdt-sprite" onclick="setBattleMode('sprite')">sprite</div>
+        <div class="bdt-btn" id="bdt-text" onclick="setBattleMode('text')">text</div>
+      </div>
+    </div>
+    <div id="battle-sprite-view" class="active">
+      <div class="sprite-slot p2" id="sprite-p2"></div>
+      <div class="sprite-slot p1" id="sprite-p1"></div>
+    </div>
+    <div id="battle-repr-text" class="hidden">no battle data</div>
   </div>
 </div>
 
@@ -304,6 +377,7 @@ const S = {
   pendingMove: '', turn: 0,
   selP1: 0, selP2: 0,
   p1Mode: 'nash', p2Mode: 'nash',  // 'nash' | 'empirical' | 'prior'
+  battleMode: 'sprite',  // 'sprite' | 'text'
 };
 let ws, reconnTimer;
 const $ = id => document.getElementById(id);
@@ -554,12 +628,80 @@ function buildRight() {
 // ─────────────────────────────────────────────────────────
 // Battle strip — parse battle_repr
 // ─────────────────────────────────────────────────────────
+function setBattleMode(mode) {
+  S.battleMode = mode;
+  $('bdt-sprite').className = 'bdt-btn' + (mode === 'sprite' ? ' active' : '');
+  $('bdt-text').className   = 'bdt-btn' + (mode === 'text'   ? ' active' : '');
+  $('battle-sprite-view').className = 'active' in {} ? '' : ''; // reset
+  $('battle-sprite-view').className = mode === 'sprite' ? 'active' : '';
+  const te = $('battle-repr-text');
+  if (te) te.className = mode === 'text' ? '' : 'hidden';
+  buildBattle();
+}
+
+function hpColor(pct) {
+  if (pct > 50) return '#3ddc84';
+  if (pct > 20) return '#f0b030';
+  return '#ff4444';
+}
+
+function buildSpriteSlot(elId, state, isBack) {
+  const el = $(elId);
+  if (!el) return;
+  el.innerHTML = '';
+  if (!state || !state.species_num) return;
+
+  const sid = state.species_id || String(state.species_num);
+  const folder = isBack ? 'gen1-back' : 'gen1';
+  const imgUrl = `https://play.pokemonshowdown.com/sprites/${folder}/${sid}.png`;
+
+  const hp = state.hp ?? 0;
+  const maxhp = state.maxhp || 1;
+  const pct = Math.round(hp / maxhp * 100);
+  const name = sid.charAt(0).toUpperCase() + sid.slice(1);
+  const status = state.status && state.status !== 'ok' ? state.status.toLowerCase() : '';
+  const statusCls = status ? ` shp-status ${status}` : '';
+  const statusBadge = status ? `<span class="shp-status ${status}">${status.toUpperCase()}</span>` : '';
+
+  // HP bar block — above sprite for p2, below for p1
+  const hpBar = document.createElement('div');
+  hpBar.className = 'sprite-hpbar';
+  hpBar.innerHTML = `
+    <div class="shp-name"><span>${name}${statusBadge ? '&nbsp;' + statusBadge : ''}</span></div>
+    <div class="shp-track"><div class="shp-fill" style="width:${pct}%;background:${hpColor(pct)}"></div></div>
+    <div class="shp-nums">${hp} / ${maxhp} &nbsp;(${pct}%)</div>`;
+
+  const img = document.createElement('img');
+  img.src = imgUrl;
+  img.onerror = () => img.style.display = 'none';
+
+  // p2: hp bar on top, sprite below; p1: sprite on top, hp bar below
+  if (isBack) {
+    // p1 (our side, bottom-left) — sprite first, then hp bar
+    el.appendChild(img);
+    el.appendChild(hpBar);
+  } else {
+    // p2 (opponent, top-right) — hp bar first, then sprite
+    el.appendChild(hpBar);
+    el.appendChild(img);
+  }
+}
+
 function buildBattle() {
   const d = activeCell();
-  const repr = d.battle_repr || '';
-  // Update the battle text repr in the left panel
+
+  // Always update text repr
   const reprEl = $('battle-repr-text');
-  if (reprEl) reprEl.textContent = repr || 'no battle data';
+  if (reprEl) reprEl.textContent = d.battle_repr || 'no battle data';
+
+  // Update sprite view
+  if (S.battleMode === 'sprite' && d.battle_state) {
+    buildSpriteSlot('sprite-p2', d.battle_state.p2, false);  // front sprite, upper-right
+    buildSpriteSlot('sprite-p1', d.battle_state.p1, true);   // back sprite, lower-left
+  } else if (S.battleMode === 'sprite') {
+    $('sprite-p2').innerHTML = '';
+    $('sprite-p1').innerHTML = '';
+  }
 }
 
 
