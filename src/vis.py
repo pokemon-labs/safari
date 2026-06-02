@@ -98,9 +98,9 @@ def _extract_cells(
             empirical_matrix[:m, :n].tolist() if empirical_matrix is not None else []
         )
         visit_matrix = out.get("visit_matrix")
-        vm_list = (
-            visit_matrix[:m, :n].tolist() if visit_matrix is not None else []
-        )
+        # print(empirical_matrix, visit_matrix)
+        # print(type(empirical_matrix), type(visit_matrix)) # np.array, list
+        vm_list = visit_matrix[:m, :n].tolist() if visit_matrix is not None else []
 
         cells[f"{i},{j}"] = {
             "empirical_value": float(out.get("empirical_value", 0.0)),
