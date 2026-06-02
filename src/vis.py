@@ -65,6 +65,24 @@ def _choice_name(choice: int, battle: oak.Battle) -> str:
     return f"choice({choice})"
 
 
+def _battle_state(battle) -> dict:
+    """Structured snapshot of the active pokemon on each side for sprite display."""
+    def side_info(side_idx: int) -> dict:
+        side = battle.side(side_idx)
+        mon = side.stored()  # currently active (stored = the active slot)
+        sp = mon.species
+        stats = mon.stats()
+        return {
+            "species_num": int(sp),
+            "species_id": oak.species_id(sp) if sp else "",
+            "hp": int(mon.hp),
+            "maxhp": int(stats.hp),
+            "status": mon.status_name() if mon.hp > 0 else "fnt",
+        }
+    return {"p1": side_info(0), "p2": side_info(1)}
+
+
+
 def _extract_cells(
     search: Search, p1_nash: list[list[float]], p2_nash: list[list[float]]
 ) -> dict:
@@ -133,6 +151,7 @@ def _extract_cells(
             "empirical_matrix": em_list,
             "visit_matrix": vm_list,
             "battle_repr": oak.battle_string(battle, search.battle.durations),
+            "battle_state": _battle_state(battle),
         }
     return cells
 
