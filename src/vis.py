@@ -93,20 +93,18 @@ def _extract_cells(
         p1_n = list(p1_nash[i]) if i < len(p1_nash) else []
         p2_n = list(p2_nash[j]) if j < len(p2_nash) else []
 
-        empirical_matrix = out.get("empirical_matrix")
-        em_list = (
-            empirical_matrix[:m, :n].tolist() if empirical_matrix is not None else []
-        )
-        visit_matrix = out.get("visit_matrix")
-        # print(empirical_matrix, visit_matrix)
-        # print(type(empirical_matrix), type(visit_matrix)) # np.array, list
-        vm_list = visit_matrix[:m, :n].tolist() if visit_matrix is not None else []
+        # Both matrices are plain list[list] from pybind11 (std::array<std::array<...>>)
+        raw_val = out.get("value_matrix")
+        em_list = [row[:n] for row in raw_val[:m]] if raw_val is not None else []
+
+        raw_vis = out.get("visit_matrix")
+        vm_list = [row[:n] for row in raw_vis[:m]] if raw_vis is not None else []
 
         cells[f"{i},{j}"] = {
             "empirical_value": float(out.get("empirical_value", 0.0)),
             "nash_value": float(out.get("nash_value", 0.0)),
             "iterations": int(out.get("iterations", 0)),
-            "duration_ms": int(out.get("duration_ms", 0)),
+            "duration_ms": int(out.get("duration", 0)),
             "p1_action_names": p1_action_names,
             "p2_action_names": p2_action_names,
             "p1_nash": p1_n,
