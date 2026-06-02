@@ -112,6 +112,11 @@ def _extract_cells(
             em_list.append(ev_row)
             vm_list.append(vis_row)
 
+        def _trim(arr, length) -> list[float]:
+            if arr is None:
+                return []
+            return [float(x) for x in list(arr)[:length]]
+
         cells[f"{i},{j}"] = {
             "empirical_value": float(out.get("empirical_value", 0.0)),
             "nash_value": float(out.get("nash_value", 0.0)),
@@ -121,6 +126,10 @@ def _extract_cells(
             "p2_action_names": p2_action_names,
             "p1_nash": p1_n,
             "p2_nash": p2_n,
+            "p1_empirical": _trim(out.get("p1_empirical"), m),
+            "p2_empirical": _trim(out.get("p2_empirical"), n),
+            "p1_prior": _trim(out.get("p1_prior"), m),
+            "p2_prior": _trim(out.get("p2_prior"), n),
             "empirical_matrix": em_list,
             "visit_matrix": vm_list,
             "battle_repr": oak.battle_string(battle, search.battle.durations),
