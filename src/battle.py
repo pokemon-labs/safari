@@ -331,7 +331,8 @@ class PSBattle:
 
         if status_str:
             if status_str in (
-                constants.PARALYZED.constants.SLEEP,
+                constants.PARALYZED,
+                constants.SLEEP,
                 constants.FROZEN,
                 constants.BURN,
             ):

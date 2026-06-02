@@ -372,7 +372,7 @@ async def main() -> None:
     predictor = TeamPredictor(Config.predictor_teams, Config.predictor_ratio)
 
     battles_run = 0
-    result: dict[Result, int] = defaultdict(lambda: 0)
+    record: dict[Result, int] = defaultdict(lambda: 0)
     while True:
 
         selected_team = random.choice(user_teams.teams)

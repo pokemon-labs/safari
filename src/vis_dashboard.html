@@ -19,7 +19,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 #root {
   display: grid;
-  grid-template-columns: 380px 1fr 420px;
+  grid-template-columns: 500px 1fr 420px;
   height: 100vh;
 }
 
@@ -480,7 +480,7 @@ function buildRight() {
       <div class="scard"><div class="sl">Empirical</div><div class="sv">${fmt(d.empirical_value)}</div><div class="ss">avg leaf eval</div></div>
       <div class="scard"><div class="sl">Nash</div><div class="sv">${fmt(d.nash_value)}</div><div class="ss">equilibrium</div></div>
       <div class="scard"><div class="sl">Iterations</div><div class="sv">${fmtN(d.iterations)}</div><div class="ss">nodes</div></div>
-      <div class="scard"><div class="sl">Duration</div><div class="sv">${d.duration_ms!=null?d.duration_ms+'ms':'—'}</div><div class="ss">wall time</div></div>
+      <div class="scard"><div class="sl">Duration</div><div class="sv">${d.duration_ms!=null?d.duration_ms+'sec':'—'}</div><div class="ss">wall time</div></div>
     </div>
     <div class="pol-title" style="color:var(--p1)">P1 POLICY — ${S.p1Types[S.selP1]||'—'}</div>
     ${pol(d.p1_action_names, d.p1_nash, 'p1')}
