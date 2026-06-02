@@ -144,10 +144,11 @@ def _team_labels(player) -> list[str]:
     return labels
 
 
-def _team_species(player) -> list[list[str]]:
-    """All species IDs for each team, in slot order."""
+def _team_species(player) -> list[list[dict]]:
+    """All species for each team: [{num: dex_index, id: showdown_id}, ...]."""
     return [
-        [oak.species_id(s.species) for s in team if s.species] for team in player.teams
+        [{"num": s.species, "id": oak.species_id(s.species)} for s in team if s.species]
+        for team in player.teams
     ]
 
 
