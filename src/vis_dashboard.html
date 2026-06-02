@@ -304,7 +304,8 @@ function mkImg(sid, back, sz) {
 // EV color  [0,1] → red‥grey‥green
 // ─────────────────────────────────────────────────────────
 function evColor(v) {
-  if (v == null || isNaN(v)) return { bg: 'var(--bg3)', fg: 'var(--dim)' };
+  // Unvisited / null → dark muted gray so it reads as "no data"
+  if (v == null || isNaN(v)) return { bg: '#1a1a28', fg: '#383858', unvisited: true };
   const t = Math.max(0, Math.min(1, v));
   let r, g, b;
   if (t < 0.5) {
@@ -315,7 +316,7 @@ function evColor(v) {
     r = Math.round(150-x*100); g = Math.round(110+x*110); b = Math.round(90-x*40);
   }
   const lum = .299*r + .587*g + .114*b;
-  return { bg: `rgb(${r},${g},${b})`, fg: lum>100 ? 'rgba(0,0,0,.85)' : 'rgba(255,255,255,.9)' };
+  return { bg: `rgb(${r},${g},${b})`, fg: lum>100 ? 'rgba(0,0,0,.85)' : 'rgba(255,255,255,.9)', unvisited: false };
 }
 
 // ─────────────────────────────────────────────────────────
@@ -377,11 +378,13 @@ function buildMatrix() {
     p2a.forEach((_, j) => {
       const v = (em[i] || [])[j];
       const visits = (vm[i] || [])[j];
-      const { bg, fg } = evColor(v);
+      const { bg, fg, unvisited } = evColor(v);
       const cell = document.createElement('div');
       cell.className = 'ev-cell' + (i===j ? ' diag' : '');
       cell.style.cssText = `background:${bg};min-height:${maxH}px;min-width:${maxW}px`;
-      if (v != null) {
+      if (unvisited) {
+        cell.innerHTML = `<div class="ev-v" style="color:#2a2a42">—</div>`;
+      } else {
         const visitStr = visits != null ? Number(visits).toLocaleString() : '';
         cell.innerHTML =
           `<div class="ev-v" style="color:${fg}">${v.toFixed(2)}</div>` +
