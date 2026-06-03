@@ -174,11 +174,25 @@ def _team_labels(player) -> list[str]:
 
 
 def _team_species(player) -> list[list[dict]]:
-    """All species for each team: [{num: dex_index, id: showdown_id}, ...]."""
-    return [
-        [{"num": s.species, "id": oak.species_id(s.species)} for s in team if s.species]
-        for team in player.teams
-    ]
+    """All species for each team: [{num, id, moves: [move_id, ...]}, ...]."""
+    result = []
+    for team in player.teams:
+        slot_list = []
+        for s in team:
+            if not s.species:
+                continue
+            moves = []
+            for mi in range(4):
+                mv = s.move(mi)
+                if mv.id:
+                    moves.append(oak.move_id(mv.id))
+            slot_list.append({
+                "num": s.species,
+                "id": oak.species_id(s.species),
+                "moves": moves,
+            })
+        result.append(slot_list)
+    return result
 
 
 # ---------------------------------------------------------------------------
