@@ -54,7 +54,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   flex: 1; display: grid; grid-template-columns: 1fr 1fr;
   overflow: hidden;
 }
-.type-col { display: flex; flex-direction: column; overflow: hidden; padding: 4px 3px; gap: 3px; flex: 1; justify-content: space-evenly; }
+.type-col { display: flex; flex-direction: column; overflow: hidden; padding: 4px 3px; gap: 3px; flex: 1; justify-content: flex-start; }
 .type-col:first-child { border-right: 1px solid var(--border); }
 .type-col-hdr {
   font-size: 8px; letter-spacing: .08em; text-transform: uppercase;
@@ -132,7 +132,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 .mh-row .mh-name { overflow: hidden; text-overflow: ellipsis; width: 100%; text-align: right; }
 .mh-row .mh-q {
-  font-size: 10px; font-family: var(--mono); font-weight: 700;
+  font-size: 13px; font-family: var(--mono); font-weight: 700;
   color: #888; /* overridden inline based on value */
 }
 .mh-col {
@@ -143,7 +143,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 .mh-col .mh-name { overflow: hidden; text-overflow: ellipsis; width: 100%; text-align: center; }
 .mh-col .mh-q {
-  font-size: 10px; font-family: var(--mono); font-weight: 700;
+  font-size: 13px; font-family: var(--mono); font-weight: 700;
   color: #888;
 }
 
@@ -529,21 +529,9 @@ function buildMatrix() {
   const qMax = allQ.length ? Math.max(...allQ) : 1;
   function qColor(q) {
     if (q == null) return '#444';
+    // Reuse evColor's red→grey→green gradient, normalised over [qMin, qMax]
     const t = qMax === qMin ? 0.5 : (q - qMin) / (qMax - qMin);
-    // low → var(--p2) purple, high → var(--p1) blue, scaled
-    if (t < 0.5) {
-      const x = t / 0.5;
-      const r = Math.round(180 - x * 100);
-      const g = Math.round(60 + x * 40);
-      const b = Math.round(240 - x * 60);
-      return `rgb(${r},${g},${b})`;
-    } else {
-      const x = (t - 0.5) / 0.5;
-      const r = Math.round(80 - x * 6);
-      const g = Math.round(100 + x * 58);
-      const b = Math.round(180 + x * 75);
-      return `rgb(${r},${g},${b})`;
-    }
+    return evColor(t).bg;
   }
 
   // corner — show which modes are active
