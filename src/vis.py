@@ -183,14 +183,16 @@ def _team_species(player) -> list[list[dict]]:
                 continue
             moves = []
             for mi in range(4):
-                mv = s.move(mi)
-                if mv.id:
-                    moves.append(oak.move_id(mv.id))
-            slot_list.append({
-                "num": s.species,
-                "id": oak.species_id(s.species),
-                "moves": moves,
-            })
+                mv = s.moves[mi]
+                if mv:
+                    moves.append(oak.move_id(mv))
+            slot_list.append(
+                {
+                    "num": s.species,
+                    "id": oak.species_id(s.species),
+                    "moves": moves,
+                }
+            )
         result.append(slot_list)
     return result
 
