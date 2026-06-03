@@ -47,18 +47,19 @@ class PSWebsocketClient:
 
     @classmethod
     async def create(
-        cls, username: str, password: str | None, address: str
+        cls, username: str, password: str | None, address: str, login_address: str
     ) -> "PSWebsocketClient":
         self = cls()
         self.username = username
         self.password = password
         self.address = address
         self.websocket = await websockets.connect(address)
-        self.login_uri = (
+        login_default = (
             "https://play.pokemonshowdown.com/api/login"
             if password
             else "https://play.pokemonshowdown.com/action.php?"
         )
+        self.login_uri = login_address if login_address else login_default
         return self
 
     async def receive_message(self) -> str:
@@ -107,6 +108,7 @@ class PSWebsocketClient:
             resp = requests.post(
                 self.login_uri,
                 data={
+                    "act": "login",
                     "name": self.username,
                     "pass": self.password,
                     "challstr": combined,
@@ -355,7 +357,7 @@ async def main() -> None:
     init_logging(Config.log_level, Config.log_to_file)
 
     client = await PSWebsocketClient.create(
-        Config.username, Config.password, Config.websocket_uri
+        Config.username, Config.password, Config.websocket_uri, Config.login_uri
     )
     Config.user_id = await client.login()
 

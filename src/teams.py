@@ -112,7 +112,7 @@ class SetDict:
     def get_matching(self, s: oak.Set) -> list[oak.Set]:
         result = []
         for t in self.sets:
-            if matches(s, t):
+            if set_matches(s, t):
                 result.append(t)
         den = sum(p for _, p in result)
         assert den > 0
@@ -192,15 +192,19 @@ def get_teams_and_probs(
     # get as many actual teams as possible, using only the top (no sampling)
     matching_teams: list[tuple[Team, Logit]] = predictor.find_all_matching(side)[:n]
     n_matched = len(matching_teams)
-    matched_sum = sum(math.exp(l) for _, l in matching_teams) / (
-        remaining_weight * n_matched / n
-    )
-    for t, logit in matching_teams:
-        # turn the decrementing logits into probs
-        teams.append(t)
-        probs.append(math.exp(logit) / matched_sum)
-    remaining_weight *= (n - n_matched) / n
-    n -= n_matched
+    if n_matched:
+        matched_sum = sum(math.exp(l) for _, l in matching_teams) / (
+            remaining_weight * n_matched / n
+        )
+        for t, logit in matching_teams:
+            # turn the decrementing logits into probs
+            teams.append(t)
+            probs.append(math.exp(logit) / matched_sum)
+        remaining_weight *= (n - n_matched) / n
+        n -= n_matched
+    else:
+        pass
+
     if n == 0:
         return (teams, probs)
 

@@ -94,6 +94,7 @@ class _Config:
             required=True,
             help="The PokemonShowdown websocket URI, e.g. wss://sim3.psim.us/showdown/websocket",
         )
+        parser.add_argument("--login-uri", type=str, default=None)
         parser.add_argument("--ps-username", required=True)
         parser.add_argument("--ps-password", default=None)
         parser.add_argument("--ps-avatar", default=None)
@@ -203,6 +204,7 @@ class _Config:
 
         args = parser.parse_args()
         self.websocket_uri = args.websocket_uri
+        self.login_uri = args.login_uri
         self.username = args.ps_username
         self.password = args.ps_password
         self.avatar = args.ps_avatar
