@@ -9,14 +9,16 @@ from enum import Enum, auto
 # These correspond to the members of self.p1.strategies[0], the defacto type for p1
 class Policy(Enum):
     bayesian_nash = auto()
-    argmax = auto()
-    nash = auto()
     empirical = auto()
+    nash = auto()
+    argmax = auto()
+
 
 class Selection(Enum):
     sample = auto()
     argmax = auto()
     # argmax sample from empirical is the same as 'sample' sample from argmax
+
 
 class CustomFormatter(logging.Formatter):
     def format(self, record):
@@ -206,16 +208,8 @@ class _Config:
             action="store_true",
             help="Launch the debug visualizer at http://localhost:8765",
         )
-        parser.add_argument(
-            "--policy",
-            type=Policy,
-            default=Policy.bayesian_nash
-        )
-        parser.add_argument(
-            "--selection",
-            type=Selection,
-            default=Selection.sample
-        )
+        parser.add_argument("--policy", type=Policy, default=Policy.bayesian_nash)
+        parser.add_argument("--selection", type=Selection, default=Selection.sample)
 
         args = parser.parse_args()
         self.websocket_uri = args.websocket_uri

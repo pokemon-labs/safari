@@ -20,9 +20,7 @@ import oak
 
 logger = logging.getLogger(__name__)
 
-
-@dataclass
-type Strategies = dict[Policy, list[float]]
+type Strategy = dict[Policy, list[float]]
 
 
 class Player:
@@ -36,10 +34,12 @@ class Player:
         self.n = len(teams)
         assert len(omega) == self.n
         self.side = side
-        self.teams = teamsself.strat
+        self.teams = teams
         self.omega = omega
         self.team_length = 6
-        self.strategies: list[Strategies] = [{p : [0.0 for _ in range(9)] for p in Policy} for _ in range(self.n)]
+        self.strategies: list[Strategy] = [
+            {p: [0.0 for _ in range(9)] for p in Policy} for _ in range(self.n)
+        ]
 
     def _find(self, n: int, f) -> int | None:
         return next((i for i in range(n) if f(i)), None)
@@ -172,16 +172,28 @@ class Search:
         self.p1_actions = [self.outputs[(i, 0)]["m"] for i in range(self.p1.n)]
         self.p2_actions = [self.outputs[(0, j)]["n"] for j in range(self.p2.n)]
 
-        for i in range(self.p1.n):
-            for j in range(self.p2.n):
+        for t1 in range(self.p1.n):
+            for t2 in range(self.p2.n):
 
-                s1 = self.p1.strategies[i]
-                s2 = self.p2.strategies[j]
-                o1 = self.p1.omega[i]
-                o2 = self.p2.omega[j]
+                output = self.outputs[(t1, t2)]
 
-                # TODO add these up to produce the final, save bayes nash for solve
+                s1: Strategy = self.p1.strategies[t1]
+                s2: Strategy = self.p2.strategies[t2]
+                o1 = self.p1.omega[t1]
+                o2 = self.p2.omega[t2]
 
+                for p in Policy:
+                    if p in (Policy.empirical, Policy.nash, Policy.prior):
+                        for i in range(9):
+                            s1[p][i] += o2 * output[f"p1_{p.name}"]
+                            s2[p][i] += o1 * output[f"p2_{p.name}"]
+                # p1 argmax
+                for strategy, prefix in [(s1, "p1"), (s2, "p2")]:
+                    s = output[f"{prefix}_empirical"]
+                    argmax_idx = max(range(len(s)), key=s.__getitem__)
+                    strategy[Policy.argmax] = [
+                        1.0 if i == argmax_idx else 0.0 for i in range(9)
+                    ]
 
     def solve(self) -> None:
         p1 = src.bayes_nash.Player(self.p1_actions, self.p1.omega)
@@ -201,12 +213,12 @@ class Search:
             p2_cur,
         ) = solver.run(10000, 1.0, 1.0)
 
-        # TODO formatting
         for t in range(self.p1.n):
-            self.p1.strategies[i][Policy.bayesian_nash] = p1_avg[i]
-            for i in range(n);
+            for i in range(self.p1_actions[t]):
+                self.p1.strategies[t][Policy.bayesian_nash][i] = p1_avg[t, i]
         for t in range(self.p2.n):
-            self.p2.strategies[i][Policy.bayesian_nash] = p2_avg[i]
+            for i in range(self.p2_actions[t]):
+                self.p2.strategies[t][Policy.bayesian_nash][i] = p2_avg[t, i]
 
     def parse_pkmn_choice(self, c: int) -> str:
         side = self.battles[(0, 0)].side(0)

@@ -15,7 +15,15 @@ import requests
 import websockets
 import websockets.asyncio.client
 
-from src.config import Config, SaveReplay, BotModes, Format, init_logging, Policy, Selection
+from src.config import (
+    Config,
+    SaveReplay,
+    BotModes,
+    Format,
+    init_logging,
+    Policy,
+    Selection,
+)
 from src.battle import PSBattle, PSPlayer, normalize_name
 from src.teams import TeamPredictor, to_packed, get_teams_and_probs, team_to_string
 from src.search import Player, Search
@@ -216,7 +224,6 @@ async def _pick_move(battle: PSBattle, predictor: TeamPredictor) -> tuple[str, s
     search.solve()
 
     policy = search.p1.strategies[0][Config.policy]
-     
 
     # choose p1 move
     eps = 1e-3
@@ -230,7 +237,7 @@ async def _pick_move(battle: PSBattle, predictor: TeamPredictor) -> tuple[str, s
     pending_move = search.parse_pkmn_choice(c)
 
     if _viz is not None:
-        _viz.push(battle, search, a, b, pending_move)
+        _viz.push(battle, search, pending_move)
         override = _viz.get_move_override()
         if override is not None:
             return (override, str(battle.rqid))

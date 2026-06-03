@@ -9,7 +9,7 @@ Usage (from run.py):
     viz.start()
 
     # after search.run() + search.solve():
-    viz.push(battle, search, p1_nash, p2_nash, pending_move)
+    viz.push(battle, search, pending_move)
 
     # instead of sending the move directly:
     override = viz.get_move_override()   # None if auto; blocks if manual toggle on
@@ -84,9 +84,7 @@ def _battle_state(battle) -> dict:
     return {"p1": side_info(0), "p2": side_info(1)}
 
 
-def _extract_cells(
-    search: Search, p1_nash: list[list[float]], p2_nash: list[list[float]]
-) -> dict:
+def _extract_cells(search: Search) -> dict:
     """
     Build the cells dict from a completed Search.
 
@@ -103,14 +101,8 @@ def _extract_cells(
         p1_choices = out["p1_choices"][:m]
         p2_choices = out["p2_choices"][:n]
 
-        # p1_action_names = [_choice_name(c, battle) for c in p1_choices]
-        # p2_action_names = [_choice_name(c, battle) for c in p2_choices]
         p1_action_names = [oak.choice_label(battle.side(0), c) for c in p1_choices]
         p2_action_names = [oak.choice_label(battle.side(1), c) for c in p2_choices]
-
-        # nash slices — already trimmed to m/n by solve()
-        p1_n = list(p1_nash[i]) if i < len(p1_nash) else []
-        p2_n = list(p2_nash[j]) if j < len(p2_nash) else []
 
         # Both matrices are plain list[list] from pybind11 (std::array<std::array<...>>)
         raw_val = out.get("value_matrix")
@@ -143,8 +135,8 @@ def _extract_cells(
             "duration_ms": int(out.get("duration", 0)),
             "p1_action_names": p1_action_names,
             "p2_action_names": p2_action_names,
-            "p1_nash": p1_n,
-            "p2_nash": p2_n,
+            "p1_nash": _trim(out.get("p1_nash"), m),
+            "p2_nash": _trim(out.get("p2_nash"), n),
             "p1_empirical": _trim(out.get("p1_empirical"), m),
             "p2_empirical": _trim(out.get("p2_empirical"), n),
             "p1_prior": _trim(out.get("p1_prior"), m),
@@ -246,8 +238,6 @@ class DebugViz:
         self,
         battle,  # PSBattle — for turn number
         search: Search,
-        p1_nash: list,  # from search.solve() — list of per-type strategies
-        p2_nash: list,
         pending_move: str,
     ):
         """
@@ -258,7 +248,7 @@ class DebugViz:
         p1_species = _team_species(search.p1)
         p2_species = _team_species(search.p2)
         probs = _omega_matrix(search.p1.omega, search.p2.omega)
-        cells = _extract_cells(search, p1_nash, p2_nash)
+        cells = _extract_cells(search)
 
         snapshot = {
             "p1_types": p1_labels,
