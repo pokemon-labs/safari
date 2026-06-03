@@ -33,6 +33,7 @@ from fastapi.responses import HTMLResponse
 import oak
 from src.teams import team_to_string
 from src.search import Search
+from src.config import Policy
 
 # Load HTML from sibling file so this module stays readable
 _HTML_PATH = os.path.join(os.path.dirname(__file__), "vis_dashboard.html")
@@ -82,6 +83,19 @@ def _battle_state(battle) -> dict:
         }
 
     return {"p1": side_info(0), "p2": side_info(1)}
+
+
+def _player_strategies(player, action_counts: list[int]) -> list[dict[str, list[float]]]:
+    """Per-type strategies: list indexed by type, each a dict of policy_name -> list[float]."""
+    result = []
+    for t, strat in enumerate(player.strategies):
+        m = action_counts[t] if t < len(action_counts) else 9
+        entry = {}
+        for policy, values in strat.items():
+            entry[policy.name] = [float(v) for v in values[:m]]
+        result.append(entry)
+    return result
+
 
 
 def _extract_cells(search: Search) -> dict:
@@ -259,6 +273,8 @@ class DebugViz:
             "p2_omega": list(search.p2.omega),
             "probs": probs,
             "cells": cells,
+            "p1_strategies": _player_strategies(search.p1, search.p1_actions),
+            "p2_strategies": _player_strategies(search.p2, search.p2_actions),
             "pending_move": pending_move,
             "turn": battle.public.turn,
         }
