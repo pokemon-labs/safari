@@ -276,7 +276,13 @@ class DebugViz:
         with self._lock:
             self._data.update(snapshot)
             self._history.append(snapshot)
-            payload = json.dumps({"type": "update", "snapshot": snapshot, "history_len": len(self._history)})
+            payload = json.dumps(
+                {
+                    "type": "update",
+                    "snapshot": snapshot,
+                    "history_len": len(self._history),
+                }
+            )
 
         if self._loop:
             asyncio.run_coroutine_threadsafe(self._broadcast(payload), self._loop)
@@ -310,12 +316,14 @@ class DebugViz:
             self._clients.add(websocket)
             try:
                 with self._lock:
-                    init_payload = json.dumps({
-                        "type": "init",
-                        "history": self._history,
-                        "history_len": len(self._history),
-                        **self._data,
-                    })
+                    init_payload = json.dumps(
+                        {
+                            "type": "init",
+                            "history": self._history,
+                            "history_len": len(self._history),
+                            **self._data,
+                        }
+                    )
                 await websocket.send_text(init_payload)
 
                 async for raw in websocket.iter_text():

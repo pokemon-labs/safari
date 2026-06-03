@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from concurrent.futures import ProcessPoolExecutor
 
-from src.config import Config, Policy
+from src.config import Config, Policy, Selection
 from src.battle import PSBattle
 from src.teams import (
     TeamPredictor,
@@ -21,6 +21,10 @@ import oak
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+type Strategies = dict[Policy, list[float]]
+
+
 class Player:
     """
     A proxy for BayesNash player that encaps all oak calls
@@ -32,9 +36,10 @@ class Player:
         self.n = len(teams)
         assert len(omega) == self.n
         self.side = side
-        self.teams = teams
+        self.teams = teamsself.strat
         self.omega = omega
         self.team_length = 6
+        self.strategies: list[Strategies] = [{p : [0.0 for _ in range(9)] for p in Policy} for _ in range(self.n)]
 
     def _find(self, n: int, f) -> int | None:
         return next((i for i in range(n) if f(i)), None)
@@ -154,6 +159,7 @@ class Search:
                 ref_p2 = self.outputs[(0, j)]["p2_choices"]
                 cur_p1 = self.outputs[(i, j)]["p1_choices"]
                 cur_p2 = self.outputs[(i, j)]["p2_choices"]
+                # TODO this doesn't really check anything
                 assert np.array_equal(
                     np.asarray(ref_p1) > 0,
                     np.asarray(cur_p1) > 0,
@@ -166,7 +172,18 @@ class Search:
         self.p1_actions = [self.outputs[(i, 0)]["m"] for i in range(self.p1.n)]
         self.p2_actions = [self.outputs[(0, j)]["n"] for j in range(self.p2.n)]
 
-    def solve(self):
+        for i in range(self.p1.n):
+            for j in range(self.p2.n):
+
+                s1 = self.p1.strategies[i]
+                s2 = self.p2.strategies[j]
+                o1 = self.p1.omega[i]
+                o2 = self.p2.omega[j]
+
+                # TODO add these up to produce the final, save bayes nash for solve
+
+
+    def solve(self) -> None:
         p1 = src.bayes_nash.Player(self.p1_actions, self.p1.omega)
         p2 = src.bayes_nash.Player(self.p2_actions, self.p2.omega)
         matrices = {}
@@ -183,7 +200,13 @@ class Search:
             p1_cur,
             p2_cur,
         ) = solver.run(10000, 1.0, 1.0)
-        return (p1_avg, p2_avg)
+
+        # TODO formatting
+        for t in range(self.p1.n):
+            self.p1.strategies[i][Policy.bayesian_nash] = p1_avg[i]
+            for i in range(n);
+        for t in range(self.p2.n):
+            self.p2.strategies[i][Policy.bayesian_nash] = p2_avg[i]
 
     def parse_pkmn_choice(self, c: int) -> str:
         side = self.battles[(0, 0)].side(0)

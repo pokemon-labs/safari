@@ -6,14 +6,29 @@
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg: #0d0d14; --bg2: #13131f; --bg3: #1a1a2a;
-  --panel: #111120; --panel2: #1c1c2e;
-  --border: #252538; --border2: #363658;
-  --text: #e0e0f0; --muted: #7070a0; --dim: #404060;
-  --p1: #4a9eff; --p2: #c060f0;
-  --green: #3ddc84; --amber: #f0b030; --red: #ff5555;
-  --mono: 'Cascadia Code', 'Fira Code', monospace;
-  --sans: 'Segoe UI', system-ui, sans-serif;
+  --bg: #d8d8d8;
+  --bg2: #e8e8e8;
+  --bg3: #c8c8c8;
+
+  --panel: #f0f0f0;
+  --panel2: #e4e4e4;
+
+  --border: #000000;
+  --border2: #000000;
+
+  --text: #000000;
+  --muted: #505050;
+  --dim: #808080;
+
+  --p1: #000000;
+  --p2: #606060;
+
+  --green: #58a050;
+  --amber: #c0a030;
+  --red: #b04040;
+
+  --mono: "Courier New", monospace;
+  --sans: "Courier New", monospace;
 }
 html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 12px; overflow: hidden; }
 
@@ -54,11 +69,27 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   flex: 1; display: grid; grid-template-columns: 1fr 1fr;
   overflow: hidden;
 }
-.type-col { display: flex; flex-direction: column; overflow: hidden; padding: 4px 3px; gap: 3px; flex: 1; justify-content: space-evenly; }
+.type-col {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 3px;
+  gap: 3px;
+  flex: 1;
+  justify-content: flex-start;
+  align-items: stretch;
+}
 .type-col:first-child { border-right: 1px solid var(--border); }
 .type-col-hdr {
-  font-size: 8px; letter-spacing: .08em; text-transform: uppercase;
-  text-align: center; padding: 3px 0 5px; flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+
+  height: 20px;
+  min-height: 20px;
+
+  background: inherit;
 }
 
 .type-btn {
@@ -70,7 +101,16 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .type-btn:hover { border-color: var(--border2); background: var(--panel2); }
 .type-btn.sel-p1 { border-color: var(--p1); background: rgba(74,158,255,.1); box-shadow: 0 0 0 1px var(--p1) inset; }
 .type-btn.sel-p2 { border-color: var(--p2); background: rgba(192,96,240,.1); box-shadow: 0 0 0 1px var(--p2) inset; }
-.type-btn .t-sprites { display: flex; flex-direction: row; align-items: center; flex-shrink: 0; gap: 0; width: 100%; }
+.type-btn .t-sprites {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+}
+.chibi-wrap:first-child {
+  margin-left: -4px;
+}
 .type-btn .t-sprite {
   width: 40px; height: 30px; flex-shrink: 0;
   image-rendering: pixelated;
@@ -303,11 +343,29 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 /* chibi move tooltip */
 .chibi-wrap { position: relative; display: inline-flex; }
 .chibi-tip {
-  display: none; position: absolute; bottom: 105%; left: 50%; transform: translateX(-50%);
-  background: rgba(10,10,20,.95); border: 1px solid var(--border2);
-  border-radius: 4px; padding: 4px 7px; font-size: 11px; font-family: var(--mono);
-  color: #d0d0e0; white-space: nowrap; z-index: 100; pointer-events: none;
-  line-height: 1.5;
+  display: none;
+  position: absolute;
+
+  bottom: 105%;
+  left: 50%;
+  transform: translateX(-50%);
+
+  width: max-content;
+  min-width: max-content;
+  max-width: none;
+
+  white-space: nowrap;
+
+  background: #f0f0f0;
+  border: 2px solid #000;
+  padding: 4px 7px;
+
+  font-size: 11px;
+  font-family: var(--mono);
+  color: #000;
+
+  z-index: 1000;
+  pointer-events: none;
 }
 .chibi-wrap:hover .chibi-tip { display: block; }
 
@@ -324,7 +382,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .ev-cell { position: relative; overflow: hidden; }
 .ev-cell .visit-bar {
   position: absolute; bottom: 0; left: 0; right: 0;
-  background: rgba(255,255,255,0.13); pointer-events: none;
+  background: rgba(0,0,0,.08);
+  pointer-events: none;
 }
 
 /* History navigation */
@@ -350,6 +409,246 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   color: #000; font-weight: 700; letter-spacing: .05em;
 }
 #hist-live.hidden { display: none; }
+
+/* ==========================================================
+   RBY STYLE OVERRIDES
+   ========================================================== */
+
+html,
+body,
+#left,
+#center,
+#right,
+#battle-repr-text {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+}
+
+/* remove modern gradients */
+#battle-sprite-view {
+  background: #e8e8e8;
+}
+
+/* headers */
+.ptitle,
+.type-col-hdr,
+.pol-title,
+.mode-btn,
+.bdt-btn,
+.mmt-btn,
+#hist-live {
+  letter-spacing: 0;
+  text-transform: uppercase;
+  font-family: var(--mono);
+}
+
+/* remove rounded corners everywhere */
+.type-btn,
+.scard,
+.mode-btn,
+.bdt-btn,
+.mmt-btn,
+#move-input,
+#send-btn,
+.pbar-track,
+.pbar-fill,
+.ev-cell,
+#battle-display-toggle,
+#matrix-mode-toggle,
+.sprite-hpbar .shp-track,
+.sprite-hpbar .shp-fill {
+  border-radius: 0 !important;
+}
+
+/* gameboy-style black borders */
+#left,
+#right {
+  border-color: #000;
+}
+
+#center-header,
+#battle-ctrl-bar,
+#hist-nav,
+#battle-repr-wrap,
+.scard,
+.type-btn,
+#move-input,
+#send-btn {
+  border-color: #000;
+}
+
+/* type selectors */
+.type-btn {
+  background: #f0f0f0;
+  border: 2px solid #000;
+}
+
+.type-btn:hover {
+  background: #d8d8d8;
+  border-color: #000;
+}
+
+/* selected boxes */
+.type-btn.sel-p1,
+.type-btn.sel-p2 {
+  background: #b8b8b8;
+  border-color: #000;
+  box-shadow: inset 0 0 0 2px #000;
+}
+
+.type-btn .t-omega,
+.type-btn.sel-p1 .t-omega,
+.type-btn.sel-p2 .t-omega {
+  color: #000;
+}
+
+/* matrix mode buttons */
+.mode-btn,
+.bdt-btn,
+.mmt-btn {
+  background: #f0f0f0;
+  border-color: #000;
+  color: #000;
+}
+
+.mode-btn:hover,
+.bdt-btn:hover,
+.mmt-btn:hover {
+  background: #d8d8d8;
+  color: #000;
+}
+
+.mode-btn.active-p1,
+.mode-btn.active-p2,
+.bdt-btn.active,
+.mmt-btn.active {
+  background: #b8b8b8;
+  color: #000;
+  border-color: #000;
+  box-shadow: inset 0 0 0 1px #000;
+}
+
+/* cards */
+.scard {
+  background: #f0f0f0;
+}
+
+.scard .sl {
+  color: #505050;
+}
+
+.scard .sv {
+  color: #000;
+}
+
+/* matrix labels */
+.mh-row,
+.mh-col {
+  color: #000;
+}
+
+.mh-row .mh-q,
+.mh-col .mh-q {
+  color: #404040 !important;
+}
+
+/* matrix cells */
+.ev-cell {
+  border: 1px solid #000;
+}
+
+.ev-cell.diag {
+  outline: 2px solid #000;
+}
+
+/* visit mode */
+.ev-cell .visit-bar {
+  background: rgba(0,0,0,.15);
+}
+
+/* policy bars */
+.pbar-name,
+.pbar-pct {
+  color: #000;
+}
+
+.pbar-track {
+  background: #fff;
+  border: 1px solid #000;
+}
+
+.pbar-fill.p1 {
+  background: #000;
+}
+
+.pbar-fill.p2 {
+  background: #808080;
+}
+
+/* hp bars */
+.sprite-hpbar .shp-name {
+  color: #000;
+}
+
+.sprite-hpbar .shp-track {
+  background: #fff;
+  border: 2px solid #000;
+  height: 8px;
+}
+
+.sprite-hpbar .shp-nums {
+  color: #000;
+}
+
+/* battle text panel */
+#battle-repr-text {
+  color: #000;
+}
+
+/* history nav */
+#hist-nav {
+  background: #e8e8e8;
+}
+
+#hist-label {
+  color: #000;
+}
+
+#hist-live {
+  background: #000;
+  color: #fff;
+}
+
+#hist-nav .hn-arrow {
+  color: #000;
+}
+
+#hist-nav .hn-arrow:hover {
+  background: #d0d0d0;
+}
+
+/* manual controls */
+#move-input {
+  background: #fff;
+  color: #000;
+}
+
+#send-btn {
+  background: #c8c8c8;
+  color: #000;
+}
+
+/* status indicators */
+.dot.live {
+  box-shadow: none;
+}
+
+#status {
+  color: #404040;
+}
+
+
 </style>
 </head>
 <body>
@@ -631,10 +930,11 @@ function buildMatrix() {
       cell.className = 'ev-cell' + (i===j ? ' diag' : '');
 
       if (S.matrixMode === 'visit') {
-        cell.style.cssText = `background:#181824;min-height:${maxH}px;min-width:${maxW}px`;
+        cell.style.cssText =
+          `background:#f0f0f0;min-height:${maxH}px;min-width:${maxW}px`;
+        const textCol = visits > 0 ? '#000' : '#707070';
+        const subCol  = visits > 0 ? '#404040' : '#909090';
         const barPct  = (visits / maxVisits * 100).toFixed(1);
-        const textCol = visits > 0 ? '#c8c8d8' : '#363650';
-        const subCol  = visits > 0 ? '#888'     : '#2a2a3a';
         const evStr   = v != null ? v.toFixed(2) : '—';
         cell.innerHTML =
           `<div class="visit-bar" style="height:${barPct}%"></div>` +
