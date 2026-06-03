@@ -650,6 +650,10 @@ body,
 }
 
 
+
+/* Per-type strategy section */
+.type-strat-wrap { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); }
+.type-strat-title { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin-bottom: 4px; }
 </style>
 </head>
 <body>
@@ -757,6 +761,7 @@ const S = {
 
   selP1: 0, selP2: 0,
   p1Mode: 'nash', p2Mode: 'nash',
+  p1TypeMode: 'bayesian_nash', p2TypeMode: 'bayesian_nash',  // per-type strategy mode
   battleMode: 'sprite',
   matrixMode: 'ev',
 };
@@ -1031,25 +1036,41 @@ function policyData(d, player, mode) {
   return player === 'p1' ? d.p1_nash : d.p2_nash;
 }
 
+function makePbars(names, probs, cls) {
+  const frag = document.createDocumentFragment();
+  (names || []).forEach((n, k) => {
+    const pct = ((probs?.[k] || 0) * 100).toFixed(1);
+    const row = document.createElement('div');
+    row.className = 'pbar';
+    row.innerHTML = `<div class="pbar-name" title="${n}">${n}</div>
+      <div class="pbar-track"><div class="pbar-fill ${cls}" style="width:${pct}%"></div></div>
+      <div class="pbar-pct">${pct}%</div>`;
+    frag.appendChild(row);
+  });
+  return frag;
+}
+
 function buildPolicySection(d, player) {
   const cls = player;
   const mode = player === 'p1' ? S.p1Mode : S.p2Mode;
+  const typeMode = player === 'p1' ? S.p1TypeMode : S.p2TypeMode;
   const names = player === 'p1' ? d.p1_action_names : d.p2_action_names;
   const probs = policyData(d, player, mode);
   const snap = currentSnap() || {};
   const p1t = snap.p1_types || []; const p2t = snap.p2_types || [];
   const label = player === 'p1' ? p1t[S.selP1] : p2t[S.selP2];
   const activeCls = `active-${player}`;
+  const typeIdx = player === 'p1' ? S.selP1 : S.selP2;
 
   const wrap = document.createElement('div');
 
+  // ── pair-level section ──
   const title = document.createElement('div');
   title.className = 'pol-title';
   title.style.color = `var(--${player})`;
   title.textContent = `${player.toUpperCase()} POLICY — ${label || '—'}`;
   wrap.appendChild(title);
 
-  // Mode selector row
   const modeRow = document.createElement('div');
   modeRow.className = 'mode-row';
   ['nash', 'empirical', 'prior'].forEach(m => {
@@ -1058,24 +1079,45 @@ function buildPolicySection(d, player) {
     btn.textContent = m;
     btn.onclick = () => {
       if (player === 'p1') S.p1Mode = m; else S.p2Mode = m;
-      buildRight();
-      buildMatrix();
+      buildRight(); buildMatrix();
     };
     modeRow.appendChild(btn);
   });
   wrap.appendChild(modeRow);
+  wrap.appendChild(makePbars(names, probs, cls));
 
-  // Bars
-  (names || []).forEach((n, k) => {
-    const pct = ((probs?.[k] || 0) * 100).toFixed(1);
-    const row = document.createElement('div');
-    row.className = 'pbar';
-    row.innerHTML = `<div class="pbar-name" title="${n}">${n}</div>
-      <div class="pbar-track"><div class="pbar-fill ${cls}" style="width:${pct}%"></div></div>
-      <div class="pbar-pct">${pct}%</div>`;
-    wrap.appendChild(row);
+  // ── per-type strategy section ──
+  const strategies = (player === 'p1' ? snap.p1_strategies : snap.p2_strategies) || [];
+  const typeStrat = strategies[typeIdx] || {};
+  const typeStratNames = names;  // same action names, same type index
+
+  const tsWrap = document.createElement('div');
+  tsWrap.className = 'type-strat-wrap';
+
+  const tsTitle = document.createElement('div');
+  tsTitle.className = 'type-strat-title';
+  tsTitle.textContent = `${player.toUpperCase()}T${typeIdx+1} strategy`;
+  tsWrap.appendChild(tsTitle);
+
+  const tsModeRow = document.createElement('div');
+  tsModeRow.className = 'mode-row';
+  ['bayesian_nash', 'nash', 'empirical', 'prior', 'argmax'].forEach(m => {
+    const btn = document.createElement('div');
+    btn.className = 'mode-btn' + (typeMode === m ? ` ${activeCls}` : '');
+    btn.textContent = m === 'bayesian_nash' ? 'bayes' : m;
+    btn.title = m;
+    btn.onclick = () => {
+      if (player === 'p1') S.p1TypeMode = m; else S.p2TypeMode = m;
+      buildRight();
+    };
+    tsModeRow.appendChild(btn);
   });
+  tsWrap.appendChild(tsModeRow);
 
+  const typeProbs = typeStrat[typeMode] || [];
+  tsWrap.appendChild(makePbars(typeStratNames, typeProbs, cls));
+
+  wrap.appendChild(tsWrap);
   return wrap;
 }
 
