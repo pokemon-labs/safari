@@ -123,17 +123,28 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 /* matrix header cells */
 .mh-corner { /* top-left blank */ }
+
+.mh-row {
+  font-size: 11px; color: #c0c0d8;
+  display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
+  padding-right: 5px; overflow: hidden; white-space: nowrap;
+  max-width: 120px; gap: 1px;
+}
+.mh-row .mh-name { overflow: hidden; text-overflow: ellipsis; width: 100%; text-align: right; }
+.mh-row .mh-q {
+  font-size: 10px; font-family: var(--mono); font-weight: 700;
+  color: #888; /* overridden inline based on value */
+}
 .mh-col {
   font-size: 11px; color: #c0c0d8; text-align: center;
   padding: 2px 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  writing-mode: horizontal-tb;
-  max-width: 100px;
+  writing-mode: horizontal-tb; max-width: 100px;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
 }
-.mh-row {
-  font-size: 11px; color: #c0c0d8;
-  display: flex; align-items: center; justify-content: flex-end;
-  padding-right: 5px; overflow: hidden; white-space: nowrap;
-  max-width: 120px;
+.mh-col .mh-name { overflow: hidden; text-overflow: ellipsis; width: 100%; text-align: center; }
+.mh-col .mh-q {
+  font-size: 10px; font-family: var(--mono); font-weight: 700;
+  color: #888;
 }
 
 .ev-cell {
@@ -455,20 +466,71 @@ function buildMatrix() {
   // col header width (row label) + N data cols
   mat.style.gridTemplateColumns = `130px ${Array(N).fill(maxW+'px').join(' ')}`;
 
-  // corner
-  mat.appendChild(Object.assign(document.createElement('div'), { className: 'mh-corner' }));
+  // Compute Q-values from empirical matrix weighted by opponent's selected strategy
+  // Row Q[i] = Σ_j em[i][j] * p2_probs[j]  (P1's expected value vs P2's mix)
+  // Col Q[j] = Σ_i em[i][j] * p1_probs[i]  (P2's expected value, negated for P1 perspective)
+  const p2Probs = policyData(d, 'p2', S.p2Mode) || [];
+  const p1Probs = policyData(d, 'p1', S.p1Mode) || [];
 
-  // col headers (p2 actions)
+  const rowQ = p1a.map((_, i) => {
+    const row = em[i] || [];
+    const allNull = row.every((v, j) => v == null || p2Probs[j] == null);
+    if (allNull) return null;
+    return row.reduce((sum, v, j) => sum + (v ?? 0) * (p2Probs[j] ?? 0), 0);
+  });
+  const colQ = p2a.map((_, j) => {
+    const allNull = em.every((row, i) => (row[j]) == null || p1Probs[i] == null);
+    if (allNull) return null;
+    return em.reduce((sum, row, i) => sum + (row[j] ?? 0) * (p1Probs[i] ?? 0), 0);
+  });
+
+  // Q color: blend from --p2 (low) to white (mid) to --p1 (high) across the range
+  const allQ = [...rowQ, ...colQ].filter(v => v != null);
+  const qMin = allQ.length ? Math.min(...allQ) : 0;
+  const qMax = allQ.length ? Math.max(...allQ) : 1;
+  function qColor(q) {
+    if (q == null) return '#444';
+    const t = qMax === qMin ? 0.5 : (q - qMin) / (qMax - qMin);
+    // low → var(--p2) purple, high → var(--p1) blue, scaled
+    if (t < 0.5) {
+      const x = t / 0.5;
+      const r = Math.round(180 - x * 100);
+      const g = Math.round(60 + x * 40);
+      const b = Math.round(240 - x * 60);
+      return `rgb(${r},${g},${b})`;
+    } else {
+      const x = (t - 0.5) / 0.5;
+      const r = Math.round(80 - x * 6);
+      const g = Math.round(100 + x * 58);
+      const b = Math.round(180 + x * 75);
+      return `rgb(${r},${g},${b})`;
+    }
+  }
+
+  // corner — show which modes are active
+  const corner = document.createElement('div');
+  corner.className = 'mh-corner';
+  corner.style.cssText = 'font-size:8px;color:var(--dim);display:flex;flex-direction:column;align-items:flex-end;justify-content:flex-end;padding:2px 4px;gap:1px';
+  corner.innerHTML = `<span style="color:var(--p1)">${S.p1Mode}</span><span style="color:var(--p2)">${S.p2Mode}</span>`;
+  mat.appendChild(corner);
+
+  // col headers (p2 actions) with Q-value
   p2a.forEach((name, j) => {
     const d2 = document.createElement('div');
-    d2.className = 'mh-col'; d2.textContent = name; d2.title = name;
+    d2.className = 'mh-col'; d2.title = name;
+    const qVal = colQ[j];
+    const qStr = qVal != null ? qVal.toFixed(2) : '—';
+    d2.innerHTML = `<span class="mh-name">${name}</span><span class="mh-q" style="color:${qColor(qVal)}">${qStr}</span>`;
     mat.appendChild(d2);
   });
 
-  // rows
+  // rows with Q-value
   p1a.forEach((rname, i) => {
     const rl = document.createElement('div');
-    rl.className = 'mh-row'; rl.textContent = rname; rl.title = rname;
+    rl.className = 'mh-row'; rl.title = rname;
+    const qVal = rowQ[i];
+    const qStr = qVal != null ? qVal.toFixed(2) : '—';
+    rl.innerHTML = `<span class="mh-name">${rname}</span><span class="mh-q" style="color:${qColor(qVal)}">${qStr}</span>`;
     mat.appendChild(rl);
 
     p2a.forEach((_, j) => {
@@ -576,6 +638,7 @@ function buildPolicySection(d, player) {
     btn.onclick = () => {
       if (player === 'p1') S.p1Mode = m; else S.p2Mode = m;
       buildRight();
+      buildMatrix();
     };
     modeRow.appendChild(btn);
   });
