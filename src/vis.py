@@ -195,7 +195,7 @@ def _team_species(player) -> list[list[dict]]:
 
 
 class DebugViz:
-    def __init__(self, port: int = 8765, auto_open: bool = True):
+    def __init__(self, port: int = 8765, auto_open: bool = False):
         self.port = port
         self.auto_open = auto_open
 

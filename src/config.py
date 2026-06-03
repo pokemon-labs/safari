@@ -11,6 +11,7 @@ class Policy(Enum):
     bayesian_nash = auto()
     empirical = auto()
     nash = auto()
+    prior = auto()
     argmax = auto()
 
 
@@ -82,10 +83,12 @@ class _Config:
     teams: str
     predictor_teams: str
 
-    p1_types: int = 1
-    p2_types: int = 1
+    p1_types: int
+    p2_types: int
     # policy_mode controls move selection from MCTS output
-    policy_mode: Policy = Policy.argmax
+    policy_mode: Policy
+    policy_min: float
+    policy_temp: float
     user_to_challenge: str
     save_replay: SaveReplay
     room_name: str
@@ -184,7 +187,16 @@ class _Config:
             "--policy-mode",
             type=str,
             default=Policy.bayesian_nash,
-            help="Move selection policy: x=argmax, n=nash, e=empirical (default: x)",
+        )
+        parser.add_argument(
+            "--policy-min",
+            type=float,
+            default=0,
+        )
+        parser.add_argument(
+            "--policy-temp",
+            type=float,
+            default=1,
         )
         parser.add_argument(
             "--save-replay",
@@ -226,7 +238,9 @@ class _Config:
         self.p1_types = args.p1_types or 1
         self.p2_types = args.p2_types or 1
         self.parallelism = args.threads or self.p1_types * self.p2_types
-        self.policy_mode = Policy(args.policy_mode)
+        self.policy_mode = args.policy_mode  # Policy()
+        self.policy_min = args.policy_min
+        self.policy_temp = args.policy_temp
         self.run_count = args.run_count
         self.teams = args.teams
         self.predictor_teams = args.predictor_teams

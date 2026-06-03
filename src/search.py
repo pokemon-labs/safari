@@ -23,6 +23,21 @@ logger = logging.getLogger(__name__)
 type Strategy = dict[Policy, list[float]]
 
 
+def process_policy(policy, min_val=0.0, temp=1.0) -> np.array:
+    x = np.asarray(policy, dtype=float)
+    if temp != 1.0:
+        x = x**temp
+        s = x.sum()
+        if s:
+            x /= s
+    if min_val > 0.0:
+        x = np.where(x >= min_val, x, 0.0)
+        s = x.sum()
+        if s:
+            x /= s
+    return x
+
+
 class Player:
     """
     A proxy for BayesNash player that encaps all oak calls
@@ -185,8 +200,8 @@ class Search:
                 for p in Policy:
                     if p in (Policy.empirical, Policy.nash, Policy.prior):
                         for i in range(9):
-                            s1[p][i] += o2 * output[f"p1_{p.name}"]
-                            s2[p][i] += o1 * output[f"p2_{p.name}"]
+                            s1[p][i] += o2 * output[f"p1_{p.name}"][i]
+                            s2[p][i] += o1 * output[f"p2_{p.name}"][i]
                 # p1 argmax
                 for strategy, prefix in [(s1, "p1"), (s2, "p2")]:
                     s = output[f"{prefix}_empirical"]

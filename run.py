@@ -26,7 +26,7 @@ from src.config import (
 )
 from src.battle import PSBattle, PSPlayer, normalize_name
 from src.teams import TeamPredictor, to_packed, get_teams_and_probs, team_to_string
-from src.search import Player, Search
+from src.search import Player, Search, process_policy
 from src.vis import DebugViz
 
 _viz: DebugViz | None = None
@@ -223,16 +223,15 @@ async def _pick_move(battle: PSBattle, predictor: TeamPredictor) -> tuple[str, s
     search.run()
     search.solve()
 
+    output = search.outputs[(0, 0)]  # p2 type does not matter
     policy = search.p1.strategies[0][Config.policy]
+    processed_policy = process_policy(policy, Config.policy_min, Config.policy_temp)
 
     # choose p1 move
-    eps = 1e-3
-    actual_strategy = [float(x) if float(x) > eps else 0 for x in a[0]]
-    as_sum = sum(actual_strategy)
-    actual_strategy = [x / as_sum for x in actual_strategy]
-    output = search.outputs[(0, 0)]
     c = random.choices(
-        output["p1_choices"][: output["m"]], weights=actual_strategy[: output["m"]], k=1
+        output["p1_choices"][: output["m"]],
+        weights=processed_policy[: output["m"]],
+        k=1,
     )[0]
     pending_move = search.parse_pkmn_choice(c)
 

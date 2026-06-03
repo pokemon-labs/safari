@@ -111,9 +111,9 @@ class SetDict:
 
     def get_matching(self, s: oak.Set) -> list[oak.Set]:
         result = []
-        for t in self.sets:
+        for t, prob in self.sets.items():
             if set_matches(s, t):
-                result.append(t)
+                result.append((t, prob))
         den = sum(p for _, p in result)
         assert den > 0
         return [(s, p / den) for s, p in result]
