@@ -79,7 +79,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   /* background-position set inline per pokemon */
 }
 .type-btn .t-omega {
-  font-size: 9px; font-family: var(--mono); color: var(--muted);
+  font-size: 12px; font-family: var(--mono); color: #d0d0e0;
   white-space: nowrap; padding: 1px 2px 0; flex-shrink: 0;
   align-self: flex-end;
 }
@@ -104,24 +104,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   display: flex; align-items: center; gap: 16px;
   padding: 7px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0;
   background: var(--panel);
-}
-#matrix-mode-toggle {
-  display: flex; gap: 0; border: 1px solid var(--border2); border-radius: 4px; overflow: hidden;
-}
-.mmt-btn {
-  font-size: 9px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .04em;
-  padding: 2px 8px; cursor: pointer; background: var(--bg2); color: var(--muted);
-  border: none; transition: all .12s;
-}
-.mmt-btn:hover { background: var(--panel2); color: var(--text); }
-.mmt-btn.active { background: var(--bg3); color: var(--text); font-weight: 700; }
-/* visit bar — absolutely fills cell from bottom */
-.ev-cell { position: relative; overflow: hidden; }
-.ev-cell .visit-bar {
-  position: absolute; bottom: 0; left: 0; right: 0;
-  background: rgba(255,255,255,0.12);
-  pointer-events: none;
-  transition: height .3s;
 }
 #center-header .ptitle { margin: 0; }
 #matrix-label { font-size: 10px; color: var(--text); font-family: var(--mono); font-weight: 600; }
@@ -232,12 +214,12 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 .pol-title { font-size: 8px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
 .pbar { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; }
-.pbar-name { font-size: 11px; font-family: var(--mono); color: var(--muted); width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pbar-track { flex: 1; height: 7px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+.pbar-name { font-size: 13px; font-family: var(--sans); color: #d0d0e0; width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pbar-track { flex: 1; height: 10px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
 .pbar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
 .pbar-fill.p1 { background: var(--p1); }
 .pbar-fill.p2 { background: var(--p2); }
-.pbar-pct { font-size: 11px; color: var(--muted); width: 36px; text-align: right; font-family: var(--mono); }
+.pbar-pct { font-size: 13px; color: #d0d0e0; width: 40px; text-align: right; font-family: var(--mono); }
 .divider { height: 1px; background: var(--border); margin: 4px 0; }
 #no-sel { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--dim); font-size: 11px; }
 
@@ -317,6 +299,17 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 .bdt-btn:hover { background: var(--panel2); color: var(--text); }
 .bdt-btn.active { background: var(--bg3); color: var(--text); font-weight: 700; }
+
+/* chibi move tooltip */
+.chibi-wrap { position: relative; display: inline-flex; }
+.chibi-tip {
+  display: none; position: absolute; bottom: 105%; left: 50%; transform: translateX(-50%);
+  background: rgba(10,10,20,.95); border: 1px solid var(--border2);
+  border-radius: 4px; padding: 4px 7px; font-size: 11px; font-family: var(--mono);
+  color: #d0d0e0; white-space: nowrap; z-index: 100; pointer-events: none;
+  line-height: 1.5;
+}
+.chibi-wrap:hover .chibi-tip { display: block; }
 </style>
 </head>
 <body>
@@ -357,10 +350,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 <!-- ── CENTER ── -->
 <div id="center">
   <div id="center-header">
-    <div id="matrix-mode-toggle">
-      <div class="mmt-btn active" id="mmt-ev" onclick="setMatrixMode('ev')">ev</div>
-      <div class="mmt-btn" id="mmt-visit" onclick="setMatrixMode('visit')">visit</div>
-    </div>
+    <div class="ptitle" style="margin:0">EV MATRIX</div>
     <div id="matrix-label">—</div>
     <div style="flex:1"></div>
     <div class="hval">EMPIRICAL&nbsp;<span id="hv-emp">—</span></div>
@@ -410,7 +400,6 @@ const S = {
   selP1: 0, selP2: 0,
   p1Mode: 'nash', p2Mode: 'nash',  // 'nash' | 'empirical' | 'prior'
   battleMode: 'sprite',  // 'sprite' | 'text'
-  matrixMode: 'ev',      // 'ev' | 'visit'
 };
 let ws, reconnTimer;
 const $ = id => document.getElementById(id);
@@ -458,13 +447,6 @@ function activeCell() {
 // ─────────────────────────────────────────────────────────
 // EV matrix — rows = p1 actions, cols = p2 actions
 // ─────────────────────────────────────────────────────────
-function setMatrixMode(mode) {
-  S.matrixMode = mode;
-  $('mmt-ev').className    = 'mmt-btn' + (mode === 'ev'    ? ' active' : '');
-  $('mmt-visit').className = 'mmt-btn' + (mode === 'visit' ? ' active' : '');
-  buildMatrix();
-}
-
 function buildMatrix() {
   const d = activeCell();
   const mat = $('ev-matrix');
@@ -536,9 +518,6 @@ function buildMatrix() {
     }
   }
 
-  // Max visit count for proportional fill bar in visit mode
-  const maxVisits = Math.max(1, ...vm.flatMap(row => row.map(x => x ?? 0)));
-
   // corner — show which modes are active
   const corner = document.createElement('div');
   corner.className = 'mh-corner';
@@ -567,36 +546,18 @@ function buildMatrix() {
 
     p2a.forEach((_, j) => {
       const v = (em[i] || [])[j];
-      const visits = (vm[i] || [])[j] ?? 0;
+      const visits = (vm[i] || [])[j];
+      const { bg, fg, unvisited } = evColor(v);
       const cell = document.createElement('div');
       cell.className = 'ev-cell' + (i===j ? ' diag' : '');
-      cell.style.cssText = `min-height:${maxH}px;min-width:${maxW}px`;
-
-      if (S.matrixMode === 'visit') {
-        // Visit mode: grey bg, fill bar from bottom, visits major, ev minor
-        cell.style.background = '#181824';
-        const barPct = maxVisits > 0 ? (visits / maxVisits * 100).toFixed(1) : '0';
-        const evStr = v != null ? v.toFixed(2) : '—';
-        const visitStr = Number(visits).toLocaleString();
-        // text color: slightly lighter when visited
-        const textCol = visits > 0 ? '#c8c8d8' : '#363650';
-        const subCol  = visits > 0 ? '#888'     : '#2a2a3a';
-        cell.innerHTML =
-          `<div class="visit-bar" style="height:${barPct}%"></div>` +
-          `<div class="ev-v" style="color:${textCol};position:relative">${visitStr}</div>` +
-          `<div class="ev-visits" style="color:${subCol};position:relative">${evStr}</div>`;
+      cell.style.cssText = `background:${bg};min-height:${maxH}px;min-width:${maxW}px`;
+      if (unvisited) {
+        cell.innerHTML = `<div class="ev-v" style="color:#2a2a42">—</div>`;
       } else {
-        // EV mode: original color-graded cells
-        const { bg, fg, unvisited } = evColor(v);
-        cell.style.background = bg;
-        if (unvisited) {
-          cell.innerHTML = `<div class="ev-v" style="color:#2a2a42">—</div>`;
-        } else {
-          const visitStr = visits != null ? Number(visits).toLocaleString() : '';
-          cell.innerHTML =
-            `<div class="ev-v" style="color:${fg}">${v.toFixed(2)}</div>` +
-            (visitStr ? `<div class="ev-visits" style="color:${fg}">${visitStr}</div>` : '');
-        }
+        const visitStr = visits != null ? Number(visits).toLocaleString() : '';
+        cell.innerHTML =
+          `<div class="ev-v" style="color:${fg}">${v.toFixed(2)}</div>` +
+          (visitStr ? `<div class="ev-visits" style="color:${fg}">${visitStr}</div>` : '');
       }
       mat.appendChild(cell);
     });
@@ -640,7 +601,17 @@ function mkTypeBtn(label, idx, player) {
   sp.className = 't-sprites';
   species.forEach(mon => {
     const dexNum = typeof mon === 'object' ? mon.num : 0;
-    sp.appendChild(mkChibi(dexNum));
+    const moves  = (typeof mon === 'object' && mon.moves) ? mon.moves : [];
+    const wrap = document.createElement('div');
+    wrap.className = 'chibi-wrap';
+    wrap.appendChild(mkChibi(dexNum));
+    if (moves.length) {
+      const tip = document.createElement('div');
+      tip.className = 'chibi-tip';
+      tip.textContent = moves.join('  ');
+      wrap.appendChild(tip);
+    }
+    sp.appendChild(wrap);
   });
 
   const omegaVal = omegas[idx];
