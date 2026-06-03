@@ -411,10 +411,12 @@ class PSBattle:
         from_str = split_msg[4].strip() if len(split_msg) > 4 else None
         byte: int = _STATUS_BYTE.get(status_str, None)
         assert byte is not None, f"Bad status string lookup: {status_str}"
-        if from_str == "Rest":
-            side.stored().status = _STATUS_BYTE["rest"]
-        else:
-            side.stored().status = byte
+        if side.stored().status == 0:
+            oak.status_modify(side.stored().status, side.active.stats())
+            if from_str == "Rest":
+                side.stored().status = _STATUS_BYTE["rest"]
+            else:
+                side.stored().status = byte
         # dur.sleep()
         # TODO maybe init sleep duration to 1?
 
