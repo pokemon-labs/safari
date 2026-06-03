@@ -412,13 +412,13 @@ class PSBattle:
         byte: int = _STATUS_BYTE.get(status_str, None)
         assert byte is not None, f"Bad status string lookup: {status_str}"
         if side.stored().status == 0:
-            oak.status_modify(side.stored().status, side.active.stats())
             if from_str == "Rest":
                 side.stored().status = _STATUS_BYTE["rest"]
             else:
                 side.stored().status = byte
         # dur.sleep()
         # TODO maybe init sleep duration to 1?
+        oak.status_modify(side.stored().status, side.active.stats())
 
     def setboost(self, split_msg):
         assert False, "setboost assumed impossile"
