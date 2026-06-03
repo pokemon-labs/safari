@@ -15,7 +15,7 @@ import requests
 import websockets
 import websockets.asyncio.client
 
-from src.config import Config, SaveReplay, BotModes, Format, init_logging
+from src.config import Config, SaveReplay, BotModes, Format, init_logging, Policy, Selection
 from src.battle import PSBattle, PSPlayer, normalize_name
 from src.teams import TeamPredictor, to_packed, get_teams_and_probs, team_to_string
 from src.search import Player, Search
@@ -213,7 +213,10 @@ async def _pick_move(battle: PSBattle, predictor: TeamPredictor) -> tuple[str, s
     search = Search(battle, p1_player, p2_player)
     search.init_battles()
     search.run()
-    a, b = search.solve()
+    search.solve()
+
+    policy = search.p1.strategies[0][Config.policy]
+     
 
     # choose p1 move
     eps = 1e-3
