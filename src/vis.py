@@ -219,6 +219,7 @@ class DebugViz:
             "pending_move": "",
             "turn": 0,
         }
+        self._history: list[dict] = []
         self._lock = threading.Lock()
         self._clients: set[WebSocket] = set()
 
@@ -259,22 +260,23 @@ class DebugViz:
         probs = _omega_matrix(search.p1.omega, search.p2.omega)
         cells = _extract_cells(search, p1_nash, p2_nash)
 
+        snapshot = {
+            "p1_types": p1_labels,
+            "p2_types": p2_labels,
+            "p1_teams": p1_species,
+            "p2_teams": p2_species,
+            "p1_omega": list(search.p1.omega),
+            "p2_omega": list(search.p2.omega),
+            "probs": probs,
+            "cells": cells,
+            "pending_move": pending_move,
+            "turn": battle.public.turn,
+        }
+
         with self._lock:
-            self._data.update(
-                {
-                    "p1_types": p1_labels,
-                    "p2_types": p2_labels,
-                    "p1_teams": p1_species,
-                    "p2_teams": p2_species,
-                    "p1_omega": list(search.p1.omega),
-                    "p2_omega": list(search.p2.omega),
-                    "probs": probs,
-                    "cells": cells,
-                    "pending_move": pending_move,
-                    "turn": battle.public.turn,
-                }
-            )
-            payload = json.dumps({"type": "update", **self._data})
+            self._data.update(snapshot)
+            self._history.append(snapshot)
+            payload = json.dumps({"type": "update", "snapshot": snapshot, "history_len": len(self._history)})
 
         if self._loop:
             asyncio.run_coroutine_threadsafe(self._broadcast(payload), self._loop)
@@ -308,7 +310,12 @@ class DebugViz:
             self._clients.add(websocket)
             try:
                 with self._lock:
-                    init_payload = json.dumps({"type": "init", **self._data})
+                    init_payload = json.dumps({
+                        "type": "init",
+                        "history": self._history,
+                        "history_len": len(self._history),
+                        **self._data,
+                    })
                 await websocket.send_text(init_payload)
 
                 async for raw in websocket.iter_text():
