@@ -54,7 +54,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   flex: 1; display: grid; grid-template-columns: 1fr 1fr;
   overflow: hidden;
 }
-.type-col { display: flex; flex-direction: column; overflow: hidden; padding: 4px 3px; gap: 3px; flex: 1; justify-content: flex-start; }
+.type-col { display: flex; flex-direction: column; overflow: hidden; padding: 4px 3px; gap: 3px; flex: 1; justify-content: space-evenly; }
 .type-col:first-child { border-right: 1px solid var(--border); }
 .type-col-hdr {
   font-size: 8px; letter-spacing: .08em; text-transform: uppercase;
@@ -132,7 +132,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 .mh-row .mh-name { overflow: hidden; text-overflow: ellipsis; width: 100%; text-align: right; }
 .mh-row .mh-q {
-  font-size: 13px; font-family: var(--mono); font-weight: 700;
+  font-size: 10px; font-family: var(--mono); font-weight: 700;
   color: #888; /* overridden inline based on value */
 }
 .mh-col {
@@ -143,7 +143,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 .mh-col .mh-name { overflow: hidden; text-overflow: ellipsis; width: 100%; text-align: center; }
 .mh-col .mh-q {
-  font-size: 13px; font-family: var(--mono); font-weight: 700;
+  font-size: 10px; font-family: var(--mono); font-weight: 700;
   color: #888;
 }
 
@@ -326,6 +326,30 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   position: absolute; bottom: 0; left: 0; right: 0;
   background: rgba(255,255,255,0.13); pointer-events: none;
 }
+
+/* History navigation */
+#hist-nav {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 6px 16px; border-bottom: 1px solid var(--border);
+  background: var(--bg2); flex-shrink: 0;
+}
+#hist-nav .hn-arrow {
+  font-size: 20px; color: var(--muted); cursor: pointer; user-select: none;
+  padding: 0 8px; border-radius: 4px; transition: color .1s, background .1s;
+  line-height: 1.4;
+}
+#hist-nav .hn-arrow:hover { color: var(--text); background: var(--panel2); }
+#hist-nav .hn-arrow.disabled { color: var(--dim); cursor: default; background: none; }
+#hist-label {
+  font-family: var(--mono); font-size: 13px; color: var(--text);
+  min-width: 100px; text-align: center;
+}
+#hist-live {
+  font-size: 9px; font-family: var(--mono); text-transform: uppercase;
+  padding: 2px 6px; border-radius: 3px; background: var(--green);
+  color: #000; font-weight: 700; letter-spacing: .05em;
+}
+#hist-live.hidden { display: none; }
 </style>
 </head>
 <body>
@@ -365,6 +389,15 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 <!-- ── CENTER ── -->
 <div id="center">
+  <div id="hist-nav">
+    <div class="hn-arrow" id="hn-first" onclick="navHist('first')" title="First turn">&#x21E4;</div>
+    <div class="hn-arrow" id="hn-prev"  onclick="navHist('prev')"  title="Previous turn">&#x2190;</div>
+    <div id="hist-label">—</div>
+    <span id="hist-live">live</span>
+    <div class="hn-arrow" id="hn-next"  onclick="navHist('next')"  title="Next turn">&#x2192;</div>
+    <div class="hn-arrow" id="hn-last"  onclick="navHist('last')"  title="Latest turn">&#x21E5;</div>
+  </div>
+
   <div id="center-header">
     <div id="matrix-mode-toggle">
       <div class="mmt-btn active" id="mmt-ev" onclick="setMatrixMode('ev')">ev</div>
@@ -413,13 +446,19 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 // State
 // ─────────────────────────────────────────────────────────
 const S = {
+  // history of snapshots from vis.py push()
+  history: [],   // list of snapshot dicts
+  histIdx: -1,   // -1 = latest; navigated to specific turn otherwise
+
+  // derived from current snapshot
   cells: {}, p1Types: [], p2Types: [], p1Teams: [], p2Teams: [],
   p1Omega: [], p2Omega: [], probs: [],
   pendingMove: '', turn: 0,
+
   selP1: 0, selP2: 0,
-  p1Mode: 'nash', p2Mode: 'nash',  // 'nash' | 'empirical' | 'prior'
-  battleMode: 'sprite',  // 'sprite' | 'text'
-  matrixMode: 'ev',      // 'ev' | 'visit'
+  p1Mode: 'nash', p2Mode: 'nash',
+  battleMode: 'sprite',
+  matrixMode: 'ev',
 };
 let ws, reconnTimer;
 const $ = id => document.getElementById(id);
@@ -460,8 +499,21 @@ function evColor(v) {
 // ─────────────────────────────────────────────────────────
 // Active cell data
 // ─────────────────────────────────────────────────────────
+function currentSnap() {
+  if (!S.history.length) return null;
+  const idx = S.histIdx < 0 ? S.history.length - 1 : S.histIdx;
+  return S.history[Math.max(0, Math.min(idx, S.history.length - 1))];
+}
+
 function activeCell() {
-  return S.cells[`${S.selP1},${S.selP2}`] || {};
+  const snap = currentSnap();
+  if (!snap) return {};
+  return (snap.cells || {})[`${S.selP1},${S.selP2}`] || {};
+}
+
+function snapField(field) {
+  const snap = currentSnap();
+  return snap ? snap[field] : S[field];
 }
 
 // ─────────────────────────────────────────────────────────
@@ -529,9 +581,21 @@ function buildMatrix() {
   const qMax = allQ.length ? Math.max(...allQ) : 1;
   function qColor(q) {
     if (q == null) return '#444';
-    // Reuse evColor's red→grey→green gradient, normalised over [qMin, qMax]
     const t = qMax === qMin ? 0.5 : (q - qMin) / (qMax - qMin);
-    return evColor(t).bg;
+    // low → var(--p2) purple, high → var(--p1) blue, scaled
+    if (t < 0.5) {
+      const x = t / 0.5;
+      const r = Math.round(180 - x * 100);
+      const g = Math.round(60 + x * 40);
+      const b = Math.round(240 - x * 60);
+      return `rgb(${r},${g},${b})`;
+    } else {
+      const x = (t - 0.5) / 0.5;
+      const r = Math.round(80 - x * 6);
+      const g = Math.round(100 + x * 58);
+      const b = Math.round(180 + x * 75);
+      return `rgb(${r},${g},${b})`;
+    }
   }
 
   // corner — show which modes are active
@@ -597,32 +661,36 @@ function buildMatrix() {
 // Type selector
 // ─────────────────────────────────────────────────────────
 function buildTypes() {
+  const snap = currentSnap() || {};
+  const p1Types = snap.p1_types || [];
+  const p2Types = snap.p2_types || [];
+
   const p1Col = $('p1-col'), p2Col = $('p2-col');
   const h1 = p1Col.querySelector('.type-col-hdr');
   const h2 = p2Col.querySelector('.type-col-hdr');
   p1Col.innerHTML = ''; p1Col.appendChild(h1);
   p2Col.innerHTML = ''; p2Col.appendChild(h2);
 
-  S.p1Types.forEach((label, i) => {
-    const btn = mkTypeBtn(label, i, 'p1');
+  p1Types.forEach((label, i) => {
+    const btn = mkTypeBtn(label, i, 'p1', snap);
     if (i === S.selP1) btn.classList.add('sel-p1');
     btn.onclick = () => { S.selP1 = i; refresh(); };
     p1Col.appendChild(btn);
   });
-  S.p2Types.forEach((label, j) => {
-    const btn = mkTypeBtn(label, j, 'p2');
+  p2Types.forEach((label, j) => {
+    const btn = mkTypeBtn(label, j, 'p2', snap);
     if (j === S.selP2) btn.classList.add('sel-p2');
     btn.onclick = () => { S.selP2 = j; refresh(); };
     p2Col.appendChild(btn);
   });
 }
 
-function mkTypeBtn(label, idx, player) {
+function mkTypeBtn(label, idx, player, snap) {
   const btn = document.createElement('div');
   btn.className = 'type-btn';
-
-  const teams = player === 'p1' ? S.p1Teams : S.p2Teams;
-  const omegas = player === 'p1' ? S.p1Omega : S.p2Omega;
+  snap = snap || currentSnap() || {};
+  const teams = player === 'p1' ? (snap.p1_teams || []) : (snap.p2_teams || []);
+  const omegas = player === 'p1' ? (snap.p1_omega || []) : (snap.p2_omega || []);
   // Each entry in teams[idx] is {num, id}; fall back to empty if not loaded yet
   const species = teams[idx] || [];
 
@@ -667,7 +735,9 @@ function buildPolicySection(d, player) {
   const mode = player === 'p1' ? S.p1Mode : S.p2Mode;
   const names = player === 'p1' ? d.p1_action_names : d.p2_action_names;
   const probs = policyData(d, player, mode);
-  const label = player === 'p1' ? S.p1Types[S.selP1] : S.p2Types[S.selP2];
+  const snap = currentSnap() || {};
+  const p1t = snap.p1_types || []; const p2t = snap.p2_types || [];
+  const label = player === 'p1' ? p1t[S.selP1] : p2t[S.selP2];
   const activeCls = `active-${player}`;
 
   const wrap = document.createElement('div');
@@ -860,23 +930,33 @@ function connect() {
   };
   ws.onmessage = e => {
     const msg = JSON.parse(e.data);
-    if (msg.type !== 'init' && msg.type !== 'update') return;
-    if (msg.p1_types  != null) S.p1Types  = msg.p1_types;
-    if (msg.p2_types  != null) S.p2Types  = msg.p2_types;
-    if (msg.p1_teams  != null) S.p1Teams  = msg.p1_teams;
-    if (msg.p2_teams  != null) S.p2Teams  = msg.p2_teams;
-    if (msg.p1_omega  != null) S.p1Omega  = msg.p1_omega;
-    if (msg.p2_omega  != null) S.p2Omega  = msg.p2_omega;
-    if (msg.probs     != null) S.probs    = msg.probs;
-    if (msg.cells     != null) Object.assign(S.cells, msg.cells);
-    if (msg.pending_move !== undefined) {
-      S.pendingMove = msg.pending_move;
-      $('pending-lbl').textContent = msg.pending_move ? `bot: ${msg.pending_move}` : '';
-    }
-    if (msg.turn != null) { S.turn = msg.turn; $('turn-lbl').textContent = `turn ${msg.turn}`; }
-    $('status-txt').textContent = `turn ${msg.turn??'?'} · ${new Date().toLocaleTimeString()}`;
-    // default selection
-    if (!S.p1Types.length) return;
+    if (msg.type === 'init') {
+      // Full history on connect
+      S.history = msg.history || [];
+      // If server sends current state at top level, add as snapshot if history empty
+      if (!S.history.length && msg.p1_types) {
+        const snap = {};
+        for (const k of ['p1_types','p2_types','p1_teams','p2_teams','p1_omega','p2_omega','probs','cells','pending_move','turn'])
+          if (msg[k] != null) snap[k] = msg[k];
+        if (Object.keys(snap).length) S.history.push(snap);
+      }
+      S.histIdx = -1;  // always start at latest
+    } else if (msg.type === 'update') {
+      // Append new snapshot
+      if (msg.snapshot) {
+        S.history.push(msg.snapshot);
+        // If user was already at the latest, stay at latest
+        if (S.histIdx < 0 || S.histIdx === S.history.length - 2) S.histIdx = -1;
+      }
+    } else return;
+
+    const snap = currentSnap();
+    if (!snap) return;
+    const t = snap.turn ?? '?';
+    $('turn-lbl').textContent = `turn ${t}`;
+    $('pending-lbl').textContent = snap.pending_move ? `bot: ${snap.pending_move}` : '';
+    $('status-txt').textContent = `turn ${t} · ${new Date().toLocaleTimeString()}`;
+    updateHistNav();
     refresh();
   };
   ws.onclose = () => {
@@ -886,6 +966,38 @@ function connect() {
   };
   ws.onerror = () => ws.close();
 }
+function navHist(dir) {
+  if (!S.history.length) return;
+  const last = S.history.length - 1;
+  let idx = S.histIdx < 0 ? last : S.histIdx;
+  if (dir === 'prev')  idx = Math.max(0, idx - 1);
+  else if (dir === 'next')  idx = Math.min(last, idx + 1);
+  else if (dir === 'first') idx = 0;
+  else if (dir === 'last')  idx = last;
+  S.histIdx = (idx === last) ? -1 : idx;
+  updateHistNav();
+  refresh();
+}
+
+function updateHistNav() {
+  if (!S.history.length) return;
+  const last = S.history.length - 1;
+  const isLive = S.histIdx < 0;
+  const idx = isLive ? last : S.histIdx;
+  const snap = S.history[idx] || {};
+
+  $('hist-label').textContent = `turn ${snap.turn ?? idx + 1}  (${idx + 1} / ${S.history.length})`;
+  $('hist-live').className = 'hist-live' + (isLive ? '' : ' hidden');  // note: id not class
+  $('hist-live').style.display = isLive ? '' : 'none';
+
+  const atFirst = idx === 0;
+  const atLast  = isLive || idx === last;
+  $('hn-first').className = 'hn-arrow' + (atFirst ? ' disabled' : '');
+  $('hn-prev').className  = 'hn-arrow' + (atFirst ? ' disabled' : '');
+  $('hn-next').className  = 'hn-arrow' + (atLast  ? ' disabled' : '');
+  $('hn-last').className  = 'hn-arrow' + (atLast  ? ' disabled' : '');
+}
+
 connect();
 window.addEventListener('resize', () => buildMatrix());
 </script>
