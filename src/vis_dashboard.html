@@ -101,14 +101,14 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 /* top bar */
 #center-header {
-  display: flex; align-items: center; gap: 16px;
-  padding: 7px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  display: flex; align-items: center; gap: 24px;
+  padding: 14px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0;
   background: var(--panel);
 }
 #center-header .ptitle { margin: 0; }
-#matrix-label { font-size: 10px; color: var(--text); font-family: var(--mono); font-weight: 600; }
-.hval { font-size: 9px; color: var(--muted); }
-.hval span { font-family: var(--mono); color: var(--text); font-weight: 600; }
+#matrix-label { font-size: 28px; color: var(--text); font-family: var(--mono); font-weight: 700; letter-spacing: .02em; }
+.hval { font-size: 16px; color: var(--muted); display: flex; flex-direction: column; gap: 1px; }
+.hval span { font-family: var(--mono); color: var(--text); font-weight: 700; font-size: 22px; }
 
 /* EV matrix fills most of center */
 #matrix-wrap {
@@ -293,8 +293,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   display: flex; gap: 0; border: 1px solid var(--border2); border-radius: 4px; overflow: hidden;
 }
 .bdt-btn {
-  font-size: 9px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .04em;
-  padding: 2px 8px; cursor: pointer; background: var(--bg2); color: var(--muted);
+  font-size: 16px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .04em;
+  padding: 6px 16px; cursor: pointer; background: var(--bg2); color: var(--muted);
   border: none; transition: all .12s;
 }
 .bdt-btn:hover { background: var(--panel2); color: var(--text); }
@@ -315,8 +315,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   display: flex; gap: 0; border: 1px solid var(--border2); border-radius: 4px; overflow: hidden;
 }
 .mmt-btn {
-  font-size: 9px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .04em;
-  padding: 2px 8px; cursor: pointer; background: var(--bg2); color: var(--muted);
+  font-size: 14px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .04em;
+  padding: 5px 14px; cursor: pointer; background: var(--bg2); color: var(--muted);
   border: none; transition: all .12s;
 }
 .mmt-btn:hover { background: var(--panel2); color: var(--text); }
@@ -493,7 +493,7 @@ function buildMatrix() {
   }
 
   const M = p1a.length, N = p2a.length;
-  $('matrix-label').textContent = `P1T${S.selP1+1} vs P2T${S.selP2+1}  ·  ${M}×${N}`;
+  $('matrix-label').textContent = `P1T${S.selP1+1}  ·  P2T${S.selP2+1}`;
   $('hv-emp').textContent  = d.empirical_value?.toFixed(3) ?? '—';
   $('hv-nash').textContent = d.nash_value?.toFixed(3) ?? '—';
   const maxVisits = Math.max(1, ...vm.flatMap(row => row.map(x => x ?? 0)));
