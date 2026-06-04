@@ -1285,11 +1285,20 @@ function connect() {
       }
       S.histIdx = -1;  // always start at latest
     } else if (msg.type === 'update') {
-      // Append new snapshot
       if (msg.snapshot) {
         S.history.push(msg.snapshot);
-        // If user was already at the latest, stay at latest
         if (S.histIdx < 0 || S.histIdx === S.history.length - 2) S.histIdx = -1;
+      }
+    } else if (msg.type === 'amend') {
+      // Search results arrived — amend the last snapshot in-place
+      if (msg.snapshot && S.history.length) {
+        Object.assign(S.history[S.history.length - 1], msg.snapshot);
+        // re-render if we're viewing the last entry
+        if (S.histIdx < 0) {
+          updateHistNav();
+          refresh();
+          return;
+        }
       }
     } else return;
 
