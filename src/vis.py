@@ -248,6 +248,46 @@ class DebugViz:
         if self.auto_open:
             webbrowser.open(f"http://localhost:{self.port}")
 
+    def push_battle(self, battle, search_p1, search_p2) -> None:
+        """
+        Call this immediately after battle.update() — before search starts.
+        Pushes a battle-only snapshot: left-panel data only, no search results.
+        search_p1 / search_p2 are Player objects (for team/omega info).
+        """
+        p1_labels = _team_labels(search_p1)
+        p2_labels = _team_labels(search_p2)
+        p1_species = _team_species(search_p1)
+        p2_species = _team_species(search_p2)
+        probs = _omega_matrix(search_p1.omega, search_p2.omega)
+
+        snapshot = {
+            "p1_types": p1_labels,
+            "p2_types": p2_labels,
+            "p1_teams": p1_species,
+            "p2_teams": p2_species,
+            "p1_omega": list(search_p1.omega),
+            "p2_omega": list(search_p2.omega),
+            "probs": probs,
+            "cells": {},           # no search data yet
+            "p1_strategies": [],   # no search data yet
+            "p2_strategies": [],
+            "pending_move": "",
+            "turn": battle.public.turn,
+            "search_ready": False,
+        }
+
+        with self._lock:
+            self._data.update(snapshot)
+            self._history.append(snapshot)
+            payload = json.dumps({
+                "type": "update",
+                "snapshot": snapshot,
+                "history_len": len(self._history),
+            })
+
+        if self._loop:
+            asyncio.run_coroutine_threadsafe(self._broadcast(payload), self._loop)
+
     def push(
         self,
         battle,  # PSBattle — for turn number
@@ -256,6 +296,7 @@ class DebugViz:
     ):
         """
         Call this after search.run() + search.solve() to push live data to the browser.
+        Amends the most recent battle snapshot (from push_battle) with search results.
         """
         p1_labels = _team_labels(search.p1)
         p2_labels = _team_labels(search.p2)
@@ -277,18 +318,31 @@ class DebugViz:
             "p2_strategies": _player_strategies(search.p2, search.p2_actions),
             "pending_move": pending_move,
             "turn": battle.public.turn,
+            "search_ready": True,
         }
 
         with self._lock:
             self._data.update(snapshot)
-            self._history.append(snapshot)
-            payload = json.dumps(
-                {
+            # Amend the last history entry in-place if it was a battle-only snapshot
+            # for the same turn; otherwise append fresh.
+            if (
+                self._history
+                and not self._history[-1].get("search_ready")
+                and self._history[-1].get("turn") == battle.public.turn
+            ):
+                self._history[-1].update(snapshot)
+                payload = json.dumps({
+                    "type": "amend",
+                    "snapshot": snapshot,
+                    "history_len": len(self._history),
+                })
+            else:
+                self._history.append(snapshot)
+                payload = json.dumps({
                     "type": "update",
                     "snapshot": snapshot,
                     "history_len": len(self._history),
-                }
-            )
+                })
 
         if self._loop:
             asyncio.run_coroutine_threadsafe(self._broadcast(payload), self._loop)
