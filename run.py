@@ -218,6 +218,11 @@ async def _pick_move(battle: PSBattle, predictor: TeamPredictor) -> tuple[str, s
 
     p1_player = Player(battle.public.side(0), p1_teams, p1_probs)
     p2_player = Player(battle.public.side(1), p2_teams, p2_probs)
+
+    # Push battle state immediately — before search (seconds earlier)
+    if _viz is not None:
+        _viz.push_battle(battle, p1_player, p2_player)
+
     search = Search(battle, p1_player, p2_player)
     search.init_battles()
     search.run()
