@@ -59,15 +59,15 @@ def pokemon_to_set(pokemon: oak.Pokemon) -> oak.Set:
 
 
 def side_to_team(side: oak.Side) -> Team:
-    return tuple(pokemon_to_set(side.pokemon(_)) for _ in range(6))
+    return tuple(pokemon_to_set(side.pokemon(side.order[_] - 1)) if side.order[_] else oak.Set() for _ in range(6))
 
 
 def set_matches(s: Set, t: Set) -> bool:
-    return s.species == t.species and all(m == 0 or m in t.moves for m in s.moves)
+    return (s.species == 0) or (s.species == t.species and all(m == 0 or m in t.moves for m in s.moves))
 
 
 def matches(a: Team, b: Team) -> bool:
-    return all(s.species == 0 or any(set_matches(s, t) for t in b) for s in a)
+    return all(any(set_matches(s, t) for t in b) for s in a)
 
 
 class SetDict:
@@ -115,6 +115,10 @@ class SetDict:
             if set_matches(s, t):
                 result.append((t, prob))
         den = sum(p for _, p in result)
+        if den == 0:
+            print(f"Cant match set {set_to_string(s)}, sets: {len(self.sets)}")
+            for t, prob in self.sets.items():
+                print(f"{set_to_string(t)} : {set_matches(s, t)}")
         assert den > 0
         return [(s, p / den) for s, p in result]
 
@@ -158,6 +162,7 @@ class TeamPredictor:
     def fill_from_sets(self, side: oak.Side) -> tuple[Team, Probability]:
         result = []
         team = side_to_team(side)
+        print(f"TEAM: {team_to_string(team)}")
         legal_sets = self.sets.clone()
         selection_prob = 1
         for s in team:
@@ -167,7 +172,7 @@ class TeamPredictor:
             )[0]
             result.append(selected[0])
             selection_prob *= selected[1]
-            legal_sets.remove_species(s.species)
+            legal_sets.remove_species(selected[0].species)
         return (tuple(result), selection_prob)
 
 
@@ -219,5 +224,5 @@ def get_teams_and_probs(
     teams += contrived
     probs += [p / contrived_sum for p in contrived_probs]
 
-    assert math.abs(1 - sum(probs)) < 1e-5
+    assert abs(1 - sum(probs)) < 1e-5
     return (teams, probs)

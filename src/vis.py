@@ -85,7 +85,9 @@ def _battle_state(battle) -> dict:
     return {"p1": side_info(0), "p2": side_info(1)}
 
 
-def _player_strategies(player, action_counts: list[int]) -> list[dict[str, list[float]]]:
+def _player_strategies(
+    player, action_counts: list[int]
+) -> list[dict[str, list[float]]]:
     """Per-type strategies: list indexed by type, each a dict of policy_name -> list[float]."""
     result = []
     for t, strat in enumerate(player.strategies):
@@ -95,7 +97,6 @@ def _player_strategies(player, action_counts: list[int]) -> list[dict[str, list[
             entry[policy.name] = [float(v) for v in values[:m]]
         result.append(entry)
     return result
-
 
 
 def _extract_cells(search: Search) -> dict:
@@ -268,8 +269,8 @@ class DebugViz:
             "p1_omega": list(search_p1.omega),
             "p2_omega": list(search_p2.omega),
             "probs": probs,
-            "cells": {},           # no search data yet
-            "p1_strategies": [],   # no search data yet
+            "cells": {},  # no search data yet
+            "p1_strategies": [],  # no search data yet
             "p2_strategies": [],
             "pending_move": "",
             "turn": battle.public.turn,
@@ -279,11 +280,13 @@ class DebugViz:
         with self._lock:
             self._data.update(snapshot)
             self._history.append(snapshot)
-            payload = json.dumps({
-                "type": "update",
-                "snapshot": snapshot,
-                "history_len": len(self._history),
-            })
+            payload = json.dumps(
+                {
+                    "type": "update",
+                    "snapshot": snapshot,
+                    "history_len": len(self._history),
+                }
+            )
 
         if self._loop:
             asyncio.run_coroutine_threadsafe(self._broadcast(payload), self._loop)
@@ -331,18 +334,22 @@ class DebugViz:
                 and self._history[-1].get("turn") == battle.public.turn
             ):
                 self._history[-1].update(snapshot)
-                payload = json.dumps({
-                    "type": "amend",
-                    "snapshot": snapshot,
-                    "history_len": len(self._history),
-                })
+                payload = json.dumps(
+                    {
+                        "type": "amend",
+                        "snapshot": snapshot,
+                        "history_len": len(self._history),
+                    }
+                )
             else:
                 self._history.append(snapshot)
-                payload = json.dumps({
-                    "type": "update",
-                    "snapshot": snapshot,
-                    "history_len": len(self._history),
-                })
+                payload = json.dumps(
+                    {
+                        "type": "update",
+                        "snapshot": snapshot,
+                        "history_len": len(self._history),
+                    }
+                )
 
         if self._loop:
             asyncio.run_coroutine_threadsafe(self._broadcast(payload), self._loop)

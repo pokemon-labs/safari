@@ -73,6 +73,8 @@ class Player:
                 matching = self._find(
                     self.team_length, lambda i: team[i].species == pokemon.species
                 )
+                if matching is None:
+                    print(f"Cant find {oak.species_id(pokemon.species)} in {team_to_string(team)}")
                 assert (
                     matching is not None
                 ), "Pokemon does not match any set in the team"
@@ -85,6 +87,9 @@ class Player:
                         for k in range(self.team_length)
                     ),
                 )  # find first team index where mon is not present
+                if first_missing_set_index is None:
+                    print(f"team: {team_to_string(team)}")
+                    print([oak.species_id(dest.pokemon(i).species) for i in range(6)])
                 assert (
                     first_missing_set_index is not None
                 ), "Found empty slot but no sets are free to fill it"

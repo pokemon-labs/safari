@@ -86,7 +86,7 @@ class _Config:
     p1_types: int
     p2_types: int
     # policy_mode controls move selection from MCTS output
-    policy_mode: Policy
+    policy: Policy
     policy_min: float
     policy_temp: float
     user_to_challenge: str
@@ -184,7 +184,12 @@ class _Config:
             type=int,
         )
         parser.add_argument(
-            "--policy-mode",
+            "--policy",
+            type=str,
+            default=Policy.bayesian_nash,
+        )
+        parser.add_argument(
+            "--selection",
             type=str,
             default=Policy.bayesian_nash,
         )
@@ -220,8 +225,6 @@ class _Config:
             action="store_true",
             help="Launch the debug visualizer at http://localhost:8765",
         )
-        parser.add_argument("--policy", type=Policy, default=Policy.bayesian_nash)
-        parser.add_argument("--selection", type=Selection, default=Selection.sample)
 
         args = parser.parse_args()
         self.websocket_uri = args.websocket_uri
@@ -238,7 +241,8 @@ class _Config:
         self.p1_types = args.p1_types or 1
         self.p2_types = args.p2_types or 1
         self.parallelism = args.threads or self.p1_types * self.p2_types
-        self.policy_mode = args.policy_mode  # Policy()
+        self.policy = Policy[args.policy]  # Policy()
+        self.selection = Selection[args.selection]
         self.policy_min = args.policy_min
         self.policy_temp = args.policy_temp
         self.run_count = args.run_count
@@ -251,9 +255,6 @@ class _Config:
         self.log_level = args.log_level
         self.log_to_file = args.log_to_file
         self.vis = args.vis
-
-        self.policy = args.policy
-        self.selection = args.selection
 
         self.validate_config()
 

@@ -15,6 +15,8 @@ import requests
 import websockets
 import websockets.asyncio.client
 
+import numpy as np
+
 from src.config import (
     Config,
     SaveReplay,
@@ -233,11 +235,16 @@ async def _pick_move(battle: PSBattle, predictor: TeamPredictor) -> tuple[str, s
     processed_policy = process_policy(policy, Config.policy_min, Config.policy_temp)
 
     # choose p1 move
-    c = random.choices(
-        output["p1_choices"][: output["m"]],
-        weights=processed_policy[: output["m"]],
-        k=1,
-    )[0]
+    if Config.selection == Selection.sample:
+        c = random.choices(
+            output["p1_choices"][: output["m"]],
+            weights=processed_policy[: output["m"]],
+            k=1,
+        )[0]
+    elif Config.selection == Selection.argmax:
+        c = output["p1_choices"][np.argmax(processed_policy)]
+    else:
+        assert False, "Bad selection mode"
     pending_move = search.parse_pkmn_choice(c)
 
     if _viz is not None:
@@ -416,7 +423,9 @@ async def main() -> None:
             record[Result.lose] += 1
             logger.info(f"lost with {team_to_string(selected_team)}")
 
-        # logger.info(f"W:{wins} L:{losses} T:{ties}")
+        for key, value in record.items():
+            print(f"{key.name} : {value}")
+
         battles_run += 1
         if battles_run >= Config.run_count:
             break
