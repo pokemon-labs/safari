@@ -114,13 +114,13 @@ class SetDict:
         for t, prob in self.sets.items():
             if set_matches(s, t):
                 result.append((t, prob))
-        den = sum(p for _, p in result)
-        if den == 0:
-            print(f"Cant match set {set_to_string(s)}, sets: {len(self.sets)}")
-            for t, prob in self.sets.items():
-                print(f"{set_to_string(t)} : {set_matches(s, t)}")
-        assert den > 0
-        return [(s, p / den) for s, p in result]
+        if len(result) > 0:
+            den = sum(p for _, p in result)
+            return [(s, p / den) for s, p in result]
+        else:
+            s_copy = deepcopy(s)
+            oak.fill_random_moveset(s_copy)
+            return [(s_copy, 1)]
 
 
 class TeamPredictor:
@@ -133,7 +133,7 @@ class TeamPredictor:
         assert len(self.teams) > 0, f"Failed to load any teams from {path}"
         assert all(len(team) <= 6 for team in self.teams)
         assert all(
-            all(1 < s.species <= 151 and any(s.moves) for s in team)
+            all(1 <= s.species <= 151 and any(s.moves) for s in team)
             for team in self.teams
         )
         assert self.teams, f"no teams loaded from {path!r}"

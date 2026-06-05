@@ -207,13 +207,16 @@ class PSBattle:
             action = split_msg[1].strip()
             fn = self._HANDLERS.get(action)
             if fn:
-                fn(self, split_msg)
                 if action not in ("inactive",):
                     print(f"args: {split_msg}")
+                try:
+                    fn(self, split_msg)
+                except:
                     print(
                         f"|{action}|: \n{oak.battle_string(self.public, self.durations)}"
                     )
-                    print(self.public.side(0).order, self.public.side(1).order)
+                    exit()
+
         self.msg_lines.clear()
 
     def parse_request(self, split_msg: list[str]):
@@ -248,7 +251,7 @@ class PSBattle:
         condition = split_msg[4] if len(split_msg) > 4 else ""  # 100/100
 
         species_name, level = _parse_details(details)
-        species: int = oak.id_to_species(species_name)
+        species: int = oak.id_to_species(normalize_name(species_name))
         assert 0 < species <= 151, f"Failed to parse species {species_name}"
 
         # add to pokemon/order if necessary, then return maintained slot of the incoming
@@ -482,13 +485,21 @@ class PSBattle:
         assert False, "transform not impl"
 
     def activate(self, split_msg):
-        assert False, "TODO"
+        active, _ = self.actives(split_msg)
+        vol, _ = self.volatiles(split_msg)
+        s = normalize_name(split_msg[3].split(":")[-1]) if len(split_msg) > 3 else None
+        assert s is not None
+        if s == "substitute":
+            vol.substitute = True
+            vol.substitute_hp = int(active.stats().hp / 4) or 1
+        else:
+            assert False, "Activate idk"
 
     def prepare(self, split_msg):
-        side_idx = 1 if self._is_opponent(split_msg) else 0
+        side, _ = self.sides(split_msg)
         move_name = normalize_name(split_msg[3]) if len(split_msg) > 3 else ""
         if move_name in ("solarbeam", "skyattack", "razorwind"):
-            self._set_vol(side_idx, charging=True)
+            side.active.volatiles().charging = True
         else:
             assert False, f"Prepare unexpected move: {move_name}"
 

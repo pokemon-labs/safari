@@ -74,7 +74,9 @@ class Player:
                     self.team_length, lambda i: team[i].species == pokemon.species
                 )
                 if matching is None:
-                    print(f"Cant find {oak.species_id(pokemon.species)} in {team_to_string(team)}")
+                    print(
+                        f"Cant find {oak.species_id(pokemon.species)} in {team_to_string(team)}"
+                    )
                 assert (
                     matching is not None
                 ), "Pokemon does not match any set in the team"
