@@ -20,7 +20,6 @@ def argmax(pdf):
 
 
 class Player:
-
     def __init__(self, actions: list[int], omega: list[float]):
         eps = 0.001
         assert len(actions) == len(omega), "Mismatched actions and omega lengths"
