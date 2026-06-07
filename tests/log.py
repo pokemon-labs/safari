@@ -3,12 +3,16 @@ from src.battle import PSBattle, PSPlayer
 import oak
 import oak.log
 
+import argparse
 import random
+
+RNG = random.Random(0)
 
 
 def fill_side_randomly(side: oak.Side):
     species_list = list(range(1, 152))
-    random.shuffle(species_list)
+    RNG.shuffle(species_list)
+
     for i, species in enumerate(species_list[:6]):
         s = oak.Set()
         s.species = species
@@ -18,49 +22,74 @@ def fill_side_randomly(side: oak.Side):
     side.order = list(range(1, 7))
 
 
-def get_random_battle() -> oak.Battle:
+def get_battle(side=None) -> oak.Battle:
     battle = oak.Battle()
-    fill_side_randomly(battle.side(0))
-    fill_side_randomly(battle.side(1))
+    if side is None:
+        fill_side_randomly(battle.side(0))
+        fill_side_randomly(battle.side(1))
+    else:
+        fill_side_randomly(battle.side(side))
+
     return battle
 
 
-
-def rollout_random_battle_with_log():
+def rollout_battle_with_log(side=None):
     PLAYER = 1
-    battle = get_random_battle()
+
+    battle = get_battle(side)
     durations = oak.Durations()
 
     ps_battle = PSBattle("", PSPlayer(), PSPlayer())
     ps_battle.us = "p1"
 
     result, msg = oak.log.update(battle, durations, 0, 0, PLAYER)
+
     for line in msg:
         ps_battle.update(line)
     ps_battle.process_msg_lines_and_clear()
 
     while not oak.result_type(result):
         p1_choices, p2_choices = oak.choices(battle, result)
-        c1 = random.choice(p1_choices)
-        c2 = random.choice(p2_choices)
+
+        c1 = RNG.choice(p1_choices)
+        c2 = RNG.choice(p2_choices)
+
         result, msg = oak.log.update(battle, durations, c1, c2, PLAYER)
 
-        matches, reason = oak.log.compare_battles(ps_battle.public, ps_battle.durations, battle, durations)
+        matches, reason = oak.log.compare_battles(
+            ps_battle.public,
+            ps_battle.durations,
+            battle,
+            durations,
+        )
 
         if not matches:
             print(f"Reason: {reason}")
-            print(oak.battle_string(ps_battle.public, ps_battle.durations))
-            exit()
-
+            print(
+                oak.battle_string(
+                    ps_battle.public,
+                    ps_battle.durations,
+                )
+            )
+            return
 
         for line in msg:
             ps_battle.update(line)
         ps_battle.process_msg_lines_and_clear()
 
 
-
 def main():
-    rollout_random_battle_with_log()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--side",
+        type=int,
+        choices=[0, 1],
+        default=None,
+        help="Only randomize the specified side (default: randomize both)",
+    )
+    args = parser.parse_args()
+
+    rollout_battle_with_log(args.side)
 
 
 if __name__ == "__main__":
