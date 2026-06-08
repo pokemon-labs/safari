@@ -6,7 +6,8 @@ import oak.log
 import argparse
 import random
 
-RNG = random.Random(0)
+seed = random.randint(0, 2**64 - 1)
+RNG = random.Random(seed)
 
 
 def fill_side_randomly(side: oak.Side):
@@ -17,26 +18,22 @@ def fill_side_randomly(side: oak.Side):
         s = oak.Set()
         s.species = species
         s.level = 100
-        oak.fill_random_moveset(s)
+        oak.fill_random_moveset(s, RNG.randint(0, 2**32 - 1))
         oak.complete_pokemon_from_set(side.pokemon(i), s)
     side.order = list(range(1, 7))
 
 
-def get_battle(side=None) -> oak.Battle:
+def get_battle() -> oak.Battle:
     battle = oak.Battle()
-    if side is None:
-        fill_side_randomly(battle.side(0))
-        fill_side_randomly(battle.side(1))
-    else:
-        fill_side_randomly(battle.side(side))
-
+    fill_side_randomly(battle.side(0))
+    fill_side_randomly(battle.side(1))
     return battle
 
 
-def rollout_battle_with_log(side=None):
+def rollout_battle_with_log():
     PLAYER = 1
 
-    battle = get_battle(side)
+    battle = get_battle()
     durations = oak.Durations()
 
     ps_battle = PSBattle("", PSPlayer(), PSPlayer())
@@ -55,6 +52,9 @@ def rollout_battle_with_log(side=None):
         c2 = RNG.choice(p2_choices)
 
         result, msg = oak.log.update(battle, durations, c1, c2, PLAYER)
+        for line in msg:
+            ps_battle.update(line)
+        ps_battle.process_msg_lines_and_clear()
 
         matches, reason = oak.log.compare_battles(
             ps_battle.public,
@@ -64,32 +64,41 @@ def rollout_battle_with_log(side=None):
         )
 
         if not matches:
-            print(f"Reason: {reason}")
+            print(f"Mismatch: {reason}")
             print(
+                "Client battle:\n",
                 oak.battle_string(
                     ps_battle.public,
                     ps_battle.durations,
-                )
+                ),
+            )
+            print(
+                "Actual battle:\n",
+                oak.battle_string(
+                    battle,
+                    durations,
+                ),
             )
             return
 
-        for line in msg:
-            ps_battle.update(line)
-        ps_battle.process_msg_lines_and_clear()
-
 
 def main():
+    global seed, RNG
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--side",
+        "--seed",
         type=int,
-        choices=[0, 1],
         default=None,
-        help="Only randomize the specified side (default: randomize both)",
     )
     args = parser.parse_args()
 
-    rollout_battle_with_log(args.side)
+    if not args.seed is None:
+        seed = args.seed
+        RNG = random.Random(seed)
+
+    print(f"Seed: {seed}")
+
+    rollout_battle_with_log()
 
 
 if __name__ == "__main__":

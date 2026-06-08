@@ -209,13 +209,13 @@ class PSBattle:
             if fn:
                 if action not in ("inactive",):
                     print(f"args: {split_msg}")
-                try:
-                    fn(self, split_msg)
-                except:
-                    print(
-                        f"|{action}|: \n{oak.battle_string(self.public, self.durations)}"
-                    )
-                    exit()
+                # try:
+                fn(self, split_msg)
+                # except:
+                #     print(
+                #         f"|{action}|: \n{oak.battle_string(self.public, self.durations)}"
+                #     )
+                #     exit()
 
         self.msg_lines.clear()
 
@@ -378,21 +378,42 @@ class PSBattle:
             s.moves = [oak.id_to_move(move_id), 0, 0, 0]
             oak.complete_pokemon_moves(side.stored(), s)
             oak.complete_active_moves(side.active, s)
+
+            deduct_pp = (
+                0 if (move_id in ("rage",) and side.active.volatiles().rage) else 1
+            )
+
             for i in range(4):
                 ms: oak.MoveSlot = side.stored().move(i)
                 if ms.id == move:
                     assert ms.pp > 0, "Used move with tracked pp=0"
-                    ms.pp = max(0, ms.pp - 1)
+                    ms.pp = max(0, ms.pp - deduct_pp)
             for i in range(4):
                 ms: oak.MoveSlot = side.active.move(i)
                 if ms.id == move:
                     assert ms.pp > 0, "Used move with tracked pp=0"
-                    ms.pp = max(0, ms.pp - 1)
+                    ms.pp = max(0, ms.pp - deduct_pp)
+
+        if move_id == "bide":
+            if side.active.volatiles().bide():
+                dur.attacking = dur.get_attacking() + 1
+            else:
+                side.active.volatiles().bide = True
+                dur.attacking = 1
+
+        if move_id == "rage":
+            # if side.active.volatiles().rage:
+            # else:
+            side.active.volatiles().rage = True
 
     def boost(self, split_msg):
         side, opp_side = self.sides(split_msg)
         stat: str | None = split_msg[3].strip() if len(split_msg) > 3 else None
-        amount = int(split_msg[4].strip()) if len(split_msg) > 4 else 0
+        if split_msg[4].strip() == "[from] Rage":
+            amount = int(split_msg[5].strip())
+            assert amount == 1
+        else:
+            amount = int(split_msg[4].strip()) if len(split_msg) > 4 else 0
         assert amount != 0, "Why is boost amount 0???"
         prop = _STAT_ABBREV_TO_BOOST_PROPERTY.get(stat)
         assert prop is not None, f"Could not parse stat for boost: {stat}"
