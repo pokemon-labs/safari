@@ -50,6 +50,7 @@ def rollout_battle_with_log():
 
         c1 = RNG.choice(p1_choices)
         c2 = RNG.choice(p2_choices)
+        print(f"{oak.choice_label(battle.side(0), c1)} {oak.choice_label(battle.side(1), c2)}")
 
         result, msg = oak.log.update(battle, durations, c1, c2, PLAYER)
         for line in msg:

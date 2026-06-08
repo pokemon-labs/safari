@@ -38,8 +38,8 @@ class constants:
     PARALYZED = "par"
     POISON = "psn"
     TOXIC = "tox"
-    TOXIC_COUNT = "toxic_count"
     FIGHT = "fight"
+    CHARGING_MOVES = ("skullbash", "solarbeam", "skyattack", "razorwind")
 
 
 BINDING_MOVES = {"bind", "clamp", "firespin", "wrap"}
@@ -209,7 +209,7 @@ class PSBattle:
             if fn:
                 if action not in ("inactive",):
                     print(f"args: {split_msg}")
-                # try:
+                    # try:
                 fn(self, split_msg)
                 # except:
                 #     print(
@@ -309,6 +309,14 @@ class PSBattle:
     def faint(self, split_msg):
         side, _ = self.sides(split_msg)
         side.stored().hp = 0
+        side.stored().status = 0
+        vol = side.active.volatiles()
+        vol.rage = False
+        vol.toxic = 0
+        vol.toxic_counter = 0
+        vol.reflect = 0
+        vol.light_screen = 0
+        vol.charging = 0
 
     def heal_or_damage(self, split_msg):
         is_us: bool = self.is_us(split_msg)
@@ -338,8 +346,10 @@ class PSBattle:
                 constants.SLEEP,
                 constants.FROZEN,
                 constants.BURN,
+                constants.TOXIC,
+                constants.POISON,
             ):
-                side.stored().status = _STATUS_BYTE[status_str]
+                # side.stored().status = _STATUS_BYTE[status_str]
                 if status_str == constants.SLEEP:
                     duration.set_sleep(0, 1)
             else:
@@ -360,6 +370,7 @@ class PSBattle:
 
     def move(self, split_msg):
         side, opp_side = self.sides(split_msg)
+        vol = side.active.volatiles()
         dur, opp_dur = self.get_durations(split_msg)
         move_id: str | None = (
             normalize_name(split_msg[3]) if len(split_msg) > 3 else None
@@ -371,16 +382,20 @@ class PSBattle:
         opp_side.active.volatiles().binding = False
         opp_dur.binding = 0
 
+        from_metrome = len(split_msg) > 5 and split_msg[5] == "[from] Metronome"
+
         # add move to pokemon/active
-        if move_id and move_id != "struggle":
+        if move_id and move_id != "struggle" and not from_metrome:
+            # idiom to add single move while while keeping existing moves the same
             s = oak.Set()
             move: int = oak.id_to_move(move_id)
             s.moves = [oak.id_to_move(move_id), 0, 0, 0]
             oak.complete_pokemon_moves(side.stored(), s)
             oak.complete_active_moves(side.active, s)
 
+            charging_move = move_id in constants.CHARGING_MOVES
             deduct_pp = (
-                0 if (move_id in ("rage",) and side.active.volatiles().rage) else 1
+                0 if (move_id == "rage" and vol.rage) or (charging_move and not vol.charging) else 1
             )
 
             for i in range(4):
@@ -395,16 +410,21 @@ class PSBattle:
                     ms.pp = max(0, ms.pp - deduct_pp)
 
         if move_id == "bide":
-            if side.active.volatiles().bide():
+            if vol.bide:
                 dur.attacking = dur.get_attacking() + 1
             else:
-                side.active.volatiles().bide = True
-                dur.attacking = 1
+                vol.bide = True
 
         if move_id == "rage":
-            # if side.active.volatiles().rage:
-            # else:
-            side.active.volatiles().rage = True
+            vol.rage = True
+
+        if move_id in constants.CHARGING_MOVES:
+            vol.charging = not vol.charging
+
+
+        if vol.toxic:
+            vol.toxic_counter = vol.toxic_counter + 1
+
 
     def boost(self, split_msg):
         side, opp_side = self.sides(split_msg)
@@ -428,19 +448,26 @@ class PSBattle:
         assert prop is not None, f"Could not parse stat for boost: {stat}"
         oak.boost(side, opp_side, prop, -amount)
 
-    def status(self, split_msg):
+    def _status(self, split_msg):
         side, _ = self.sides(split_msg)
         dur, _ = self.get_durations(split_msg)
         status_str = split_msg[3].strip() if len(split_msg) > 3 else ""
-        from_str = split_msg[4].strip() if len(split_msg) > 4 else None
+        from_str = normalize_name(split_msg[5]) if len(split_msg) > 5 else None
         byte: int = _STATUS_BYTE.get(status_str, None)
         assert byte is not None, f"Bad status string lookup: {status_str}"
         if side.stored().status == 0:
-            if from_str == "Rest":
+            if from_str == "rest":
                 side.stored().status = _STATUS_BYTE["rest"]
             else:
                 side.stored().status = byte
-        # dur.sleep()
+
+            if status_str == constants.TOXIC:
+                vol = side.active.volatiles()
+                vol.toxic = True
+                # vol.toxic_counter = 1
+            if status_str == constants.SLEEP:
+                dur.set_sleep(0, 1)
+
         # TODO maybe init sleep duration to 1?
         oak.status_modify(side.stored().status, side.active.stats())
 
@@ -467,7 +494,7 @@ class PSBattle:
                 dur, _ = self.get_durations(split_msg)
                 dur.set_sleep(0, 0)
 
-    def start_volatile_status(self, split_msg):
+    def _start(self, split_msg):
         active, _ = self.actives(split_msg)
         vol, _ = self.volatiles(split_msg)
         s = normalize_name(split_msg[3].split(":")[-1]) if len(split_msg) > 3 else None
@@ -479,6 +506,20 @@ class PSBattle:
             vol.reflect = True
         elif s == "lightscreen":
             vol.light_screen = True
+        elif s == "bide":
+            vol.bide = True
+        elif s == "disable":
+            # vol.disable = True
+            vol.disable_left = 1
+        elif s == "focusenergy":
+            vol.focus_energy = True
+        elif s == "mimic":
+            move = oak.id_to_move(normalize_name(split_msg[4]))
+            for i in range(4):
+                if active.move(i).id == oak.id_to_move("mimic"):
+                    active.move(i).id = move
+                    # active.move(i).pp = 5
+                    break
         else:
             assert False, f"Bad volatile {s}"
 
@@ -519,7 +560,7 @@ class PSBattle:
     def prepare(self, split_msg):
         side, _ = self.sides(split_msg)
         move_name = normalize_name(split_msg[3]) if len(split_msg) > 3 else ""
-        if move_name in ("solarbeam", "skyattack", "razorwind"):
+        if move_name in constants.CHARGING_MOVES:
             side.active.volatiles().charging = True
         else:
             assert False, f"Prepare unexpected move: {move_name}"
@@ -541,6 +582,10 @@ class PSBattle:
             pass
         elif reason == constants.SLEEP:
             dur.set_sleep(0, dur.sleep(0) + 1)
+            def is_self(status):
+                return bool(status ^ 128)
+            if is_self(side.stored().status):
+                side.stored().status = side.stored().status - 1
         elif reason == "partiallytrapped":
             opp_side.active.volatiles().binding = True
             # TODO set duration
@@ -552,6 +597,13 @@ class PSBattle:
 
     def turn(self, split_msg):
         self.public.turn = int(split_msg[2])
+        for side in range(2):
+            dur = self.durations.get(side)
+            vol = self.public.side(side).active.volatiles()
+            if vol.disable_left:
+                dur.disable = dur.disable + 1
+            if vol.bide:
+                dur.attacking = dur.attacking + 1
 
     def noinit(self, split_msg):
         if len(split_msg) > 3 and split_msg[2] == "rename":
@@ -590,13 +642,13 @@ class PSBattle:
         "-clearnegativeboost": clearnegativeboost,
         "-clearboost": clearboost,
         "-clearallboost": clearallboost,
-        "-status": status,
+        "-status": _status,
         "-curestatus": curestatus,
         "-activate": activate,
         "-anim": anim,
         "-prepare": prepare,
-        "-start": start_volatile_status,
-        "-singlemove": start_volatile_status,
+        "-start": _start,
+        "-singlemove": _start,
         "-end": end_volatile_status,
         "-immune": immune,
         "-transform": transform,
