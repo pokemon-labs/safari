@@ -367,6 +367,7 @@ class PSBattle:
 
     def move(self, split_msg):
         side, opp_side = self.sides(split_msg)
+        self.before_move(side)
         vol = side.active.volatiles()
         dur, opp_dur = self.get_durations(split_msg)
         move_id: str | None = (
@@ -379,9 +380,12 @@ class PSBattle:
 
         from_metrome = len(split_msg) > 5 and split_msg[5] == "[from] Metronome"
         charging_move = move_id in constants.CHARGING_MOVES
+        thrashing_move = move_id in constants.THRASHING_MOVES
         deduct_pp = (
             0
-            if (move_id == "rage" and vol.rage) or (charging_move and not vol.charging)
+            if (move_id == "rage" and vol.rage)
+            or (charging_move and not vol.charging)
+            or (thrashing_move and vol.thrashing)
             else 1
         )
 
@@ -420,10 +424,9 @@ class PSBattle:
                     ms.pp = max(0, ms.pp - deduct_pp)
 
         if missed:
-            print("MISSED")
             return
 
-        if move_id in BINDING_MOVES and not missed:
+        if move_id in BINDING_MOVES:
             side.active.volatiles().binding = True
 
         if move_id == "bide":
@@ -441,24 +444,23 @@ class PSBattle:
         if move_id in constants.THRASHING_MOVES:
 
             if vol.thrashing:
-                pass
+                dur.attacking = dur.attacking + 1
             else:
                 vol.thrashing = True
                 dur.attacking = 1
 
-        if vol.toxic:
-            vol.toxic_counter = vol.toxic_counter + 1
-
     def boost(self, split_msg):
         side, opp_side = self.sides(split_msg)
         stat: str | None = split_msg[3].strip() if len(split_msg) > 3 else None
+        prop = _STAT_ABBREV_TO_BOOST_PROPERTY.get(stat)
         if split_msg[4].strip() == "[from] Rage":
+            prop += "|[from] Rage"
             amount = int(split_msg[5].strip())
             assert amount == 1
         else:
             amount = int(split_msg[4].strip()) if len(split_msg) > 4 else 0
         assert amount != 0, "Why is boost amount 0???"
-        prop = _STAT_ABBREV_TO_BOOST_PROPERTY.get(stat)
+
         assert prop is not None, f"Could not parse stat for boost: {stat}"
         oak.boost(side, opp_side, prop, amount)
 
@@ -555,6 +557,10 @@ class PSBattle:
         elif s == "leechseed":
             vol.leech_seed = True
         elif s == "confusion":
+            if vol.thrashing:
+                vol.thrashing = False
+                vol.attacks = 0
+                dur.attacking = 0
             vol.confusion = True
             vol.confusion_left = 1
             dur.confusion = 1
@@ -633,14 +639,16 @@ class PSBattle:
         else:
             assert False, f"Prepare unexpected move: {move_name}"
 
-    def before_move(self):
+    def before_move(self, side: oak.Side):
         # upkeep like incrementing confusion
+        vol = side.active.volatiles()
+        if vol.toxic:
+            vol.toxic_counter = vol.toxic_counter + 1
         pass
 
     def cant(self, split_msg):
-        self.before_move()
-
         side, opp_side = self.sides(split_msg)
+        self.before_move(side)
         dur, _ = self.get_durations(split_msg)
         if len(split_msg) < 4:
             return

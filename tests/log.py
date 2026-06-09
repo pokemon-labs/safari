@@ -8,6 +8,7 @@ import random
 
 seed = random.randint(0, 2**64 - 1)
 RNG = random.Random(seed)
+PLAYER = 1
 games = 1
 
 
@@ -32,8 +33,7 @@ def get_battle() -> oak.Battle:
     return battle
 
 
-def rollout_battle_with_log():
-    PLAYER = 1
+def single():
 
     battle = get_battle()
     durations = oak.Durations()
@@ -91,7 +91,6 @@ def rollout_battle_with_log():
 
 def percent():
     global games
-    PLAYER = 1
     from collections import defaultdict
 
     success = 0
@@ -142,6 +141,9 @@ def main():
     global seed, RNG, games
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--main", type=str, choices=["single", "percent"], default="single"
+    )
+    parser.add_argument(
         "--seed",
         type=int,
         default=None,
@@ -153,6 +155,8 @@ def main():
     )
     args = parser.parse_args()
 
+    handles = [("single", single), ("percent", percent)]
+
     if not args.seed is None:
         seed = args.seed
         RNG = random.Random(seed)
@@ -161,8 +165,10 @@ def main():
 
     print(f"Seed: {seed}")
 
-    # rollout_battle_with_log()
-    percent()
+    for name, fn in handles:
+        if args.main == name:
+            fn()
+            return
 
 
 if __name__ == "__main__":
