@@ -310,13 +310,6 @@ class PSBattle:
         side, _ = self.sides(split_msg)
         side.stored().hp = 0
         side.stored().status = 0
-        vol = side.active.volatiles()
-        vol.rage = False
-        vol.toxic = 0
-        vol.toxic_counter = 0
-        vol.reflect = 0
-        vol.light_screen = 0
-        vol.charging = 0
 
     def heal_or_damage(self, split_msg):
         is_us: bool = self.is_us(split_msg)
@@ -383,9 +376,25 @@ class PSBattle:
         opp_dur.binding = 0
 
         from_metrome = len(split_msg) > 5 and split_msg[5] == "[from] Metronome"
+        charging_move = move_id in constants.CHARGING_MOVES
+        deduct_pp = (
+            0 if (move_id == "rage" and vol.rage) or (charging_move and not vol.charging) else 1
+        )
 
+        mimic_move, mimic_move_index = None, None
+        mimic_ = oak.id_to_move("mimic")
+        for i in range(4):
+            if side.active.move(i).id != mimic_ and side.stored().move(i).id == mimic_:
+                mimic_move: int = side.active.move(i).id
+                mimic_move_index = i
+                break
+        not_mimic_move = mimic_move is None or (oak.id_to_move(move_id) != mimic_move)
+        if not not_mimic_move:
+            ms = side.active.move(mimic_move_index)
+            ms.pp = max(0, ms.pp - deduct_pp) 
+        
         # add move to pokemon/active
-        if move_id and move_id != "struggle" and not from_metrome:
+        if move_id and move_id != "struggle" and not from_metrome and not_mimic_move:
             # idiom to add single move while while keeping existing moves the same
             s = oak.Set()
             move: int = oak.id_to_move(move_id)
@@ -393,10 +402,7 @@ class PSBattle:
             oak.complete_pokemon_moves(side.stored(), s)
             oak.complete_active_moves(side.active, s)
 
-            charging_move = move_id in constants.CHARGING_MOVES
-            deduct_pp = (
-                0 if (move_id == "rage" and vol.rage) or (charging_move and not vol.charging) else 1
-            )
+
 
             for i in range(4):
                 ms: oak.MoveSlot = side.stored().move(i)
@@ -515,11 +521,19 @@ class PSBattle:
             vol.focus_energy = True
         elif s == "mimic":
             move = oak.id_to_move(normalize_name(split_msg[4]))
+            side, _ = self.sides(split_msg)
+            stored = side.stored()
+            found = False
             for i in range(4):
                 if active.move(i).id == oak.id_to_move("mimic"):
                     active.move(i).id = move
                     # active.move(i).pp = 5
+                    found = True
                     break
+            if not found:
+                assert False
+        elif s == "leechseed":
+            vol.leech_seed = True
         else:
             assert False, f"Bad volatile {s}"
 
