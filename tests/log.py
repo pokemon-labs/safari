@@ -8,6 +8,7 @@ import random
 
 seed = random.randint(0, 2**64 - 1)
 RNG = random.Random(seed)
+games = 1
 
 
 def fill_side_randomly(side: oak.Side):
@@ -52,7 +53,9 @@ def rollout_battle_with_log():
         c1 = RNG.choice(p1_choices)
         c2 = RNG.choice(p2_choices)
 
-        print(f"{oak.choice_label(battle.side(0), c1)} {oak.choice_label(battle.side(1), c2)}")
+        print(
+            f"{oak.choice_label(battle.side(0), c1)} {oak.choice_label(battle.side(1), c2)}"
+        )
         result, msg = oak.log.update(battle, durations, c1, c2, PLAYER)
 
         for line in msg:
@@ -86,11 +89,65 @@ def rollout_battle_with_log():
             return
 
 
+def percent():
+    global games
+    PLAYER = 1
+    from collections import defaultdict
+
+    success = 0
+    reasons = defaultdict(lambda: 0)
+    total = games
+    for _ in range(total):
+        fail = False
+        battle = get_battle()
+        durations = oak.Durations()
+
+        ps_battle = PSBattle("", PSPlayer(), PSPlayer())
+        ps_battle.us = "p1"
+
+        result, msg = oak.log.update(battle, durations, 0, 0, PLAYER)
+
+        for line in msg:
+            ps_battle.update(line)
+        ps_battle.process_msg_lines_and_clear()
+
+        while not oak.result_type(result):
+            p1_choices, p2_choices = oak.choices(battle, result)
+            c1 = RNG.choice(p1_choices)
+            c2 = RNG.choice(p2_choices)
+            result, msg = oak.log.update(battle, durations, c1, c2, PLAYER)
+            for line in msg:
+                ps_battle.update(line)
+            ps_battle.process_msg_lines_and_clear()
+            matches, reason = oak.log.compare_battles(
+                ps_battle.public,
+                ps_battle.durations,
+                battle,
+                durations,
+            )
+            if not matches:
+                fail = True
+                reasons[reason] += 1
+                break
+
+        if not fail:
+            success += 1
+
+    print(f"SUCCESS RATE = {success / total}")
+    for key, value in reasons.items():
+        print(key, value)
+
+
 def main():
-    global seed, RNG
+    global seed, RNG, games
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--seed",
+        type=int,
+        default=None,
+    )
+    parser.add_argument(
+        "--games",
         type=int,
         default=None,
     )
@@ -99,10 +156,13 @@ def main():
     if not args.seed is None:
         seed = args.seed
         RNG = random.Random(seed)
+    if not args.games is None:
+        games = args.games
 
     print(f"Seed: {seed}")
 
-    rollout_battle_with_log()
+    # rollout_battle_with_log()
+    percent()
 
 
 if __name__ == "__main__":

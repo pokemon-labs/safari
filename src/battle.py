@@ -40,6 +40,7 @@ class constants:
     TOXIC = "tox"
     FIGHT = "fight"
     CHARGING_MOVES = ("skullbash", "solarbeam", "skyattack", "razorwind")
+    INVULN_MOVES = ("fly", "dig")
     THRASHING_MOVES = ("thrash", "petaldance")
 
 
@@ -379,7 +380,9 @@ class PSBattle:
         from_metrome = len(split_msg) > 5 and split_msg[5] == "[from] Metronome"
         charging_move = move_id in constants.CHARGING_MOVES
         deduct_pp = (
-            0 if (move_id == "rage" and vol.rage) or (charging_move and not vol.charging) else 1
+            0
+            if (move_id == "rage" and vol.rage) or (charging_move and not vol.charging)
+            else 1
         )
 
         mimic_move, mimic_move_index = None, None
@@ -395,7 +398,7 @@ class PSBattle:
             ms.pp = max(0, ms.pp - deduct_pp)
             ms = side.stored().move(mimic_move_index)
             ms.pp = max(0, ms.pp - deduct_pp)
-        
+
         # add move to pokemon/active
         if move_id and move_id != "struggle" and not from_metrome and not_mimic_move:
             # idiom to add single move while while keeping existing moves the same
@@ -404,8 +407,6 @@ class PSBattle:
             s.moves = [oak.id_to_move(move_id), 0, 0, 0]
             oak.complete_pokemon_moves(side.stored(), s)
             oak.complete_active_moves(side.active, s)
-
-
 
             for i in range(4):
                 ms: oak.MoveSlot = side.stored().move(i)
@@ -438,7 +439,7 @@ class PSBattle:
             vol.charging = not vol.charging
 
         if move_id in constants.THRASHING_MOVES:
-            
+
             if vol.thrashing:
                 pass
             else:
@@ -447,7 +448,6 @@ class PSBattle:
 
         if vol.toxic:
             vol.toxic_counter = vol.toxic_counter + 1
-
 
     def boost(self, split_msg):
         side, opp_side = self.sides(split_msg)
@@ -504,7 +504,8 @@ class PSBattle:
         assert False, "clearboost assumed impossile"
 
     def clearallboost(self, _split_msg):
-        assert False, "clearallboost not impl"
+        pass
+        # assert False, "clearallboost not impl"
         # Haze zeros the boosts, copies stored stats into active, clears volatiles, and
         # self._clear_boosts(0)
         # self._clear_boosts(1)
@@ -557,6 +558,10 @@ class PSBattle:
             vol.confusion = True
             vol.confusion_left = 1
             dur.confusion = 1
+        elif s == "mist":
+            vol.mist = True
+        elif s == "typechange":
+            active.types = int(split_msg[4])
         else:
             assert False, f"Bad volatile {s}"
 
@@ -583,6 +588,8 @@ class PSBattle:
             vol.confusion = False
             vol.confusion_left = 0
             dur.confusion = 0
+        elif s == "mist":
+            vol.mist = False
         else:
             assert False, f"Bad volatile {s}"
 
@@ -611,6 +618,8 @@ class PSBattle:
             dur.attacking = dur.attacking + 1
         elif s == "":
             assert split_msg[-1] == "move: Splash"
+        elif s == "haze":
+            pass
         else:
             assert False, "Activate idk"
 
@@ -619,6 +628,8 @@ class PSBattle:
         move_name = normalize_name(split_msg[3]) if len(split_msg) > 3 else ""
         if move_name in constants.CHARGING_MOVES:
             side.active.volatiles().charging = True
+        elif move_name in constants.INVULN_MOVES:
+            side.active.volatiles().invulnerable = True
         else:
             assert False, f"Prepare unexpected move: {move_name}"
 
@@ -645,8 +656,10 @@ class PSBattle:
             pass
         elif reason == constants.SLEEP:
             dur.set_sleep(0, dur.sleep(0) + 1)
+
             def is_self(status):
                 return bool(status & 128)
+
             if is_self(side.stored().status):
                 print("DECREMENT REST")
                 side.stored().status = side.stored().status - 1
