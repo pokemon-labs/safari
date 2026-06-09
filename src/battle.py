@@ -40,6 +40,7 @@ class constants:
     TOXIC = "tox"
     FIGHT = "fight"
     CHARGING_MOVES = ("skullbash", "solarbeam", "skyattack", "razorwind")
+    THRASHING_MOVES = ("thrash", "petaldance")
 
 
 BINDING_MOVES = {"bind", "clamp", "firespin", "wrap"}
@@ -208,7 +209,8 @@ class PSBattle:
             fn = self._HANDLERS.get(action)
             if fn:
                 if action not in ("inactive",):
-                    print(f"args: {split_msg}")
+                    pass
+                    # print(f"args: {split_msg}")
                     # try:
                 fn(self, split_msg)
                 # except:
@@ -344,7 +346,8 @@ class PSBattle:
             ):
                 # side.stored().status = _STATUS_BYTE[status_str]
                 if status_str == constants.SLEEP:
-                    duration.set_sleep(0, 1)
+                    if duration.sleep(0) == 0:
+                        duration.set_sleep(0, 1)
             else:
                 assert False, status_str
 
@@ -369,8 +372,6 @@ class PSBattle:
             normalize_name(split_msg[3]) if len(split_msg) > 3 else None
         )
         missed: bool = any(s.strip() == "[miss]" for s in split_msg)
-        if move_id in BINDING_MOVES and not missed:
-            side.active.volatiles().binding = True
         # moving means side is free from binding
         opp_side.active.volatiles().binding = False
         opp_dur.binding = 0
@@ -391,7 +392,9 @@ class PSBattle:
         not_mimic_move = mimic_move is None or (oak.id_to_move(move_id) != mimic_move)
         if not not_mimic_move:
             ms = side.active.move(mimic_move_index)
-            ms.pp = max(0, ms.pp - deduct_pp) 
+            ms.pp = max(0, ms.pp - deduct_pp)
+            ms = side.stored().move(mimic_move_index)
+            ms.pp = max(0, ms.pp - deduct_pp)
         
         # add move to pokemon/active
         if move_id and move_id != "struggle" and not from_metrome and not_mimic_move:
@@ -415,6 +418,13 @@ class PSBattle:
                     assert ms.pp > 0, "Used move with tracked pp=0"
                     ms.pp = max(0, ms.pp - deduct_pp)
 
+        if missed:
+            print("MISSED")
+            return
+
+        if move_id in BINDING_MOVES and not missed:
+            side.active.volatiles().binding = True
+
         if move_id == "bide":
             if vol.bide:
                 dur.attacking = dur.get_attacking() + 1
@@ -427,6 +437,13 @@ class PSBattle:
         if move_id in constants.CHARGING_MOVES:
             vol.charging = not vol.charging
 
+        if move_id in constants.THRASHING_MOVES:
+            
+            if vol.thrashing:
+                pass
+            else:
+                vol.thrashing = True
+                dur.attacking = 1
 
         if vol.toxic:
             vol.toxic_counter = vol.toxic_counter + 1
@@ -452,7 +469,7 @@ class PSBattle:
         assert amount != 0
         prop = _STAT_ABBREV_TO_BOOST_PROPERTY.get(stat)
         assert prop is not None, f"Could not parse stat for boost: {stat}"
-        oak.boost(side, opp_side, prop, -amount)
+        oak.boost(side, side, prop, -amount)
 
     def _status(self, split_msg):
         side, _ = self.sides(split_msg)
@@ -461,18 +478,18 @@ class PSBattle:
         from_str = normalize_name(split_msg[5]) if len(split_msg) > 5 else None
         byte: int = _STATUS_BYTE.get(status_str, None)
         assert byte is not None, f"Bad status string lookup: {status_str}"
-        if side.stored().status == 0:
-            if from_str == "rest":
-                side.stored().status = _STATUS_BYTE["rest"]
-            else:
-                side.stored().status = byte
+        # if side.stored().status == 0:
+        if from_str == "rest":
+            side.stored().status = _STATUS_BYTE["rest"]
+        else:
+            side.stored().status = byte
 
-            if status_str == constants.TOXIC:
-                vol = side.active.volatiles()
-                vol.toxic = True
-                # vol.toxic_counter = 1
-            if status_str == constants.SLEEP:
-                dur.set_sleep(0, 1)
+        if status_str == constants.TOXIC:
+            vol = side.active.volatiles()
+            vol.toxic = True
+        if status_str == constants.SLEEP:
+            # we dont need to set this when resting for the search, but for the tests
+            dur.set_sleep(0, 1)
 
         # TODO maybe init sleep duration to 1?
         oak.status_modify(side.stored().status, side.active.stats())
@@ -504,6 +521,7 @@ class PSBattle:
         active, _ = self.actives(split_msg)
         vol, _ = self.volatiles(split_msg)
         s = normalize_name(split_msg[3].split(":")[-1]) if len(split_msg) > 3 else None
+        dur, _ = self.get_durations(split_msg)
         assert s is not None
         if s == "substitute":
             vol.substitute = True
@@ -514,6 +532,7 @@ class PSBattle:
             vol.light_screen = True
         elif s == "bide":
             vol.bide = True
+            dur.attacking = 1
         elif s == "disable":
             # vol.disable = True
             vol.disable_left = 1
@@ -534,11 +553,16 @@ class PSBattle:
                 assert False
         elif s == "leechseed":
             vol.leech_seed = True
+        elif s == "confusion":
+            vol.confusion = True
+            vol.confusion_left = 1
+            dur.confusion = 1
         else:
             assert False, f"Bad volatile {s}"
 
-    def end_volatile_status(self, split_msg):
+    def _end(self, split_msg):
         vol, _ = self.volatiles(split_msg)
+        dur, _ = self.get_durations(split_msg)
         s = normalize_name(split_msg[3].split(":")[-1]) if len(split_msg) > 3 else None
         assert s is not None
 
@@ -547,6 +571,18 @@ class PSBattle:
         elif s == "substitute":
             vol.substitute = False
             vol.substitute_hp = 0
+        elif s == "disable":
+            # vol.disable = False
+            vol.disable_left = 0
+            vol.disable_move = 0
+            dur.disable = 0
+        elif s == "bide":
+            vol.bide = False
+            dur.attacking = 0
+        elif s == "confusion":
+            vol.confusion = False
+            vol.confusion_left = 0
+            dur.confusion = 0
         else:
             assert False, f"Bad volatile {s}"
 
@@ -563,11 +599,18 @@ class PSBattle:
     def activate(self, split_msg):
         active, _ = self.actives(split_msg)
         vol, _ = self.volatiles(split_msg)
+        dur, _ = self.get_durations(split_msg)
         s = normalize_name(split_msg[3].split(":")[-1]) if len(split_msg) > 3 else None
         assert s is not None
         if s == "substitute":
             vol.substitute = True
             vol.substitute_hp = int(active.stats().hp / 4) or 1
+        elif s == "confusion":
+            dur.confusion = dur.confusion + 1
+        elif s == "bide":
+            dur.attacking = dur.attacking + 1
+        elif s == "":
+            assert split_msg[-1] == "move: Splash"
         else:
             assert False, "Activate idk"
 
@@ -579,7 +622,13 @@ class PSBattle:
         else:
             assert False, f"Prepare unexpected move: {move_name}"
 
+    def before_move(self):
+        # upkeep like incrementing confusion
+        pass
+
     def cant(self, split_msg):
+        self.before_move()
+
         side, opp_side = self.sides(split_msg)
         dur, _ = self.get_durations(split_msg)
         if len(split_msg) < 4:
@@ -597,12 +646,15 @@ class PSBattle:
         elif reason == constants.SLEEP:
             dur.set_sleep(0, dur.sleep(0) + 1)
             def is_self(status):
-                return bool(status ^ 128)
+                return bool(status & 128)
             if is_self(side.stored().status):
+                print("DECREMENT REST")
                 side.stored().status = side.stored().status - 1
         elif reason == "partiallytrapped":
             opp_side.active.volatiles().binding = True
             # TODO set duration
+        elif reason == "flinch":
+            pass
         else:
             assert False, f"Unsupported reason for cant {reason}"
 
@@ -616,8 +668,8 @@ class PSBattle:
             vol = self.public.side(side).active.volatiles()
             if vol.disable_left:
                 dur.disable = dur.disable + 1
-            if vol.bide:
-                dur.attacking = dur.attacking + 1
+            # if vol.bide:
+            #     dur.attacking = dur.attacking + 1
 
     def noinit(self, split_msg):
         if len(split_msg) > 3 and split_msg[2] == "rename":
@@ -663,7 +715,7 @@ class PSBattle:
         "-prepare": prepare,
         "-start": _start,
         "-singlemove": _start,
-        "-end": end_volatile_status,
+        "-end": _end,
         "-immune": immune,
         "-transform": transform,
         "-clearnegativeboost": clearnegativeboost,

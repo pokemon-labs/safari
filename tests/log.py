@@ -11,7 +11,8 @@ RNG = random.Random(seed)
 
 
 def fill_side_randomly(side: oak.Side):
-    species_list = list(range(1, 152))
+    species_list = list(range(1, 150))
+    species_list.remove(oak.id_to_species("ditto"))
     RNG.shuffle(species_list)
 
     for i, species in enumerate(species_list[:6]):
@@ -50,9 +51,10 @@ def rollout_battle_with_log():
 
         c1 = RNG.choice(p1_choices)
         c2 = RNG.choice(p2_choices)
-        print(f"{oak.choice_label(battle.side(0), c1)} {oak.choice_label(battle.side(1), c2)}")
 
+        print(f"{oak.choice_label(battle.side(0), c1)} {oak.choice_label(battle.side(1), c2)}")
         result, msg = oak.log.update(battle, durations, c1, c2, PLAYER)
+
         for line in msg:
             ps_battle.update(line)
         ps_battle.process_msg_lines_and_clear()
@@ -64,22 +66,23 @@ def rollout_battle_with_log():
             durations,
         )
 
+        print(
+            "Actual battle:\n",
+            oak.battle_string(
+                battle,
+                durations,
+            ),
+        )
+        print(
+            "Client battle:\n",
+            oak.battle_string(
+                ps_battle.public,
+                ps_battle.durations,
+            ),
+        )
         if not matches:
             print(f"Mismatch: {reason}")
-            print(
-                "Client battle:\n",
-                oak.battle_string(
-                    ps_battle.public,
-                    ps_battle.durations,
-                ),
-            )
-            print(
-                "Actual battle:\n",
-                oak.battle_string(
-                    battle,
-                    durations,
-                ),
-            )
+            print(ps_battle.public.side(0).stored().status)
             return
 
 
