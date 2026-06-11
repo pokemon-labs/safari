@@ -11,17 +11,48 @@ RNG = random.Random(seed)
 PLAYER = 1
 games = 1
 
+BANNED_MOVES = tuple(
+    oak.id_to_move(x)
+    for x in (
+        "metronome",
+        "transform",
+        "bind",
+        "wrap",
+        "firespin",
+        "clamp",
+        "haze",
+        "toxic",
+        "skullbash",
+        "solarbeam",
+        "skyattack",
+        "razorwind",
+        "mimic",
+        "disable",
+        "rage",
+        "bide",
+        "thrash",
+        "petaldance",
+        "stomp",
+        "headbutt",
+    )
+)
+
 
 def fill_side_randomly(side: oak.Side):
     species_list = list(range(1, 150))
     species_list.remove(oak.id_to_species("ditto"))
     RNG.shuffle(species_list)
-
     for i, species in enumerate(species_list[:6]):
         s = oak.Set()
         s.species = species
         s.level = 100
         oak.fill_random_moveset(s, RNG.randint(0, 2**32 - 1))
+        moves = list(s.moves)
+        for m in range(4):
+            if moves[m] in BANNED_MOVES:
+                moves[m] = 0
+        moves = sorted(moves, reverse=True)
+        s.moves = moves
         oak.complete_pokemon_from_set(side.pokemon(i), s)
     side.order = list(range(1, 7))
 
@@ -89,6 +120,61 @@ def single():
             return
 
 
+def scan():
+    global RNG
+    for seed in range(1200, 10000):
+        print(f"SEED: {seed}")
+        RNG = random.Random(seed)
+        battle = get_battle()
+        durations = oak.Durations()
+        ps_battle = PSBattle("", PSPlayer(), PSPlayer())
+        ps_battle.us = "p1"
+        result, msg = oak.log.update(battle, durations, 0, 0, PLAYER)
+        for line in msg:
+            ps_battle.update(line)
+        ps_battle.process_msg_lines_and_clear()
+        messages = []
+        while not oak.result_type(result):
+            p1_choices, p2_choices = oak.choices(battle, result)
+            c1 = RNG.choice(p1_choices)
+            c2 = RNG.choice(p2_choices)
+            messages.append(
+                f"{oak.choice_label(battle.side(0), c1)} {oak.choice_label(battle.side(1), c2)}"
+            )
+            result, msg = oak.log.update(battle, durations, c1, c2, PLAYER)
+            for line in msg:
+                ps_battle.update(line)
+            messages += msg
+            ps_battle.process_msg_lines_and_clear()
+            matches, reason = oak.log.compare_battles(
+                ps_battle.public,
+                ps_battle.durations,
+                battle,
+                durations,
+            )
+            messages.append(
+                "Actual battle:\n"
+                + oak.battle_string(
+                    battle,
+                    durations,
+                )
+            )
+            messages.append(
+                "Client battle:\n"
+                + oak.battle_string(
+                    ps_battle.public,
+                    ps_battle.durations,
+                )
+            )
+            if not matches:
+                messages.append(f"Mismatch: {reason}")
+                for line in messages:
+                    print(line)
+                print(f"Failure at seed: {seed}")
+
+                return
+
+
 def percent():
     global games
     from collections import defaultdict
@@ -141,7 +227,7 @@ def main():
     global seed, RNG, games
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--main", type=str, choices=["single", "percent"], default="single"
+        "--main", type=str, choices=["single", "percent", "scan"], default="single"
     )
     parser.add_argument(
         "--seed",
@@ -155,15 +241,13 @@ def main():
     )
     args = parser.parse_args()
 
-    handles = [("single", single), ("percent", percent)]
+    handles = [("single", single), ("percent", percent), ("scan", scan)]
 
     if not args.seed is None:
         seed = args.seed
         RNG = random.Random(seed)
     if not args.games is None:
         games = args.games
-
-    print(f"Seed: {seed}")
 
     for name, fn in handles:
         if args.main == name:
