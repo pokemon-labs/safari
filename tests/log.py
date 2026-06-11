@@ -3,13 +3,33 @@ from src.battle import PSBattle, PSPlayer
 import oak
 import oak.log
 
-import argparse
 import random
 
-seed = random.randint(0, 2**64 - 1)
-RNG = random.Random(seed)
+import argparse
+
+parser = argparse.ArgumentParser(description="Oak Tutorial")
+
 PLAYER = 1
-games = 1
+
+parser.add_argument(
+    "--main", type=str, choices=["single", "percent", "scan"], default="single"
+)
+parser.add_argument(
+    "--seed",
+    type=int,
+    default=None,
+)
+parser.add_argument(
+    "--games",
+    type=int,
+    default=None,
+)
+parser.add_argument(
+    "--start",
+    type=int,
+    default=0,
+)
+
 
 BANNED_MOVES = tuple(
     oak.id_to_move(x)
@@ -30,15 +50,13 @@ BANNED_MOVES = tuple(
         "disable",
         "rage",
         "bide",
-        "thrash",
-        "petaldance",
-        "stomp",
-        "headbutt",
+        # "thrash",
+        # "petaldance",
     )
 )
 
 
-def fill_side_randomly(side: oak.Side):
+def fill_side_randomly(side: oak.Side, RNG):
     species_list = list(range(1, 150))
     species_list.remove(oak.id_to_species("ditto"))
     RNG.shuffle(species_list)
@@ -57,10 +75,10 @@ def fill_side_randomly(side: oak.Side):
     side.order = list(range(1, 7))
 
 
-def get_battle() -> oak.Battle:
+def get_battle(RNG) -> oak.Battle:
     battle = oak.Battle()
-    fill_side_randomly(battle.side(0))
-    fill_side_randomly(battle.side(1))
+    fill_side_randomly(battle.side(0), RNG)
+    fill_side_randomly(battle.side(1), RNG)
     return battle
 
 
@@ -121,11 +139,11 @@ def single():
 
 
 def scan():
-    global RNG
-    for seed in range(1200, 10000):
+    args = parser.parse_args()
+    for seed in range(args.start, 10000):
         print(f"SEED: {seed}")
         RNG = random.Random(seed)
-        battle = get_battle()
+        battle = get_battle(RNG)
         durations = oak.Durations()
         ps_battle = PSBattle("", PSPlayer(), PSPlayer())
         ps_battle.us = "p1"
@@ -224,35 +242,14 @@ def percent():
 
 
 def main():
-    global seed, RNG, games
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--main", type=str, choices=["single", "percent", "scan"], default="single"
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=None,
-    )
-    parser.add_argument(
-        "--games",
-        type=int,
-        default=None,
-    )
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
 
     handles = [("single", single), ("percent", percent), ("scan", scan)]
-
-    if not args.seed is None:
-        seed = args.seed
-        RNG = random.Random(seed)
-    if not args.games is None:
-        games = args.games
-
     for name, fn in handles:
         if args.main == name:
             fn()
             return
+    assert False, f"bad --main kwarg, valid: {[name for name, _ in handles]}"
 
 
 if __name__ == "__main__":
