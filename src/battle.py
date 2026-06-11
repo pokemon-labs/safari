@@ -11,6 +11,7 @@ import oak
 
 type Msg = list[str]
 
+
 class Mechanics:
     def sleep(side: oak.Side, duration: oak.Duration):
         side.stored().status = _STATUS_BYTE["slp"]
@@ -31,6 +32,7 @@ class Mechanics:
         vol.binding = False
         duration.attacking = 0
         duration.binding = 0
+
 
 class constants:
     RQID = "rqid"
@@ -362,7 +364,7 @@ class PSBattle:
             else:
                 assert False, status_str
 
-        if (len(split_msg) > 4):
+        if len(split_msg) > 4:
             reason = normalize_name(split_msg[4])
             if reason == "confusion":
                 Mechanics.interrupt(side, duration)
@@ -449,6 +451,13 @@ class PSBattle:
                     assert ms.pp > 0, "Used move with tracked pp=0"
                     ms.pp = max(0, ms.pp - pp_deduction)
 
+        if move_id in constants.THRASHING_MOVES:
+            if vol.thrashing:
+                dur.attacking = dur.attacking + 1
+            else:
+                vol.thrashing = True
+                dur.attacking = 1
+
         if missed:
             return
 
@@ -470,14 +479,6 @@ class PSBattle:
 
         if move_id in constants.CHARGING_MOVES:
             vol.charging = not vol.charging
-
-        if move_id in constants.THRASHING_MOVES:
-
-            if vol.thrashing:
-                dur.attacking = dur.attacking + 1
-            else:
-                vol.thrashing = True
-                dur.attacking = 1
 
     def boost(self, split_msg):
         is_us = self.is_us(split_msg)
@@ -600,9 +601,9 @@ class PSBattle:
         elif s == "leechseed":
             vol.leech_seed = True
         elif s == "confusion":
-            if vol.thrashing:
-                vol.thrashing = False
-                vol.attacks = 0
+            # we only check for |silent| here since otherwise it's only emitted by clearVolatiles which belongs to haze
+            if len(split_msg) > 4 and split_msg[4] == "[silent]":
+                vol.thrashing = 0
                 dur.attacking = 0
             vol.confusion = True
             vol.confusion_left = 1
@@ -711,7 +712,6 @@ class PSBattle:
         vol.charging = False
         # clear bide
         vol.bide = False
-        dur.attacking = 0
 
         if len(split_msg) < 4:
             return
