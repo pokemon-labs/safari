@@ -11,6 +11,26 @@ import oak
 
 type Msg = list[str]
 
+class Mechanics:
+    def sleep(side: oak.Side, duration: oak.Duration):
+        side.stored().status = _STATUS_BYTE["slp"]
+        duration.set_sleep(0, 1)
+        side.active.volatiles().recharging = False
+
+    def rest(side: oak.Side, duration: oak.Duration):
+        side.stored().status = _STATUS_BYTE["rest"]
+        duration.set_sleep(0, 1)
+
+    def interrupt(side: oak.Side, duration: oak.Duration):
+        vol = side.active.volatiles()
+        if not vol.rage:
+            vol.state = 0
+        vol.bide = False
+        vol.thrashing = False
+        vol.charging = False
+        vol.binding = False
+        duration.attacking = 0
+        duration.binding = 0
 
 class constants:
     RQID = "rqid"
@@ -209,15 +229,6 @@ class PSBattle:
     def get_durations(self, is_us: bool):
         return tuple(self.durations.get(i) for i in range(2))[:: (-1) ** (not is_us)]
 
-    def sleep(self, side: oak.Side, duration: oak.Duration):
-        side.stored().status = _STATUS_BYTE["slp"]
-        duration.set_sleep(0, 1)
-        side.active.volatiles().recharging = False
-
-    def rest(self, side: oak.Side, duration: oak.Duration):
-        side.stored().status = _STATUS_BYTE["rest"]
-        duration.set_sleep(0, 1)
-
     def parse_request(self, split_msg: list[str]):
         if len(split_msg) < 3:
             return
@@ -305,7 +316,7 @@ class PSBattle:
         duration.attacking = 0
         duration.binding = 0
 
-        opp_side.active.volatiles().binding = False  # found in mechanics
+        opp_side.active.volatiles().binding = False
 
         if side.stored().status == _STATUS_BYTE[constants.TOXIC]:
             side.stored().status = _STATUS_BYTE[constants.POISON]
@@ -350,6 +361,14 @@ class PSBattle:
                 pass
             else:
                 assert False, status_str
+
+        if (len(split_msg) > 4):
+            reason = normalize_name(split_msg[4])
+            if reason == "confusion":
+                Mechanics.interrupt(side, duration)
+            else:
+                # idt theres any other meaningful reasons
+                pass
 
     def sethp(self, split_msg):
         assert False, "sethp assumed impossile"
@@ -494,12 +513,11 @@ class PSBattle:
         from_str = normalize_name(split_msg[5]) if len(split_msg) > 5 else None
         byte: int = _STATUS_BYTE.get(status_str, None)
         assert byte is not None, f"Bad status string lookup: {status_str}"
-        # if side.stored().status == 0:
         if from_str == "rest":
-            self.rest(side, dur)
+            Mechanics.rest(side, dur)
         else:
             if status_str == constants.SLEEP:
-                self.sleep(side, dur)
+                Mechanics.sleep(side, dur)
             elif status_str == constants.TOXIC:
                 vol = side.active.volatiles()
                 vol.toxic = True
@@ -702,8 +720,7 @@ class PSBattle:
             side.active.volatiles().recharging = False
         elif reason == constants.PARALYZED:
             # gen1: full paralysis releases partial trap on other side
-            side.active.volatiles().binding = False
-            dur.binding = 0
+            Mechanics.interrupt(side, dur)
         elif reason == constants.FROZEN:
             pass
         elif reason == constants.SLEEP:
