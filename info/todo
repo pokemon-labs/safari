@@ -1,0 +1,3 @@
+separate boost and unboost, since unboost does not cap
+flinch silently clears recharge
+binding ends silently, you need to parse the request for that
