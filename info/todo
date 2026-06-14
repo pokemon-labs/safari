@@ -1,3 +1,101 @@
 separate boost and unboost, since unboost does not cap
-flinch silently clears recharge
+flinch silently clears recharge - this is impl on showdown so we just don't know
 binding ends silently, you need to parse the request for that
+
+Request parsing:
+reveals binding, reveals our own recharge status
+
+Rage: if the target is immune we don't add the vol, but if it its already present then it doesn't matter
+
+Trhashing: idfk what this is
+```
+Thrash Poliwrath
+|switch|p2a: Poliwrath|Poliwrath|87/100
+|-activate|p1a: Cubone|confusion
+|move|p1a: Cubone|Thrash|p2a: Poliwrath
+|-damage|p2a: Poliwrath|75/100 slp
+|turn|63
+Actual battle:
+conf: 2 attacking: 1
+(thrashing)(confused)(substitute)(confusion_left: 4)(attacks: 3)(state: 255)(sub_hp: 51)
+Cubone: 49% (148/303) Substitute:14 Submission:40 Thrash:28 BodySlam:23 
+  Tangela: 91% (301/333) PAR SleepPowder:21 PoisonPowder:56 MegaDrain:16 None:0 
+  Farfetchd: 7% (19/307) Swift:32 DoubleEdge:23 FuryAttack:32 None:0 
+  Primeape: 72% (237/333) Substitute:16 SeismicToss:31 Submission:38 Scratch:56 
+  Gengar: KO 
+  Arcanine: 84% (321/383) Swift:31 Reflect:30 Agility:45 None:0 
+|| last_used: 37
+--- --- --- 63 --- --- ---
+Poliwrath: 75% (284/383) RST:2 Rest:14 Bubble:47 Bide:15 HydroPump:8 
+  Seadra: 67% (209/313) WaterGun:39 DoubleEdge:24 None:0 None:0 
+  Snorlax: 18% (89/523) Earthquake:16 TakeDown:32 None:0 None:0 
+  Sandshrew: 84% (254/303) RockSlide:14 PoisonSting:55 None:0 None:0 
+  Zubat: KO 
+  Magnemite: 10% (25/253) ThunderWave:32 ThunderShock:45 Tackle:56 None:0 
+|| last_used: 0
+
+Client battle:
+conf: 2 attacking: 1
+(thrashing)(confused)(substitute)(confusion_left: 1)(sub_hp: 76)
+Cubone: 49% (148/303) Thrash:28 Substitute:14 BodySlam:23 None:0 
+  Farfetchd: 7% (19/307) DoubleEdge:23 None:0 None:0 None:0 
+  Primeape: 72% (237/333) SeismicToss:31 Submission:38 None:0 None:0 
+  Gengar: KO 
+  Tangela: 91% (301/333) PAR SleepPowder:21 None:0 None:0 None:0 
+  Arcanine: 84% (321/383) Agility:45 Reflect:30 Swift:31 None:0 
+|| last_used: 37
+--- --- --- 63 --- --- ---
+Poliwrath: 75% (287/383) RST:2 Bide:15 Bubble:47 Rest:14 None:0 
+  Snorlax: 18% (94/523) None:0 None:0 None:0 None:0 
+  Magnemite: 10% (25/253) ThunderShock:45 None:0 None:0 None:0 
+  Seadra: 67% (209/313) WaterGun:39 None:0 None:0 None:0 
+  Zubat: KO 
+  Sandshrew: 84% (254/303) PoisonSting:55 RockSlide:14 None:0 None:0 
+|| last_used: 0
+
+Substitute Magnemite
+|switch|p2a: Magnemite|Magnemite|10/100
+|-activate|p1a: Cubone|confusion
+|turn|64
+Actual battle:
+conf: 3
+(confused)(substitute)(confusion_left: 3)(attacks: 3)(sub_hp: 51)
+Cubone: 49% (148/303) Substitute:14 Submission:40 Thrash:28 BodySlam:23 
+  Tangela: 91% (301/333) PAR SleepPowder:21 PoisonPowder:56 MegaDrain:16 None:0 
+  Farfetchd: 7% (19/307) Swift:32 DoubleEdge:23 FuryAttack:32 None:0 
+  Primeape: 72% (237/333) Substitute:16 SeismicToss:31 Submission:38 Scratch:56 
+  Gengar: KO 
+  Arcanine: 84% (321/383) Swift:31 Reflect:30 Agility:45 None:0 
+|| last_used: 0
+--- --- --- 64 --- --- ---
+Magnemite: 10% (25/253) ThunderWave:32 ThunderShock:45 Tackle:56 None:0 
+  Seadra: 67% (209/313) WaterGun:39 DoubleEdge:24 None:0 None:0 
+  Snorlax: 18% (89/523) Earthquake:16 TakeDown:32 None:0 None:0 
+  Sandshrew: 84% (254/303) RockSlide:14 PoisonSting:55 None:0 None:0 
+  Zubat: KO 
+  Poliwrath: 75% (284/383) RST:2 Rest:14 Bubble:47 Bide:15 HydroPump:8 
+|| last_used: 0
+
+Client battle:
+conf: 3 attacking: 1
+(thrashing)(confused)(substitute)(confusion_left: 1)(sub_hp: 76)
+Cubone: 49% (148/303) Thrash:28 Substitute:14 BodySlam:23 None:0 
+  Farfetchd: 7% (19/307) DoubleEdge:23 None:0 None:0 None:0 
+  Primeape: 72% (237/333) SeismicToss:31 Submission:38 None:0 None:0 
+  Gengar: KO 
+  Tangela: 91% (301/333) PAR SleepPowder:21 None:0 None:0 None:0 
+  Arcanine: 84% (321/383) Agility:45 Reflect:30 Swift:31 None:0 
+|| last_used: 0
+--- --- --- 64 --- --- ---
+Magnemite: 10% (25/253) ThunderShock:45 None:0 None:0 None:0 
+  Snorlax: 18% (94/523) None:0 None:0 None:0 None:0 
+  Poliwrath: 75% (287/383) RST:2 Bide:15 Bubble:47 Rest:14 None:0 
+  Seadra: 67% (209/313) WaterGun:39 None:0 None:0 None:0 
+  Zubat: KO 
+  Sandshrew: 84% (254/303) PoisonSting:55 RockSlide:14 None:0 None:0 
+|| last_used: 0
+
+Mismatch: thrashing mismatch
+Failure at seed: 3180
+
+```

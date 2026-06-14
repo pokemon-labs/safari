@@ -29,6 +29,11 @@ parser.add_argument(
     type=int,
     default=0,
 )
+parser.add_argument(
+    "--verbose",
+    type=int,
+    default=0,
+)
 
 
 BANNED_MOVES = tuple(
@@ -36,11 +41,13 @@ BANNED_MOVES = tuple(
     for x in (
         "metronome",
         "transform",
+        "mirrormove",
+        # These seem done we are only hitting situations where request parsing would save us
         "bind",
         "wrap",
         "firespin",
         "clamp",
-        "haze",
+        # "haze",
         "toxic",
         "skullbash",
         "solarbeam",
@@ -48,10 +55,13 @@ BANNED_MOVES = tuple(
         "razorwind",
         "mimic",
         "disable",
-        "rage",
-        "bide",
+        "rage",  # Not handling first-rage-on-immune correctly (don't set Rage, but immune message comes after)
+        # "bide", # this seems to be done, but we don't compare bide damage when min_damage should be used
         # "thrash",
         # "petaldance",
+        "headbutt",  # These are done except flinch silently clears recharge. We can correct this with the request object (TODO clear recharge if can attack) but only for p1
+        "stomp",
+        "bite",
     )
 )
 
@@ -82,60 +92,15 @@ def get_battle(RNG) -> oak.Battle:
     return battle
 
 
-def single():
+class Messages:
+    def __init__(self, args):
+        self.data = []
+        self.args = args
 
-    battle = get_battle()
-    durations = oak.Durations()
-
-    ps_battle = PSBattle("", PSPlayer(), PSPlayer())
-    ps_battle.us = "p1"
-
-    result, msg = oak.log.update(battle, durations, 0, 0, PLAYER)
-
-    for line in msg:
-        ps_battle.update(line)
-    ps_battle.process_msg_lines_and_clear()
-
-    while not oak.result_type(result):
-        p1_choices, p2_choices = oak.choices(battle, result)
-
-        c1 = RNG.choice(p1_choices)
-        c2 = RNG.choice(p2_choices)
-
-        print(
-            f"{oak.choice_label(battle.side(0), c1)} {oak.choice_label(battle.side(1), c2)}"
-        )
-        result, msg = oak.log.update(battle, durations, c1, c2, PLAYER)
-
-        for line in msg:
-            ps_battle.update(line)
-        ps_battle.process_msg_lines_and_clear()
-
-        matches, reason = oak.log.compare_battles(
-            ps_battle.public,
-            ps_battle.durations,
-            battle,
-            durations,
-        )
-
-        print(
-            "Actual battle:\n",
-            oak.battle_string(
-                battle,
-                durations,
-            ),
-        )
-        print(
-            "Client battle:\n",
-            oak.battle_string(
-                ps_battle.public,
-                ps_battle.durations,
-            ),
-        )
-        if not matches:
-            print(f"Mismatch: {reason}")
-            print(ps_battle.public.side(0).stored().status)
-            return
+    def append(self, x):
+        self.data.append(x)
+        if self.args.verbose:
+            print(x)
 
 
 def scan():
@@ -151,7 +116,7 @@ def scan():
         for line in msg:
             ps_battle.update(line)
         ps_battle.process_msg_lines_and_clear()
-        messages = []
+        messages = Messages(args)
         while not oak.result_type(result):
             p1_choices, p2_choices = oak.choices(battle, result)
             c1 = RNG.choice(p1_choices)
@@ -162,7 +127,8 @@ def scan():
             result, msg = oak.log.update(battle, durations, c1, c2, PLAYER)
             for line in msg:
                 ps_battle.update(line)
-            messages += msg
+                messages.append(line)
+
             ps_battle.process_msg_lines_and_clear()
             matches, reason = oak.log.compare_battles(
                 ps_battle.public,
@@ -186,65 +152,17 @@ def scan():
             )
             if not matches:
                 messages.append(f"Mismatch: {reason}")
-                for line in messages:
+                for line in messages.data:
                     print(line)
                 print(f"Failure at seed: {seed}")
 
                 return
 
 
-def percent():
-    global games
-    from collections import defaultdict
-
-    success = 0
-    reasons = defaultdict(lambda: 0)
-    total = games
-    for _ in range(total):
-        fail = False
-        battle = get_battle()
-        durations = oak.Durations()
-
-        ps_battle = PSBattle("", PSPlayer(), PSPlayer())
-        ps_battle.us = "p1"
-
-        result, msg = oak.log.update(battle, durations, 0, 0, PLAYER)
-
-        for line in msg:
-            ps_battle.update(line)
-        ps_battle.process_msg_lines_and_clear()
-
-        while not oak.result_type(result):
-            p1_choices, p2_choices = oak.choices(battle, result)
-            c1 = RNG.choice(p1_choices)
-            c2 = RNG.choice(p2_choices)
-            result, msg = oak.log.update(battle, durations, c1, c2, PLAYER)
-            for line in msg:
-                ps_battle.update(line)
-            ps_battle.process_msg_lines_and_clear()
-            matches, reason = oak.log.compare_battles(
-                ps_battle.public,
-                ps_battle.durations,
-                battle,
-                durations,
-            )
-            if not matches:
-                fail = True
-                reasons[reason] += 1
-                break
-
-        if not fail:
-            success += 1
-
-    print(f"SUCCESS RATE = {success / total}")
-    for key, value in reasons.items():
-        print(key, value)
-
-
 def main():
     args, _ = parser.parse_known_args()
 
-    handles = [("single", single), ("percent", percent), ("scan", scan)]
+    handles = [("scan", scan)]
     for name, fn in handles:
         if args.main == name:
             fn()
