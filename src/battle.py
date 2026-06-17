@@ -213,6 +213,22 @@ class Mechanics:
             assert False
         Mechanics.status_modify(side.stored().status, side.active.stats())
 
+    def decrement_pp(side: oak.Side, mslot: int):
+        if side.last_selected_move == oak.id_to_move("struggle"):
+            return
+        active = side.active
+        vol = active.volatiles()
+        assert not vol.rage and not vol.thrashing and True  # not multi_hit
+        if vol.bide:
+            return
+        ms = active.move(mslot)
+        ms.pp = (ms.pp - 1) % 64
+        if vol.transform:
+            return
+        ms = side.stored().move(mslot)
+        ms.pp = (ms.pp - 1) % 64
+        assert active.move(mslot.pp) == side.stored().move(mslot).pp
+
 
 def normalize_name(name):
     return (
@@ -429,6 +445,7 @@ class PSBattle:
 
         # Clears active, then sets species, moves, types, stats
         oak.switch_in(side.stored(), side.active)
+        side.active.species = side.stored().species
         oak.status_modify(side.stored().status, side.active.stats())
         self.store_stats()
         # Durations
@@ -502,7 +519,7 @@ class PSBattle:
                 # idt theres any other meaningful reasons
                 pass
 
-    def sethp(self, split_msg):
+    def _sethp(self, split_msg):
         assert False, "sethp assumed impossile"
 
     def _fail(self, split_msg):
@@ -524,7 +541,6 @@ class PSBattle:
             normalize_name(split_msg[3]) if len(split_msg) > 3 else None
         )
         move: int = oak.id_to_move(move_id)
-        side.last_used_move = move
         missed: bool = any(s.strip() == "[miss]" for s in split_msg)
         # moving means side is free from binding
         # opp_side.active.volatiles().binding = False
@@ -551,6 +567,9 @@ class PSBattle:
             or (binding_move and vol.binding)
             else 1
         )
+
+        if (pp_deduction or vol.thrashing) and not (charging_move and not vol.charging):
+            side.last_used_move = move
 
         mimic_move, mimic_move_index = None, None
         mimic_ = oak.id_to_move("mimic")
@@ -599,6 +618,9 @@ class PSBattle:
                 vol.thrashing = True
                 dur.attacking = 1
 
+        if charging_move and vol.charging:
+            vol.charging = False
+
         if missed:
             vol.binding = False
             dur.binding = 0
@@ -620,10 +642,7 @@ class PSBattle:
             if move_id == "rage":
                 vol.rage = True
 
-            if move_id in constants.CHARGING_MOVES:
-                vol.charging = not vol.charging
-
-    def boost(self, split_msg):
+    def _boost(self, split_msg):
         is_us = self.is_us(split_msg)
         side, opp_side = self.sides(is_us)
         stat: str | None = split_msg[3].strip() if len(split_msg) > 3 else None
@@ -639,7 +658,7 @@ class PSBattle:
         assert prop is not None, f"Could not parse stat for boost: {stat}"
         Mechanics.boost(side, opp_side, prop, amount)
 
-    def unboost(self, split_msg):
+    def _unboost(self, split_msg):
         is_us = self.is_us(split_msg)
         side, opp_side = self.sides(is_us)
         stat: str | None = split_msg[3].strip() if len(split_msg) > 3 else None
@@ -673,7 +692,7 @@ class PSBattle:
         oak.status_modify(side.stored().status, side.active.stats())
         self.store_stats()
 
-    def clearallboost(self, _split_msg):
+    def _clearallboost(self, _split_msg):
         for i in range(2):
             Mechanics.clear_boosts(self.public.side(i))
             Mechanics.clear_volatiles(self.public.side(i), self.durations.get(i))
@@ -786,24 +805,26 @@ class PSBattle:
             print(split_msg)
             assert False, f"Bad volatile {s}"
 
-    def mustrecharge(self, split_msg):
+    def _mustrecharge(self, split_msg):
         is_us = self.is_us(split_msg)
         vol, _ = self.volatiles(is_us)
         vol.recharging = True
 
-    def transform(self, split_msg):
+    def _transform(self, split_msg):
         is_us = self.is_us(split_msg)
         active, opp_active = self.actives(is_us)
         vol, opp_vol = self.volatiles(is_us)
         vol.transform = True
+        print(f"Opp species {oak.species_id(opp_vol.transform_species)}")
         vol.transform_species = (
             opp_active.species if not opp_vol.transform else opp_vol.transform_species
         )
+        # vol.transform_species = 1
         stats, opp_stats = active.stats(), opp_active.stats()
-        stats.atk = opp_active.atk
-        stats.def_ = opp_active.def_
-        stats.spe = opp_active.spe
-        stats.spc = opp_active.spc
+        stats.atk = opp_stats.atk
+        stats.def_ = opp_stats.def_
+        stats.spe = opp_stats.spe
+        stats.spc = opp_stats.spc
         active.species = opp_active.species
         active.types = opp_active.types
         boosts, opp_boosts = active.boosts(), opp_active.boosts()
@@ -840,7 +861,7 @@ class PSBattle:
         else:
             assert False, f"Activate idk: {s}"
 
-    def prepare(self, split_msg):
+    def _prepare(self, split_msg):
         is_us = self.is_us(split_msg)
         side, _ = self.sides(is_us)
         move_name = normalize_name(split_msg[3]) if len(split_msg) > 3 else ""
@@ -860,8 +881,6 @@ class PSBattle:
         vol = side.active.volatiles()
         if vol.toxic:
             vol.toxic_counter = vol.toxic_counter + 1
-        if vol.charging:
-            vol.charging = False
         if vol.binding:
             if duration.binding < 4:
                 duration.binding = duration.binding + 1
@@ -879,12 +898,11 @@ class PSBattle:
 
         self.before_move(side, dur)
 
-        # clear charging
-        vol.charging = False
         # clear bide
         # vol.bide = False
 
         if len(split_msg) < 4:
+            assert False, "cant for no reason??"
             return
         reason = split_msg[3].strip()
         if reason == "recharge":
@@ -939,23 +957,8 @@ class PSBattle:
 
         pass
 
-    def anim(self, _split_msg):
-        assert False, "anim assumed impossible"
-
-    def singleturn(self, _split_msg):
-        assert False, "singleturn assumed impossible"
-
-    def setboost(self, split_msg):
-        assert False, "setboost assumed impossile"
-
-    def clearnegativeboost(self, split_msg):
-        assert False, "clearnegativeboost assumed impossile"
-
-    def clearboost(self, split_msg):
-        assert False, "clearboost assumed impossile"
-
-    def _singlemove(self, split_msg):
-        assert False, "singlemove assumed impossible"
+    def impossible(self):
+        pass
 
     def update(self, msg: str):
         self.msg_index = 0
@@ -993,29 +996,29 @@ class PSBattle:
         "-fail": _fail,
         "-heal": heal_or_damage,
         "-damage": heal_or_damage,
-        "-sethp": sethp,
-        "-setboost": setboost,
-        "-boost": boost,
-        "-unboost": unboost,
-        "-clearnegativeboost": clearnegativeboost,
-        "-clearboost": clearboost,
-        "-clearallboost": clearallboost,
+        "-sethp": _sethp,
+        "-boost": _boost,
+        "-unboost": _unboost,
+        "-clearallboost": _clearallboost,
         "-status": _status,
         "-curestatus": _curestatus,
         "-activate": _activate,
-        "-anim": anim,
-        "-prepare": prepare,
+        "-prepare": _prepare,
         "-start": _start,
-        "-singlemove": _singlemove,
         "-end": _end,
         "-immune": _immune,
-        "-transform": transform,
-        "-clearnegativeboost": clearnegativeboost,
-        "-singleturn": singleturn,
-        "-mustrecharge": mustrecharge,
+        "-transform": _transform,
+        "-mustrecharge": _mustrecharge,
         "upkeep": upkeep,
         "cant": cant,
         "inactive": inactive,
         "inactiveoff": inactiveoff,
         "noinit": noinit,
+        "-clearnegativeboost": impossible,
+        "-singleturn": impossible,
+        "-clearnegativeboost": impossible,
+        "-clearboost": impossible,
+        "-setboost": impossible,
+        "-singlemove": impossible,
+        "-anim": impossible,
     }

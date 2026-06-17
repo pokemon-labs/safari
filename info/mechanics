@@ -1,0 +1,80 @@
+|switch| - switchIn, always fires
+|-status|psn|silent - switchIn if incoming has Toxic status
+
+selectMove: No logs but we determine if skip_turn
+    skip_turn if 
+        recharging and bound
+        rage and bound
+        (thrashing or charging) and bound
+        // e.g:
+        (re/charging, rage, thrashing) and bound
+        // but saveMove null is called if rage/thrashing/charging
+
+        (frozen or sleeping or bide) - saveMove w/ choice called
+
+        bound - saveMove choice
+
+    if binding:
+        saveMove(choice), return
+
+    otherwise: saveMove if not struggling = move|0
+
+saveMove
+    if null just return
+    otherwise assert is a move
+    if move|0 last_selected_move = Struggle
+    else
+    last_selected_move = active.move(data)
+    battle lastMove(player).index = data
+
+executeMove - no log messages in showdown mode
+    beforeMove
+    canMove
+    if cant
+        return
+    else 
+        doMove
+
+turnOrder - sets nothing, no logs
+    uses last_selected_move for priority
+
+
+beforeMove
+    if sleeping:
+        |-curestatus| if wake
+        |cant| otherwise
+
+    if frozen:
+        |cant|
+    if bound: |cant|
+    if flinch: |cant|
+    if recharging: |cant|
+    check disable count, |end| if over
+    if disabled: |cant|
+    "handleConfusion"
+
+handleResidual
+    apply status damage
+    leech seed
+
+endTurn:
+    check if tie, increment turn
+
+doTurn:
+    executeMove for each player
+    
+
+    
+
+
+update:
+    selectMove for both players - just set last_selected 
+        and maybe set skip_turn
+
+    REWRAP if binding and opp switching
+
+    doTurn for both players
+
+    if no more vol.attacks set binding = false
+
+    endTurn

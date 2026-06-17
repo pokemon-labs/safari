@@ -40,8 +40,9 @@ BANNED_MOVES = tuple(
     oak.id_to_move(x)
     for x in (
         "metronome",
-        "transform",
+        # "transform",
         "mirrormove",
+        "mimic",
         # These seem done we are only hitting situations where request parsing would save us
         "bind",
         "wrap",
@@ -49,11 +50,10 @@ BANNED_MOVES = tuple(
         "clamp",
         # "haze",
         "toxic",
-        "skullbash",
-        "solarbeam",
-        "skyattack",
-        "razorwind",
-        "mimic",
+        # "skullbash",
+        # "solarbeam",
+        # "skyattack",
+        # "razorwind",
         "disable",
         "rage",  # Not handling first-rage-on-immune correctly (don't set Rage, but immune message comes after)
         # "bide", # this seems to be done, but we don't compare bide damage when min_damage should be used
@@ -113,10 +113,13 @@ def scan():
         ps_battle = PSBattle("", PSPlayer(), PSPlayer())
         ps_battle.us = "p1"
         result, msg = oak.log.update(battle, durations, 0, 0, PLAYER)
+        messages = Messages(args)
+
         for line in msg:
             ps_battle.update(line)
+            messages.append(line)
         ps_battle.process_msg_lines_and_clear()
-        messages = Messages(args)
+
         while not oak.result_type(result):
             p1_choices, p2_choices = oak.choices(battle, result)
             c1 = RNG.choice(p1_choices)

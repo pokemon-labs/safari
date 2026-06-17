@@ -99,3 +99,5 @@ Mismatch: thrashing mismatch
 Failure at seed: 3180
 
 ```
+
+Transform stores the identity of the imitated mon via its side index and SLOT, so it can't be matched since client/truth order is necessarily different
