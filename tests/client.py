@@ -7,7 +7,7 @@ import random
 
 import argparse
 
-parser = argparse.ArgumentParser(description="Oak Tutorial")
+parser = argparse.ArgumentParser()
 
 PLAYER = 1
 
@@ -39,27 +39,27 @@ parser.add_argument(
 BANNED_MOVES = tuple(
     oak.id_to_move(x)
     for x in (
+        # ts is fucking annoying i dont understand pp deduction currently
         "metronome",
-        # "transform",
         "mirrormove",
-        "mimic",
-        # These seem done we are only hitting situations where request parsing would save us
+
+        # if a mimic'd move is already present the mon can have it twice and we can't tell which one was used/pp deducted
+        "mimic", 
+
+        # These seem done we are only hitting cases where libpkmn leaks that binding has ended
         "bind",
         "wrap",
         "firespin",
         "clamp",
-        # "haze",
-        # "toxic",
-        # "skullbash",
-        # "solarbeam",
-        # "skyattack",
-        # "razorwind",
-        # "disable",
-        "rage",  # Not handling first-rage-on-immune correctly (don't set Rage, but immune message comes after)
-        # "bide", # this seems to be done, but we don't compare bide damage when min_damage should be used
-        # "thrash",
-        # "petaldance",
-        "headbutt",  # These are done except flinch silently clears recharge. We can correct this with the request object (TODO clear recharge if can attack) but only for p1
+
+        # Not handling first-rage-on-immune correctly (don't set Rage, but immune message comes after)
+        "rage",
+
+        # this seems to be done, but we don't compare bide damage when min_damage should be used
+        "bide",
+
+        # These are done except flinch silently clears recharge. We can correct this with the request object (TODO clear recharge if can attack) but only for p1
+        "headbutt",  
         "stomp",
         "bite",
         "lowkick",

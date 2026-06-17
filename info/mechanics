@@ -52,6 +52,12 @@ beforeMove
     check disable count, |end| if over
     if disabled: |cant|
     "handleConfusion"
+    if paralyzed: |cant|
+    if bide: if starting: |activate| else |end| and if last_damage == 0 |fail|
+    if thrashing: |move| decrement attacks if attack = 0 |start| confusion
+    if binding: |move| Bind * maybe then move logic to before_move
+    if rage .skip_pp
+    return .ok
 
 handleResidual
     apply status damage

@@ -581,7 +581,7 @@ class PSBattle:
         # opp_side.active.volatiles().binding = False
         # opp_dur.binding = 0
 
-        from_metrome = len(split_msg) > 5 and split_msg[5] == "[from] Metronome"
+        from_metronome = len(split_msg) > 5 and split_msg[5] == "[from] Metronome"
         from_mirror_move = len(split_msg) > 5 and split_msg[5] == "[from] MirrorMove"
 
         charging_move = move_id in constants.CHARGING_MOVES
@@ -624,7 +624,7 @@ class PSBattle:
         if (
             move_id
             and move_id != "struggle"
-            and not from_metrome
+            and not from_metronome
             and not from_mimic
             and not from_mirror_move
         ):
@@ -924,6 +924,7 @@ class PSBattle:
         if move_name in constants.CHARGING_MOVES:
             side.active.volatiles().charging = True
         elif move_name in constants.INVULN_MOVES:
+            side.active.volatiles().charging = True
             side.active.volatiles().invulnerable = True
         else:
             assert False, f"Prepare unexpected move: {move_name}"
@@ -1028,8 +1029,15 @@ class PSBattle:
         pass
 
     def _immune(self, _split_msg):
-
-        pass
+        # TODO rage
+        is_us = self.is_us(split_msg)
+        # vol, _ = self.volatiles(is_us)
+        # if self.msg_index > 0:
+        #     prev_split_msg = self.msg_lines[self.msg_index - 1]
+        #     move_id: str | None = (
+        #         normalize_name(prev_split_msg[3]) if len(prev_split_msg) > 3 else None
+        #     )
+        #     if move_id == "rage" and 
 
     def impossible(self):
         pass
