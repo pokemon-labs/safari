@@ -1,4 +1,5 @@
 from __future__ import annotations
+from enum import Enum, auto
 
 import re
 import json
@@ -85,7 +86,6 @@ _STATUS_BYTE = {
 
 
 class Mechanics:
-
     def is_sleep(status: int) -> bool:
         return bool(status & 7)
 
@@ -228,6 +228,30 @@ class Mechanics:
         ms = side.stored().move(mslot)
         ms.pp = (ms.pp - 1) % 64
         assert active.move(mslot.pp) == side.stored().move(mslot).pp
+
+
+class BeforeMove(Enum):
+    done = auto()
+    ok = auto()
+
+
+class ActivateReason(Enum):
+    confusion = auto()
+
+
+class CantReason(Enum):
+    slp = auto()
+    frz = auto()
+    par = auto()
+    partiallytrapped = auto()
+    flinch = auto()
+    Disable = auto()
+    recharge = auto()
+    nopp = auto()
+
+
+class FailReason(Enum):
+    bide = auto()
 
 
 def normalize_name(name):
@@ -514,6 +538,7 @@ class PSBattle:
         if len(split_msg) > 4:
             reason = normalize_name(split_msg[4])
             if reason == "confusion":
+                self.before_move(side, duration, reason=ActivateReason.confusion)
                 Mechanics.interrupt(side, duration)
             else:
                 # idt theres any other meaningful reasons
@@ -702,7 +727,7 @@ class PSBattle:
         side, _ = self.sides(is_us)
         dur, _ = self.get_durations(is_us)
         from_haze = False
-        from_mist = False
+        from_mist = False  # TODO
         if self.msg_index > 0:
             prev = self.msg_lines[self.msg_index - 1].split("|")
             # print(prev)
@@ -718,9 +743,8 @@ class PSBattle:
         is_us = self.is_us(split_msg)
         active, _ = self.actives(is_us)
         vol, _ = self.volatiles(is_us)
-        s = normalize_name(split_msg[3].split(":")[-1]) if len(split_msg) > 3 else None
+        s = normalize_name(split_msg[3].split(":")[-1])
         dur, _ = self.get_durations(is_us)
-        assert s is not None
         if s == "substitute":
             vol.substitute = True
             vol.substitute_hp = int(active.stats().hp / 4) + 1 or 1
@@ -732,9 +756,23 @@ class PSBattle:
             vol.bide = True
             dur.attacking = 1
         elif s == "disable":
-            # vol.disable = True
+            move = oak.id_to_move(normalize_name(split_msg[4]))
             dur.disable = 1
-            vol.disable_left = 1
+            slot = 0
+            for i in range(4):
+                if active.move(i).id == move:
+                    slot = i + 1
+                    break
+            if slot == 0:
+                # assume we have revealed a new move
+                for i in range(4):
+                    if active.move(i).id == 0:
+                        slot = i + 1
+                        break
+            assert (
+                slot > 0
+            ), f"{oak.move_id(move)} not compatible with f{[oak.move_id(active.move(i).id) for i in range(4)]}"
+            vol.disable_move = slot
         elif s == "focusenergy":
             vol.focus_energy = True
         elif s == "mimic":
@@ -769,6 +807,7 @@ class PSBattle:
 
     def _end(self, split_msg):
         is_us = self.is_us(split_msg)
+        side, _ = self.sides(is_us)
         vol, _ = self.volatiles(is_us)
         dur, _ = self.get_durations(is_us)
         s = normalize_name(split_msg[3].split(":")[-1]) if len(split_msg) > 3 else None
@@ -780,11 +819,11 @@ class PSBattle:
             vol.substitute = False
             vol.substitute_hp = 0
         elif s == "disable":
-            # vol.disable = False
             vol.disable_left = 0
             vol.disable_move = 0
             dur.disable = 0
         elif s == "bide":
+            self.before_move(side, dur, reason=FailReason.bide)
             vol.bide = False
             dur.attacking = 0
         elif s == "confusion":
@@ -840,6 +879,7 @@ class PSBattle:
 
     def _activate(self, split_msg):
         is_us = self.is_us(split_msg)
+        side, _ = self.sides(is_us)
         active, _ = self.actives(is_us)
         vol, opp_vol = self.volatiles(is_us)
         dur, opp_dur = self.get_durations(is_us)
@@ -850,6 +890,7 @@ class PSBattle:
         elif s == "confusion":
             dur.confusion = dur.confusion + 1
         elif s == "bide":
+            self.before_move(side, dur)
             dur.attacking = dur.attacking + 1
         elif s == "":
             assert split_msg[-1] == "move: Splash"
@@ -872,15 +913,31 @@ class PSBattle:
         else:
             assert False, f"Prepare unexpected move: {move_name}"
 
-    def before_move(self, side: oak.Side, duration: oak.Duration):
+    def before_move(self, side: oak.Side, duration: oak.Duration, reason=None):
         # upkeep like incrementing confusion
 
         if Mechanics.is_sleep(side.stored().status):
             side.last_used_move = 0
+            return BeforeMove.done
+        if side.stored().status == _STATUS_BYTE[constants.FROZEN]:
+            return BeforeMove.done
+
+        if reason == CantReason.recharge:
+            return BeforeMove.done
 
         vol = side.active.volatiles()
-        if vol.toxic:
-            vol.toxic_counter = vol.toxic_counter + 1
+        if vol.disable_move != 0:
+            duration.disable += 1
+        if reason == CantReason.Disable:
+            vol.charging = False
+            return BeforeMove.done
+
+        if reason == ActivateReason.confusion:
+            return BeforeMove.done
+
+        if reason == FailReason.bide:
+            return BeforeMove.done
+
         if vol.binding:
             if duration.binding < 4:
                 duration.binding = duration.binding + 1
@@ -889,6 +946,7 @@ class PSBattle:
                 vol.binding = 0
                 duration.binding = 0
         self.store_stats()
+        return BeforeMove.ok
 
     def cant(self, split_msg):
         is_us = self.is_us(split_msg)
@@ -896,22 +954,19 @@ class PSBattle:
         vol, opp_vol = self.volatiles(is_us)
         dur, opp_dur = self.get_durations(is_us)
 
-        self.before_move(side, dur)
+        cant = None
 
-        # clear bide
-        # vol.bide = False
-
-        if len(split_msg) < 4:
-            assert False, "cant for no reason??"
-            return
         reason = split_msg[3].strip()
         if reason == "recharge":
             side.active.volatiles().recharging = False
+            cant = CantReason.recharge
         elif reason == constants.PARALYZED:
             # gen1: full paralysis releases partial trap on other side
             Mechanics.interrupt(side, dur)
+            cant = CantReason.par
         elif reason == constants.FROZEN:
             side.last_used_move = 0
+            cant = CantReason.frz
         elif reason == constants.SLEEP:
             dur.set_sleep(0, dur.sleep(0) + 1)
 
@@ -920,15 +975,19 @@ class PSBattle:
 
             if is_self(side.stored().status):
                 side.stored().status = side.stored().status - 1
+            cant = CantReason.slp
         elif reason == "partiallytrapped":
-            pass
+            cant = CantReason.partiallytrapped
         elif reason == "flinch":
             # This happens silently too so we just ignore flinch vol TODO
             vol.recharging = False
+            cant = CantReason.flinch
         elif reason == "Disable":
-            pass
+            cant = CantReason.Disable
         else:
             assert False, f"Unsupported reason for cant {reason}"
+
+        self.before_move(side, dur, cant)
 
     def turn(self, split_msg):
         self.public.turn = int(split_msg[2])

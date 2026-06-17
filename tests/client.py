@@ -54,7 +54,7 @@ BANNED_MOVES = tuple(
         # "solarbeam",
         # "skyattack",
         # "razorwind",
-        "disable",
+        # "disable",
         "rage",  # Not handling first-rage-on-immune correctly (don't set Rage, but immune message comes after)
         # "bide", # this seems to be done, but we don't compare bide damage when min_damage should be used
         # "thrash",
