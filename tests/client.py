@@ -49,7 +49,7 @@ BANNED_MOVES = tuple(
         "firespin",
         "clamp",
         # "haze",
-        "toxic",
+        # "toxic",
         # "skullbash",
         # "solarbeam",
         # "skyattack",
@@ -62,6 +62,7 @@ BANNED_MOVES = tuple(
         "headbutt",  # These are done except flinch silently clears recharge. We can correct this with the request object (TODO clear recharge if can attack) but only for p1
         "stomp",
         "bite",
+        "lowkick",
     )
 )
 

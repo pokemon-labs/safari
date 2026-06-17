@@ -503,6 +503,7 @@ class PSBattle:
     def heal_or_damage(self, split_msg):
         is_us: bool = self.is_us(split_msg)
         side, opp_side = self.sides(is_us)
+        vol, _ = self.volatiles(is_us)
         duration, _ = self.get_durations(is_us)
         condition: str | None = split_msg[3] if len(split_msg) > 3 else None
 
@@ -540,6 +541,15 @@ class PSBattle:
             if reason == "confusion":
                 self.before_move(side, duration, reason=ActivateReason.confusion)
                 Mechanics.interrupt(side, duration)
+            elif reason == "brn":
+                if vol.toxic:
+                    vol.toxic_counter += 1
+            elif reason == "psn":
+                if vol.toxic:
+                    vol.toxic_counter += 1
+            elif reason == "leechseed":
+                if vol.toxic:
+                    vol.toxic_counter += 1
             else:
                 # idt theres any other meaningful reasons
                 pass
@@ -709,6 +719,8 @@ class PSBattle:
             elif status_str == constants.TOXIC:
                 vol = side.active.volatiles()
                 vol.toxic = True
+                vol.toxic_counter = 0
+                side.stored().status = byte
             else:
                 side.stored().status = byte
                 pass
@@ -840,6 +852,9 @@ class PSBattle:
             vol.focus_energy = False
         elif s == "leechseed":
             vol.leech_seed = False
+        elif s == "toxiccounter":
+            vol.toxic = False
+            vol.toxic_counter = 0
         else:
             print(split_msg)
             assert False, f"Bad volatile {s}"
