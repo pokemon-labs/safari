@@ -1,9 +1,22 @@
-separate boost and unboost, since unboost does not cap
-flinch silently clears recharge - this is impl on showdown so we just don't know
-binding ends silently, you need to parse the request for that
 
 Request parsing:
 reveals binding, reveals our own recharge status
+
+Below: crit is shown on subdamage, need to back track to parse min damage done to sub
+OAK DEBUG
+>>> print(msg)
+['|move|p2a: Alakazam|ThunderWave|p1a: Persian', '|-status|p1a: Persian|par', '|move|p1a: Persian|Slash|p2a: Alakazam', '|-crit|p2a: Alakazam', '|-damage|p2a: Alakazam|34/100 ', '|turn|2']
+>>> r, msg = oak.log.update(b, d, 5, 10, 1)
+>>> msg
+['|switch|p2a: Rhydon|Rhydon|100/100', '|move|p1a: Persian|Slash|p2a: Rhydon', '|-crit|p2a: Rhydon', '|-resisted|p2a: Rhydon', '|-damage|p2a: Rhydon|87/100 ', '|turn|3']
+>>> r, msg = oak.log.update(b, d, 5, 5, 1)
+>>> msg
+['|move|p2a: Rhydon|Substitute|p2a: Rhydon', '|-start|p2a: Rhydon|Substitute', '|-damage|p2a: Rhydon|62/100 ', '|cant|p1a: Persian|par', '|turn|4']
+>>> r, msg = oak.log.update(b, d, 5, 5, 1)
+>>> msg
+['|move|p2a: Rhydon|Substitute|p2a: Rhydon', '|-fail|p2a: Rhydon', '|move|p1a: Persian|Slash|p2a: Rhydon', '|-crit|p2a: Rhydon', '|-resisted|p2a: Rhydon', '|-activate|p2a: Rhydon|Substitute|', '|turn|5']
+>>> 
+
 
 Rage: if the target is immune we don't add the vol, but if it its already present then it doesn't matter
 
@@ -101,3 +114,8 @@ Failure at seed: 3180
 ```
 
 Transform stores the identity of the imitated mon via its side index and SLOT, so it can't be matched since client/truth order is necessarily different
+
+Side.ts:
+	if gen1 and not locked Move (isForced?) and (frz/slp or (vol.partiallytrapped and not maybelocked)):
+		then moves = [Fight]
+

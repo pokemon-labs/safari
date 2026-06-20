@@ -149,30 +149,41 @@ class Mechanics:
         else:
             pass
 
-    def boost(side: oak.Side, opp_side: oak.Side, stat: str, amount: int):
+    def unmodified_stats(battle: oak.Battle, side: oak.Side) -> oak.Stats:
+        transform_id = side.active.volatiles().transform_species
+        if transform_id == 0:
+            return side.stored().stats()
+        else:
+            pokemon_index = transform_id & 7
+            side_index = transform_id >> 3
+            return battle.side(side_index).pokemon(pokemon_index - 1).stats()
+
+    def boost(
+        battle: oak.Battle, side: oak.Side, opp_side: oak.Side, stat: str, amount: int
+    ):
         player = side.active
         boosts = player.boosts()
         if stat == "atk" or stat == "atk|[from] Rage":
             boosts.atk = min(6, boosts.atk + amount)
             mod = BOOSTS[boosts.atk + 6]
-            stat = side.stored().stats().atk
+            stat = Mechanics.unmodified_stats(battle, side).atk
             side.active.stats().atk = min(999, stat * mod[0] // mod[1])
             if stat == "atk|[from] Rage":
                 return
         elif stat == "def":
             boosts.def_ = min(6, boosts.def_ + amount)
             mod = BOOSTS[boosts.def_ + 6]
-            stat = side.stored().stats().def_
+            stat = Mechanics.unmodified_stats(battle, side).def_
             side.active.stats().def_ = min(999, stat * mod[0] // mod[1])
         elif stat == "spe":
             boosts.spe = min(6, boosts.spe + amount)
             mod = BOOSTS[boosts.spe + 6]
-            stat = side.stored().stats().spe
+            stat = Mechanics.unmodified_stats(battle, side).spe
             side.active.stats().spe = min(999, stat * mod[0] // mod[1])
         elif stat == "spa":
             boosts.spc = min(6, boosts.spc + amount)
             mod = BOOSTS[boosts.spc + 6]
-            stat = side.stored().stats().spc
+            stat = Mechanics.unmodified_stats(battle, side).spc
             side.active.stats().spc = min(999, stat * mod[0] // mod[1])
         elif stat == "spd":
             return
@@ -182,28 +193,28 @@ class Mechanics:
             assert False
         Mechanics.status_modify(opp_side.stored().status, opp_side.active.stats())
 
-    def unboost(side: oak.Side, stat: str, amount: int):
+    def unboost(battle: oak.Battle, side: oak.Side, stat: str, amount: int):
         player = side.active
         boosts = player.boosts()
         if stat == "atk":
             boosts.atk = max(-6, boosts.atk - amount)
             mod = BOOSTS[boosts.atk + 6]
-            stat = side.stored().stats().atk
+            stat = Mechanics.unmodified_stats(battle, side).atk
             side.active.stats().atk = max(1, stat * mod[0] // mod[1])
         elif stat == "def":
             boosts.def_ = max(-6, boosts.def_ - amount)
             mod = BOOSTS[boosts.def_ + 6]
-            stat = side.stored().stats().def_
+            stat = Mechanics.unmodified_stats(battle, side).def_
             side.active.stats().def_ = max(1, stat * mod[0] // mod[1])
         elif stat == "spe":
             boosts.spe = max(-6, boosts.spe - amount)
             mod = BOOSTS[boosts.spe + 6]
-            stat = side.stored().stats().spe
+            stat = Mechanics.unmodified_stats(battle, side).spe
             side.active.stats().spe = max(1, stat * mod[0] // mod[1])
         elif stat == "spa":
             boosts.spc = max(-6, boosts.spc - amount)
             mod = BOOSTS[boosts.spc + 6]
-            stat = side.stored().stats().spc
+            stat = Mechanics.unmodified_stats(battle, side).spc
             side.active.stats().spc = max(1, stat * mod[0] // mod[1])
         elif stat == "spd":
             return
@@ -342,6 +353,14 @@ class SideAux:
 
 
 class PSBattle:
+
+    class Truth:
+        def __init__(
+            self,
+        ):
+            self.battle = oak.Battle()
+            self.durations = oak.Durations()
+
     def __init__(self, tag: str, p1: PSPlayer, p2: PSPlayer):
         self.tag = tag
         self.p1 = p1
@@ -356,6 +375,8 @@ class PSBattle:
         self.aux: list[SideAux, SideAux] = [SideAux() for i in range(2)]
         self.msg_index: int = 0
 
+        self.truth: Truth | None = None
+
         self.request: dict | None = None
         self.msg_lines: list[str] = []
 
@@ -364,6 +385,11 @@ class PSBattle:
         self.force_switch: bool = False
         self.wait: bool = False
         self.time_remaining: int | None = None
+
+    def init_truth(
+        self,
+    ):
+        self.truth = self.Truth()
 
     def store_stats(self):
         for i in range(2):
@@ -470,7 +496,7 @@ class PSBattle:
         # Clears active, then sets species, moves, types, stats
         oak.switch_in(side.stored(), side.active)
         side.active.species = side.stored().species
-        oak.status_modify(side.stored().status, side.active.stats())
+        Mechanics.status_modify(side.stored().status, side.active.stats())
         self.store_stats()
         # Durations
         old_sleep = duration.sleep(0)
@@ -522,19 +548,6 @@ class PSBattle:
                 hp = int(max_hp * hp_or_percent / max_hp_or_percent)
 
         side.stored().hp = hp
-
-        if status_str:
-            if status_str in (
-                constants.PARALYZED,
-                constants.SLEEP,
-                constants.FROZEN,
-                constants.BURN,
-                constants.TOXIC,
-                constants.POISON,
-            ):
-                pass
-            else:
-                assert False, status_str
 
         if len(split_msg) > 4:
             reason = normalize_name(split_msg[4])
@@ -627,19 +640,23 @@ class PSBattle:
             and not from_metronome
             and not from_mimic
             and not from_mirror_move
+            # and not vol.transform
         ):
             # idiom to add single move while while keeping existing moves the same
-            s = oak.Set()
-            s.moves = [oak.id_to_move(move_id), 0, 0, 0]
+            if not vol.transform:
+                s = oak.Set()
+                s.moves = [oak.id_to_move(move_id), 0, 0, 0]
 
-            oak.complete_pokemon_moves(side.stored(), s)
-            oak.complete_active_moves(side.active, s)
+                oak.complete_pokemon_moves(side.stored(), s)
+                oak.complete_active_moves(side.active, s)
 
-            for i in range(4):
-                ms: oak.MoveSlot = side.stored().move(i)
-                if ms.id == move:
-                    assert ms.pp > 0, "Used move with tracked pp=0"
-                    ms.pp = max(0, ms.pp - pp_deduction)
+            if not vol.transform:
+                for i in range(4):
+                    ms: oak.MoveSlot = side.stored().move(i)
+                    if ms.id == move:
+                        assert ms.pp > 0, "Used move with tracked pp=0"
+                        ms.pp = max(0, ms.pp - pp_deduction)
+
             for i in range(4):
                 ms: oak.MoveSlot = side.active.move(i)
                 if ms.id == move:
@@ -691,7 +708,7 @@ class PSBattle:
         assert amount != 0, "Why is boost amount 0???"
 
         assert prop is not None, f"Could not parse stat for boost: {stat}"
-        Mechanics.boost(side, opp_side, prop, amount)
+        Mechanics.boost(self.public, side, opp_side, prop, amount)
 
     def _unboost(self, split_msg):
         is_us = self.is_us(split_msg)
@@ -701,7 +718,7 @@ class PSBattle:
         assert amount != 0
         prop = _STAT_ABBREV_TO_BOOST_PROPERTY.get(stat)
         assert prop is not None, f"Could not parse stat for boost: {stat}"
-        Mechanics.unboost(side, prop, amount)
+        Mechanics.unboost(self.public, side, prop, amount)
 
     def _status(self, split_msg):
         is_us = self.is_us(split_msg)
@@ -726,7 +743,7 @@ class PSBattle:
                 pass
 
         # TODO maybe init sleep duration to 1?
-        oak.status_modify(side.stored().status, side.active.stats())
+        Mechanics.status_modify(side.stored().status, side.active.stats())
         self.store_stats()
 
     def _clearallboost(self, _split_msg):
@@ -759,7 +776,7 @@ class PSBattle:
         dur, _ = self.get_durations(is_us)
         if s == "substitute":
             vol.substitute = True
-            vol.substitute_hp = int(active.stats().hp / 4) + 1 or 1
+            vol.substitute_hp = (active.stats().hp // 4) + 1 or 1
         elif s == "reflect":
             vol.reflect = True
         elif s == "lightscreen":
@@ -866,12 +883,16 @@ class PSBattle:
 
     def _transform(self, split_msg):
         is_us = self.is_us(split_msg)
+        _, opp_side = self.sides(is_us)
+        opp_side_index = 1 if is_us else 0
         active, opp_active = self.actives(is_us)
         vol, opp_vol = self.volatiles(is_us)
         vol.transform = True
-        print(f"Opp species {oak.species_id(opp_vol.transform_species)}")
+        opp_pokemon_index = opp_side.order[0]
         vol.transform_species = (
-            opp_active.species if not opp_vol.transform else opp_vol.transform_species
+            ((opp_side_index << 3) | opp_pokemon_index)
+            if not opp_vol.transform
+            else opp_vol.transform_species
         )
         # vol.transform_species = 1
         stats, opp_stats = active.stats(), opp_active.stats()
@@ -888,9 +909,15 @@ class PSBattle:
         boosts.spc = opp_boosts.spc
         boosts.acc = opp_boosts.acc
         boosts.eva = opp_boosts.eva
-        for i in range(4):
-            active.move(i).id = opp_active.move(i).id
-            active.move(i).pp = 5 if opp_active.move(i).id else 0
+        if self.truth is None:
+            for i in range(4):
+                active.move(i).id = opp_active.move(i).id
+                active.move(i).pp = 5 if opp_active.move(i).id else 0
+        else:
+            opp_active_truth = self.truth.battle.side(1 if is_us else 0).active
+            for i in range(4):
+                active.move(i).id = opp_active_truth.move(i).id
+                active.move(i).pp = 5 if opp_active_truth.move(i).id else 0
 
     def _activate(self, split_msg):
         is_us = self.is_us(split_msg)
@@ -901,6 +928,7 @@ class PSBattle:
         s = normalize_name(split_msg[3].split(":")[-1]) if len(split_msg) > 3 else None
         assert s is not None
         if s == "substitute":
+            # TODO this happens when a sub is damaged but not broken or when a bnding move is immune's while the foe sub is up
             pass
         elif s == "confusion":
             dur.confusion = dur.confusion + 1
@@ -1017,7 +1045,7 @@ class PSBattle:
                 except ValueError:
                     pass
 
-    def inactiveoff(self, _split_msg):
+    def inactiveoff(self, split_msg):
         self.time_remaining = None
 
     def noinit(self, split_msg):
@@ -1025,10 +1053,10 @@ class PSBattle:
         if len(split_msg) > 3 and split_msg[2] == "rename":
             self.tag = split_msg[3]
 
-    def upkeep(self, _split_msg):
+    def upkeep(self, split_msg):
         pass
 
-    def _immune(self, _split_msg):
+    def _immune(self, split_msg):
         # TODO rage
         is_us = self.is_us(split_msg)
         # vol, _ = self.volatiles(is_us)
@@ -1037,7 +1065,7 @@ class PSBattle:
         #     move_id: str | None = (
         #         normalize_name(prev_split_msg[3]) if len(prev_split_msg) > 3 else None
         #     )
-        #     if move_id == "rage" and 
+        #     if move_id == "rage" and
 
     def impossible(self):
         pass

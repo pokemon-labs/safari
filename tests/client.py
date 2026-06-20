@@ -11,9 +11,7 @@ parser = argparse.ArgumentParser()
 
 PLAYER = 1
 
-parser.add_argument(
-    "--main", type=str, choices=["single", "percent", "scan"], default="single"
-)
+parser.add_argument("--main", type=str, choices=["scan"], default="scan")
 parser.add_argument(
     "--seed",
     type=int,
@@ -42,24 +40,19 @@ BANNED_MOVES = tuple(
         # ts is fucking annoying i dont understand pp deduction currently
         "metronome",
         "mirrormove",
-
         # if a mimic'd move is already present the mon can have it twice and we can't tell which one was used/pp deducted
-        "mimic", 
-
+        "mimic",
         # These seem done we are only hitting cases where libpkmn leaks that binding has ended
         "bind",
         "wrap",
         "firespin",
         "clamp",
-
         # Not handling first-rage-on-immune correctly (don't set Rage, but immune message comes after)
         "rage",
-
         # this seems to be done, but we don't compare bide damage when min_damage should be used
         "bide",
-
         # These are done except flinch silently clears recharge. We can correct this with the request object (TODO clear recharge if can attack) but only for p1
-        "headbutt",  
+        "headbutt",
         "stomp",
         "bite",
         "lowkick",
@@ -69,7 +62,7 @@ BANNED_MOVES = tuple(
 
 def fill_side_randomly(side: oak.Side, RNG):
     species_list = list(range(1, 150))
-    species_list.remove(oak.id_to_species("ditto"))
+    # species_list.remove(oak.id_to_species("ditto"))
     RNG.shuffle(species_list)
     for i, species in enumerate(species_list[:6]):
         s = oak.Set()
@@ -115,7 +108,6 @@ def scan():
         ps_battle.us = "p1"
         result, msg = oak.log.update(battle, durations, 0, 0, PLAYER)
         messages = Messages(args)
-
         for line in msg:
             ps_battle.update(line)
             messages.append(line)
@@ -132,7 +124,11 @@ def scan():
             for line in msg:
                 ps_battle.update(line)
                 messages.append(line)
-
+            # active move id's are public after transform
+            # ps_battle.truth = PSBattle.Truth()
+            ps_battle.init_truth()
+            ps_battle.truth.battle = battle
+            ps_battle.truth.durations = durations
             ps_battle.process_msg_lines_and_clear()
             matches, reason = oak.log.compare_battles(
                 ps_battle.public,
