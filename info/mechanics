@@ -84,3 +84,19 @@ update:
     if no more vol.attacks set binding = false
 
     endTurn
+
+
+LAST_DAMAGE (where its set)
+confusion self hit
+on bide end (set to x2 state)
+at start of doMove if not using counter ZERO
+in do move if not status(.bp == 0)/immune/miss/counter ZERO
+if binding and immune ZERO
+calcDamage SET (always)
+adjustDamage SET
+randomizeDamage SET
+counterDamage DOUBLE
+moveHit
+    if not Swift and (not DreamEater fail (not asleep or ))
+switchAndTeleport ZERO
+drainHP SET to drain value (how much is gained)

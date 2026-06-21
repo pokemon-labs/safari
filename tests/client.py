@@ -117,10 +117,22 @@ def scan():
             p1_choices, p2_choices = oak.choices(battle, result)
             c1 = RNG.choice(p1_choices)
             c2 = RNG.choice(p2_choices)
+
             messages.append(
                 f"{oak.choice_label(battle.side(0), c1)} {oak.choice_label(battle.side(1), c2)}"
             )
+            active = ps_battle.public.side(0).active
+            vol = active.volatiles()
+            is_forced = vol.charging or vol.recharging or vol.rage or vol.thrashing
+            c1_type = c1 & 3
+            c1_data = c1 >> 2
+            if c1_type == 1 and c1_data > 0 and not is_forced:
+                ms = battle.side(0).active.move(c1_data - 1)
+                ps_battle.public.side(0).last_selected_move = ms.id
+
+            # UPDATE
             result, msg = oak.log.update(battle, durations, c1, c2, PLAYER)
+
             for line in msg:
                 ps_battle.update(line)
                 messages.append(line)
@@ -150,12 +162,12 @@ def scan():
                     ps_battle.durations,
                 )
             )
+
             if not matches:
                 messages.append(f"Mismatch: {reason}")
                 for line in messages.data:
                     print(line)
                 print(f"Failure at seed: {seed}")
-
                 return
 
 
