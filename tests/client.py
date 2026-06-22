@@ -79,7 +79,7 @@ def get_match_keys(args):
     battle.side(1).pokemon(0).hp = 15
     battle.side(1).last_selected_move = 1
 
-    battle.last_damage = 1
+    battle.last_damage = 15
 
     return battle, durations
 
@@ -172,6 +172,12 @@ def scan():
 
             # UPDATE
             result, msg = oak.log.update(battle, durations, c1, c2, PLAYER)
+
+            for line in msg:
+                ps_battle.update(line)
+                messages.append(line)
+
+            # must come after so log appears first in printout
             messages.append(
                 "Actual battle:\n"
                 + oak.battle_string(
@@ -179,10 +185,6 @@ def scan():
                     durations,
                 )
             )
-
-            for line in msg:
-                ps_battle.update(line)
-                messages.append(line)
 
             # This is currently just for our active.moves after a transform
             ps_battle.init_truth()

@@ -59,7 +59,17 @@ class constants:
     CHARGING_MOVES = ("skullbash", "solarbeam", "skyattack", "razorwind")
     INVULN_MOVES = ("fly", "dig")
     THRASHING_MOVES = ("thrash", "petaldance")
-    BINDING_MOVES = {"bind", "clamp", "firespin", "wrap"}
+    BINDING_MOVES = ("bind", "clamp", "firespin", "wrap")
+    SWITCH_MOVES = (
+        "roar",
+        "whirlwind",
+    )  # we exclude Teleport cus that doesnt reset damage on showdown
+    DRAIN_MOVES = (
+        "megadrain",
+        "absorb",
+        "leechlife",
+        "dreameater",
+    )
 
 
 _STAT_ABBREV_TO_BOOST_PROPERTY = {
@@ -240,6 +250,26 @@ class Mechanics:
         ms.pp = (ms.pp - 1) % 64
         assert active.move(mslot.pp) == side.stored().move(mslot).pp
 
+    def confusion_self_damage(side: oak.Side):
+        stats = side.active.stats()
+        attack = stats.atk
+        defense = stats.def_
+        level = side.stored().level
+        d = level * 2 / 5 + 2
+        d *= 40
+        d *= attack
+        d /= defense
+        d /= 50
+        d = int(d)
+        d = min(997, d)
+        d += 2
+        return d
+
+    def calc_damage(attacker: oak.Side, defender: oak.Side, move: int):
+        move_data = oak.move_data(move)
+        bp = move_data["bp"]
+        effect = move_data["effect"]
+
 
 class BeforeMove(Enum):
     done = auto()
@@ -375,6 +405,7 @@ class PSBattle:
         self.aux: list[SideAux, SideAux] = [SideAux() for i in range(2)]
         self.msg_index: int = 0
 
+        # This is used for testing only
         self.truth: Truth | None = None
 
         self.request: dict | None = None
@@ -526,7 +557,16 @@ class PSBattle:
         side.last_used_move = 0
         opp_side.last_used_move = 0
 
-    def heal_or_damage(self, split_msg):
+    def _heal(self, split_msg):
+        self.heal_or_damage(split_msg, False)
+
+    def _damage(self, split_msg):
+        self.heal_or_damage(split_msg, True)
+
+    def prev_split_msg(self):
+        return self.msg_lines[self.msg_index - 1].split("|")
+
+    def heal_or_damage(self, split_msg, damage=True):
         is_us: bool = self.is_us(split_msg)
         side, opp_side = self.sides(is_us)
         vol, _ = self.volatiles(is_us)
@@ -547,6 +587,38 @@ class PSBattle:
             else:
                 hp = int(max_hp * hp_or_percent / max_hp_or_percent)
 
+        from_confusion = len(split_msg) > 4 and split_msg[4] == "confusion"
+
+        damage_counts = len(split_msg) < 5 or split_msg[4] in ("confusion",)
+        if damage and damage_counts:
+
+            from_sub = False
+            if self.msg_index > 0:
+                prev = self.prev_split_msg()
+                if len(prev) > 3:
+                    if prev[1] == "-start" and prev[3] == "Substitute":
+                        from_sub = True
+
+            if not from_sub:
+                if from_confusion:
+                    if hp == 0:
+                        d = Mechanics.confusion_self_damage(side)
+                        self.public.last_damage = d
+                    else:
+                        dmg = side.stored().hp - hp
+                        assert dmg >= 0
+                        self.public.last_damage = max(1, dmg)
+                else:
+                    dmg = side.stored().hp - hp
+                    assert dmg >= 0
+                    self.public.last_damage = max(1, dmg)
+
+                    if oak.move_data(opp_side.last_used_move)["effect"] in (
+                        32,
+                        33,
+                    ):  # DrainHP/DreamEater
+                        self.public.last_damage = max(1, self.public.last_damage // 2)
+
         side.stored().hp = hp
 
         if len(split_msg) > 4:
@@ -563,9 +635,16 @@ class PSBattle:
             elif reason == "leechseed":
                 if vol.toxic:
                     vol.toxic_counter += 1
-            else:
-                # idt theres any other meaningful reasons
+            elif reason == "recoil":
                 pass
+            elif reason == "[silent]":
+                pass
+            elif reason == "[from]drain":
+                pass
+                # self.public.last_damage = max(1, self.public.last_damage // 2)
+            else:
+                print(split_msg)
+                assert False
 
     def _sethp(self, split_msg):
         assert False, "sethp assumed impossile"
@@ -693,6 +772,15 @@ class PSBattle:
 
             if move_id == "rage":
                 vol.rage = True
+
+        is_still = len(split_msg) > 5 and split_msg[5] == "[still]"
+        move_data = oak.move_data(move)
+        effect = move_data["effect"]
+        on_begin = 0 < effect <= 16
+        if move_id in constants.SWITCH_MOVES:
+            self.public.last_damage = 0
+        if not is_still and not on_begin:
+            self.public.last_damage = 0
 
     def _boost(self, split_msg):
         is_us = self.is_us(split_msg)
@@ -839,8 +927,7 @@ class PSBattle:
         side, _ = self.sides(is_us)
         vol, _ = self.volatiles(is_us)
         dur, _ = self.get_durations(is_us)
-        s = normalize_name(split_msg[3].split(":")[-1]) if len(split_msg) > 3 else None
-        assert s is not None
+        s = normalize_name(split_msg[3].split(":")[-1])
 
         if s == "mustrecharge":
             vol.recharging = False
@@ -1067,6 +1154,9 @@ class PSBattle:
         #     )
         #     if move_id == "rage" and
 
+    def _miss(self, split_msg):
+        self.public.last_damage = 0
+
     def impossible(self):
         pass
 
@@ -1104,8 +1194,9 @@ class PSBattle:
         "faint": faint,
         "turn": turn,
         "-fail": _fail,
-        "-heal": heal_or_damage,
-        "-damage": heal_or_damage,
+        "-heal": _heal,
+        "-damage": _damage,
+        "-miss": _miss,
         "-sethp": _sethp,
         "-boost": _boost,
         "-unboost": _unboost,

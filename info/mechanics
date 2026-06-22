@@ -97,6 +97,6 @@ adjustDamage SET
 randomizeDamage SET
 counterDamage DOUBLE
 moveHit
-    if not Swift and (not DreamEater fail (not asleep or ))
+    if not Swift and (not DreamEater fail (not asleep or )) ZERO
 switchAndTeleport ZERO
 drainHP SET to drain value (how much is gained)
