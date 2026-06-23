@@ -250,25 +250,134 @@ class Mechanics:
         ms.pp = (ms.pp - 1) % 64
         assert active.move(mslot.pp) == side.stored().move(mslot).pp
 
-    def confusion_self_damage(side: oak.Side):
-        stats = side.active.stats()
-        attack = stats.atk
-        defense = stats.def_
-        level = side.stored().level
-        d = level * 2 / 5 + 2
-        d *= 40
-        d *= attack
-        d /= defense
-        d /= 50
-        d = int(d)
-        d = min(997, d)
-        d += 2
-        return d
-
-    def calc_damage(attacker: oak.Side, defender: oak.Side, move: int):
+    # TODO review claude
+    def calc_damage(
+        attacker: oak.Side,
+        defender: oak.Side,
+        move: int,
+        crit: bool = False,
+        adjust: bool = True,
+        roll: int = 217,
+    ):
         move_data = oak.move_data(move)
         bp = move_data["bp"]
         effect = move_data["effect"]
+
+        if effect in (41, 42):
+            return Mechanics.special_damage(attacker, defender, move)
+
+        move_type = move_data["type"]
+        is_special = move_type >= 8
+
+        attack = Mechanics.attack(attacker, crit, is_special)
+        defense = Mechanics.defense(defender, crit, is_special)
+
+        if attack > 255 or defense > 255:
+            attack = max((attack // 4) & 255, 1)
+            defense = max(
+                (defense // 4) & 255, 1
+            )  # pkmn.options.mod path: min 1, not 0
+
+        lvl = attacker.stored().level * (2 if crit else 1)
+
+        # GLITCH: Explode halves defense (post-rescale)
+        if effect == 34:  # Explode
+            defense = max(defense // 2, 1)
+
+        if defense == 0:
+            return 0  # cartridge: division-by-zero freeze / .Error; shouldn't reach here for min-damage use
+
+        d = (lvl * 2 // 5) + 2
+        d *= int(bp)
+        d *= int(attack)
+        d //= defense
+        d //= 50
+        d = min(997, d)
+        d += 2
+
+        # ---- adjustDamage ----
+        if adjust:
+            atk_types = set()
+            t = attacker.active.types
+            atk_types.add(t & 15)
+            t >>= 4
+            atk_types.add(t & 15)
+
+            if move_type in atk_types:
+                d += d // 2  # STAB, integer, BEFORE effectiveness
+
+            def_raw = defender.active.types
+            type1 = def_raw & 15
+            type2 = (def_raw >> 4) & 15
+
+            NEUTRAL = 10  # x1.0 scaled by /10; eff values are 0 (immune), 5 (x0.5), 10 (x1), 20 (x2)
+            eff1 = oak.get_effectiveness(move_type, type1) * 5
+            eff2 = oak.get_effectiveness(move_type, type2) * 5
+
+            # Showdown mode never takes the mismatch-precedence reorder branch (that's a
+            # non-showdown-only cartridge quirk) -- intentionally omitted here.
+            if eff1 != NEUTRAL:
+                d = (d * eff1) // 10
+            if type1 != type2 and eff2 != NEUTRAL:
+                d = (d * eff2) // 10
+
+            if d == 0:
+                return 0  # immune
+
+        # ---- randomizeDamage ----
+        if d <= 1:
+            return d  # not randomized
+
+        d = (d * roll) // 255
+        return d
+
+    def attack(side: oak.Side, crit: bool, special: bool):
+        if crit:
+            if special:
+                return side.stored().stats().spc
+            else:
+                return side.stored().stats().atk
+        else:
+            if special:
+                return side.active.stats().spc
+            else:
+                return side.active.stats().atk
+
+    def defense(side: oak.Side, crit: bool, special: bool):
+        if crit:
+            if special:
+                return side.stored().stats().spc
+            else:
+                return side.stored().stats().def_
+        else:
+            if special:
+                return side.active.stats().spc * (
+                    2 if side.active.volatiles().light_screen else 1
+                )
+            else:
+                # TODO
+                # // Pokémon Showdown doesn't apply the opponent's Reflect to confusion's self-hit
+                # target.active.stats.def *
+                # @as(u2, if ((!showdown or !cfz) and target.active.volatiles.Reflect) 2 else 1);
+                return side.active.stats().def_ * (
+                    2 if side.active.volatiles().reflect else 1
+                )
+
+    def special_damage(attacker: oak.Side, defender: oak.Side, move: int):
+        d = 0
+        if move == oak.id_to_move("superfang"):
+            d = max(defender.stored().hp // 2, 1)
+        elif move in [oak.id_to_move(m) for m in ("seismictoss", "nightshade")]:
+            d = attacker.stored().level
+        elif move == oak.id_to_move("sonicboom"):
+            d = 20
+        elif move == oak.id_to_move("dragonrage"):
+            d = 40
+        elif move == oak.id_to_move("psywave"):
+            assert False, "FUCK PSYWAVE"
+        else:
+            assert False, f"Invalid move for special_damage: {oak.move_id(move)}"
+        return d
 
 
 class BeforeMove(Enum):
@@ -563,8 +672,8 @@ class PSBattle:
     def _damage(self, split_msg):
         self.heal_or_damage(split_msg, True)
 
-    def prev_split_msg(self):
-        return self.msg_lines[self.msg_index - 1].split("|")
+    def prev_split_msg(self, offset: int = 1):
+        return self.msg_lines[self.msg_index - offset].split("|")
 
     def heal_or_damage(self, split_msg, damage=True):
         is_us: bool = self.is_us(split_msg)
@@ -602,8 +711,18 @@ class PSBattle:
             if not from_sub:
                 if from_confusion:
                     if hp == 0:
-                        d = Mechanics.confusion_self_damage(side)
-                        self.public.last_damage = d
+                        opp_def_temp = opp_side.active.stats().def_
+                        opp_side.active.stats().def_ = side.active.stats().def_
+                        dmg = Mechanics.calc_damage(
+                            side,
+                            opp_side,
+                            oak.id_to_move("pound"),
+                            crit=False,
+                            adjust=False,
+                            roll=255,
+                        )
+                        opp_side.active.stats().def_ = opp_def_temp
+                        self.public.last_damage = dmg
                     else:
                         dmg = side.stored().hp - hp
                         assert dmg >= 0
@@ -640,8 +759,8 @@ class PSBattle:
             elif reason == "[silent]":
                 pass
             elif reason == "[from]drain":
+                # we don't halve last_damage here (for now WIP)
                 pass
-                # self.public.last_damage = max(1, self.public.last_damage // 2)
             else:
                 print(split_msg)
                 assert False
@@ -779,7 +898,7 @@ class PSBattle:
         on_begin = 0 < effect <= 16
         if move_id in constants.SWITCH_MOVES:
             self.public.last_damage = 0
-        if not is_still and not on_begin:
+        if not is_still and not on_begin and move_id != "counter":
             self.public.last_damage = 0
 
     def _boost(self, split_msg):
@@ -858,13 +977,14 @@ class PSBattle:
 
     def _start(self, split_msg):
         is_us = self.is_us(split_msg)
+        side, _ = self.sides(is_us)
         active, _ = self.actives(is_us)
         vol, _ = self.volatiles(is_us)
         s = normalize_name(split_msg[3].split(":")[-1])
         dur, _ = self.get_durations(is_us)
         if s == "substitute":
             vol.substitute = True
-            vol.substitute_hp = (active.stats().hp // 4) + 1 or 1
+            vol.substitute_hp = (side.stored().stats().hp // 4) + 1 or 1
         elif s == "reflect":
             vol.reflect = True
         elif s == "lightscreen":
@@ -922,9 +1042,19 @@ class PSBattle:
         else:
             assert False, f"Bad volatile {s}"
 
+    def sub_dmg(self, side: oak.Side, opp_side: oak.Side):
+        prev = self.prev_split_msg()
+        crit = prev[1] == "-crit"
+        if not crit and self.msg_index >= 2:
+            prev = self.prev_split_msg(2)
+            crit = prev[1] == "-crit"
+        dmg = Mechanics.calc_damage(opp_side, side, opp_side.last_used_move, crit)
+        self.public.last_damage = dmg
+        return dmg
+
     def _end(self, split_msg):
         is_us = self.is_us(split_msg)
-        side, _ = self.sides(is_us)
+        side, opp_side = self.sides(is_us)
         vol, _ = self.volatiles(is_us)
         dur, _ = self.get_durations(is_us)
         s = normalize_name(split_msg[3].split(":")[-1])
@@ -932,6 +1062,7 @@ class PSBattle:
         if s == "mustrecharge":
             vol.recharging = False
         elif s == "substitute":
+            dmg = self.sub_dmg(side, opp_side)
             vol.substitute = False
             vol.substitute_hp = 0
         elif s == "disable":
@@ -1008,7 +1139,7 @@ class PSBattle:
 
     def _activate(self, split_msg):
         is_us = self.is_us(split_msg)
-        side, _ = self.sides(is_us)
+        side, opp_side = self.sides(is_us)
         active, _ = self.actives(is_us)
         vol, opp_vol = self.volatiles(is_us)
         dur, opp_dur = self.get_durations(is_us)
@@ -1016,7 +1147,11 @@ class PSBattle:
         assert s is not None
         if s == "substitute":
             # TODO this happens when a sub is damaged but not broken or when a bnding move is immune's while the foe sub is up
-            pass
+            dmg = self.sub_dmg(side, opp_side)
+            vol.substitute_hp -= min(vol.substitute_hp, dmg)
+            self.public.last_damage = dmg
+            if oak.move_data(opp_side.last_used_move)["effect"] in (32, 33):
+                self.public.last_damage = max(1, self.public.last_damage // 2)
         elif s == "confusion":
             dur.confusion = dur.confusion + 1
         elif s == "bide":
