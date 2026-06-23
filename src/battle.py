@@ -169,66 +169,66 @@ class Mechanics:
             return battle.side(side_index).pokemon(pokemon_index - 1).stats()
 
     def boost(
-        battle: oak.Battle, side: oak.Side, opp_side: oak.Side, stat: str, amount: int
+        battle: oak.Battle, side: oak.Side, opp_side: oak.Side, prop: str, amount: int
     ):
         player = side.active
         boosts = player.boosts()
-        if stat == "atk" or stat == "atk|[from] Rage":
+        if prop == "atk" or prop == "atk|[from] Rage":
             boosts.atk = min(6, boosts.atk + amount)
             mod = BOOSTS[boosts.atk + 6]
             stat = Mechanics.unmodified_stats(battle, side).atk
             side.active.stats().atk = min(999, stat * mod[0] // mod[1])
-            if stat == "atk|[from] Rage":
+            if prop == "atk|[from] Rage":
                 return
-        elif stat == "def":
+        elif prop == "def":
             boosts.def_ = min(6, boosts.def_ + amount)
             mod = BOOSTS[boosts.def_ + 6]
             stat = Mechanics.unmodified_stats(battle, side).def_
             side.active.stats().def_ = min(999, stat * mod[0] // mod[1])
-        elif stat == "spe":
+        elif prop == "spe":
             boosts.spe = min(6, boosts.spe + amount)
             mod = BOOSTS[boosts.spe + 6]
             stat = Mechanics.unmodified_stats(battle, side).spe
             side.active.stats().spe = min(999, stat * mod[0] // mod[1])
-        elif stat == "spa":
+        elif prop == "spa":
             boosts.spc = min(6, boosts.spc + amount)
             mod = BOOSTS[boosts.spc + 6]
             stat = Mechanics.unmodified_stats(battle, side).spc
             side.active.stats().spc = min(999, stat * mod[0] // mod[1])
-        elif stat == "spd":
+        elif prop == "spd":
             return
-        elif stat == "eva":
+        elif prop == "eva":
             side.active.stats().eva = min(6, boosts.eva + amount)
         else:
             assert False
         Mechanics.status_modify(opp_side.stored().status, opp_side.active.stats())
 
-    def unboost(battle: oak.Battle, side: oak.Side, stat: str, amount: int):
+    def unboost(battle: oak.Battle, side: oak.Side, prop: str, amount: int):
         player = side.active
         boosts = player.boosts()
-        if stat == "atk":
+        if prop == "atk":
             boosts.atk = max(-6, boosts.atk - amount)
             mod = BOOSTS[boosts.atk + 6]
             stat = Mechanics.unmodified_stats(battle, side).atk
             side.active.stats().atk = max(1, stat * mod[0] // mod[1])
-        elif stat == "def":
+        elif prop == "def":
             boosts.def_ = max(-6, boosts.def_ - amount)
             mod = BOOSTS[boosts.def_ + 6]
             stat = Mechanics.unmodified_stats(battle, side).def_
             side.active.stats().def_ = max(1, stat * mod[0] // mod[1])
-        elif stat == "spe":
+        elif prop == "spe":
             boosts.spe = max(-6, boosts.spe - amount)
             mod = BOOSTS[boosts.spe + 6]
             stat = Mechanics.unmodified_stats(battle, side).spe
             side.active.stats().spe = max(1, stat * mod[0] // mod[1])
-        elif stat == "spa":
+        elif prop == "spa":
             boosts.spc = max(-6, boosts.spc - amount)
             mod = BOOSTS[boosts.spc + 6]
             stat = Mechanics.unmodified_stats(battle, side).spc
             side.active.stats().spc = max(1, stat * mod[0] // mod[1])
-        elif stat == "spd":
+        elif prop == "spd":
             return
-        elif stat == "acc":
+        elif prop == "acc":
             boosts.acc = max(-6, boosts.acc - amount)
         else:
             assert False
@@ -254,11 +254,16 @@ class Mechanics:
     def calc_damage(
         attacker: oak.Side,
         defender: oak.Side,
-        move: int,
+        move: int | None,
         crit: bool = False,
         adjust: bool = True,
         roll: int = 217,
     ):
+        cfz = False
+        if move is None:
+            cfz = True
+            move = oak.id_to_move("pound")
+
         move_data = oak.move_data(move)
         bp = move_data["bp"]
         effect = move_data["effect"]
@@ -270,7 +275,7 @@ class Mechanics:
         is_special = move_type >= 8
 
         attack = Mechanics.attack(attacker, crit, is_special)
-        defense = Mechanics.defense(defender, crit, is_special)
+        defense = Mechanics.defense(defender, crit, is_special, cfz)
 
         if attack > 255 or defense > 255:
             attack = max((attack // 4) & 255, 1)
@@ -343,7 +348,7 @@ class Mechanics:
             else:
                 return side.active.stats().atk
 
-    def defense(side: oak.Side, crit: bool, special: bool):
+    def defense(side: oak.Side, crit: bool, special: bool, cfz: bool = False):
         if crit:
             if special:
                 return side.stored().stats().spc
@@ -355,12 +360,8 @@ class Mechanics:
                     2 if side.active.volatiles().light_screen else 1
                 )
             else:
-                # TODO
-                # // Pokémon Showdown doesn't apply the opponent's Reflect to confusion's self-hit
-                # target.active.stats.def *
-                # @as(u2, if ((!showdown or !cfz) and target.active.volatiles.Reflect) 2 else 1);
                 return side.active.stats().def_ * (
-                    2 if side.active.volatiles().reflect else 1
+                    2 if not cfz and side.active.volatiles().reflect else 1
                 )
 
     def special_damage(attacker: oak.Side, defender: oak.Side, move: int):
@@ -581,10 +582,6 @@ class PSBattle:
         pokemon_list = side_data.get("pokemon", [])
         # TODO we may need this for action parsing
 
-    # -----------------------------------------------------------------------
-    # Protocol handlers
-    # -----------------------------------------------------------------------
-
     def switch_or_drag(self, split_msg: Msg) -> None:
         is_us = self.is_us(split_msg)
         side, opp_side = self.sides(is_us)
@@ -629,7 +626,6 @@ class PSBattle:
         side.order = order
 
         # last_ stuff
-        # side.last_move_index = 1
         side.last_used_move = 0
         opp_side.last_used_move = 0
 
@@ -671,6 +667,8 @@ class PSBattle:
 
     def _damage(self, split_msg):
         self.heal_or_damage(split_msg, True)
+        # TODO new, ad hoc, to fix 5 hit double slap vs rage
+        self.store_stats()
 
     def prev_split_msg(self, offset: int = 1):
         return self.msg_lines[self.msg_index - offset].split("|")
@@ -689,7 +687,7 @@ class PSBattle:
             # showdown gives us exact hp
             hp = hp_or_percent
         else:
-            # and percentage 100,100 for opp live mons or 0,0 for fainted
+            # and `percentage, 100` for opp live mons or `0, 0` for fainted
             if max_hp_or_percent == 0:
                 assert hp_or_percent == 0, "hp is not 0 while max_hp is 0"
                 hp = 0
@@ -697,46 +695,39 @@ class PSBattle:
                 hp = int(max_hp * hp_or_percent / max_hp_or_percent)
 
         from_confusion = len(split_msg) > 4 and split_msg[4] == "confusion"
-
-        damage_counts = len(split_msg) < 5 or split_msg[4] in ("confusion",)
+        from_sub = False
+        if self.msg_index > 0:
+            prev = self.prev_split_msg()
+            if len(prev) > 3:
+                if prev[1] == "-start" and prev[3] == "Substitute":
+                    from_sub = True
+        damage_counts = (
+            len(split_msg) < 5 or split_msg[4] in ("confusion",)
+        ) and not from_sub
         if damage and damage_counts:
-
-            from_sub = False
-            if self.msg_index > 0:
-                prev = self.prev_split_msg()
-                if len(prev) > 3:
-                    if prev[1] == "-start" and prev[3] == "Substitute":
-                        from_sub = True
-
-            if not from_sub:
-                if from_confusion:
-                    if hp == 0:
-                        opp_def_temp = opp_side.active.stats().def_
-                        opp_side.active.stats().def_ = side.active.stats().def_
-                        dmg = Mechanics.calc_damage(
-                            side,
-                            opp_side,
-                            oak.id_to_move("pound"),
-                            crit=False,
-                            adjust=False,
-                            roll=255,
-                        )
-                        opp_side.active.stats().def_ = opp_def_temp
-                        self.public.last_damage = dmg
-                    else:
-                        dmg = side.stored().hp - hp
-                        assert dmg >= 0
-                        self.public.last_damage = max(1, dmg)
+            if from_confusion:
+                if hp == 0:
+                    opp_def_temp = opp_side.active.stats().def_
+                    opp_side.active.stats().def_ = side.active.stats().def_
+                    dmg = Mechanics.calc_damage(
+                        side, opp_side, None, crit=False, adjust=False, roll=255
+                    )
+                    opp_side.active.stats().def_ = opp_def_temp
+                    self.public.last_damage = dmg
                 else:
                     dmg = side.stored().hp - hp
                     assert dmg >= 0
                     self.public.last_damage = max(1, dmg)
+            else:
+                dmg = side.stored().hp - hp
+                assert dmg >= 0
+                self.public.last_damage = max(1, dmg)
 
-                    if oak.move_data(opp_side.last_used_move)["effect"] in (
-                        32,
-                        33,
-                    ):  # DrainHP/DreamEater
-                        self.public.last_damage = max(1, self.public.last_damage // 2)
+                if oak.move_data(opp_side.last_used_move)["effect"] in (
+                    32,
+                    33,
+                ):  # DrainHP/DreamEater
+                    self.public.last_damage = max(1, self.public.last_damage // 2)
 
         side.stored().hp = hp
 
@@ -788,6 +779,8 @@ class PSBattle:
         )
         move: int = oak.id_to_move(move_id)
         missed: bool = any(s.strip() == "[miss]" for s in split_msg)
+
+        # TODO uncomment this lol
         # moving means side is free from binding
         # opp_side.active.volatiles().binding = False
         # opp_dur.binding = 0
@@ -795,6 +788,7 @@ class PSBattle:
         from_metronome = len(split_msg) > 5 and split_msg[5] == "[from] Metronome"
         from_mirror_move = len(split_msg) > 5 and split_msg[5] == "[from] MirrorMove"
 
+        rage = move_id == "rage"
         charging_move = move_id in constants.CHARGING_MOVES
         thrashing_move = move_id in constants.THRASHING_MOVES
         binding_move = move_id in constants.BINDING_MOVES
@@ -807,14 +801,16 @@ class PSBattle:
 
         pp_deduction = (
             0
-            if (move_id == "rage" and vol.rage)
+            if (rage and vol.rage)
             or (charging_move and not vol.charging)
             or (thrashing_move and vol.thrashing)
             or (binding_move and vol.binding)
             else 1
         )
 
-        if (pp_deduction or vol.thrashing) and not (charging_move and not vol.charging):
+        if (rage or pp_deduction or vol.thrashing) and not (
+            charging_move and not vol.charging
+        ):
             side.last_used_move = move
 
         mimic_move, mimic_move_index = None, None
@@ -889,8 +885,13 @@ class PSBattle:
                 else:
                     vol.bide = True
 
-            if move_id == "rage":
+            if move_id == "rage" and not vol.rage:
                 vol.rage = True
+                # rage is not applied if target is immune
+                if len(self.msg_lines) >= self.msg_index + 2:
+                    next_ = self.prev_split_msg(-1)
+                    if next_[1] == "-immune":
+                        vol.rage = False
 
         is_still = len(split_msg) > 5 and split_msg[5] == "[still]"
         move_data = oak.move_data(move)
@@ -924,8 +925,19 @@ class PSBattle:
         amount = int(split_msg[4].strip()) if len(split_msg) > 4 else 0
         assert amount != 0
         prop = _STAT_ABBREV_TO_BOOST_PROPERTY.get(stat)
-        assert prop is not None, f"Could not parse stat for boost: {stat}"
-        Mechanics.unboost(self.public, side, prop, amount)
+
+        # Showdown bug where no -fail is emitted when Rage is the reason so we check here
+        prev = self.prev_split_msg()
+        if (
+            prop == "atk"
+            and len(prev) > 4
+            and prev[3] == "atk"
+            and prev[4] == "[from] Rage"
+        ):
+            side.active.boosts().atk -= 1
+            self.unstore_stats()
+        else:
+            Mechanics.unboost(self.public, side, prop, amount)
 
     def _status(self, split_msg):
         is_us = self.is_us(split_msg)
