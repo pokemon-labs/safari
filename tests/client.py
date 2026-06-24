@@ -57,7 +57,15 @@ TEAMS = oak.load_teams("/home/user/teams150")
 def get_banned_moves(args) -> list[int]:
     banned = []
     if args.no_flinch:
-        banned += ["headbutt", "stomp", "bite", "lowkick", "boneclub"]
+        banned += [
+            "headbutt",
+            "stomp",
+            "bite",
+            "lowkick",
+            "boneclub",
+            "hyperfang",
+            "rollingkick",
+        ]
     if args.no_binding:
         banned += ["wrap", "bind", "clamp", "firespin"]
     if args.no_pp:
@@ -76,6 +84,8 @@ def get_match_keys(args):
         vol = side.active.volatiles()
         vol.substitute_hp = 20
         vol.state = 50
+        vol.binding = True
+        durations.get(i).binding = 1
         battle.last_move(i).index = 1
         battle.last_move(i).counterable = 1
 
@@ -84,9 +94,6 @@ def get_match_keys(args):
     battle.side(1).last_selected_move = 1
 
     battle.last_damage = 15
-
-    durations.get(0).binding = 1
-    durations.get(1).binding = 1
 
     return battle, durations
 

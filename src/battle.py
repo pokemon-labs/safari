@@ -307,15 +307,30 @@ class PSBattle:
 
         from_confusion = len(split_msg) > 4 and split_msg[4] == "confusion"
         from_sub = False
+        bind_into_ghost = False
         if self.msg_index > 0:
             prev = self.prev_split_msg()
             if len(prev) > 3:
                 if prev[1] == "-start" and prev[3] == "Substitute":
                     from_sub = True
+                if prev[1] == "move":
+                    prev_move_id = normalize_name(prev[3])
+                    prev_move = oak.id_to_move(prev_move_id)
+                    move_data = oak.move_data(prev_move)
+                    types = side.active.types
+                    t1 = types & 15
+                    t2 = types >> 4
+                    effectiveness = oak.get_effectiveness(
+                        move_data["type"], t1
+                    ) * oak.get_effectiveness(move_data["type"], t2)
+
+                    if effectiveness == 0 and prev_move_id in Constants.BINDING_MOVES:
+                        bind_into_ghost = True
         damage_counts = (
             len(split_msg) < 5 or split_msg[4] in ("confusion",)
         ) and not from_sub
-        if damage and damage_counts:
+
+        if damage and damage_counts and not bind_into_ghost:
             dmg = 0
             if from_confusion:
                 if hp == 0:
