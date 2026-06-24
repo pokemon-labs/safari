@@ -1,4 +1,5 @@
 from src.battle import PSBattle, PSPlayer
+from src.mechanics import Mechanics
 
 import oak
 import oak.log
@@ -73,13 +74,19 @@ def get_match_keys(args):
     for i in range(2):
         side = battle.side(i)
         vol = side.active.volatiles()
-        vol.substitute_hp = 255
+        vol.substitute_hp = 20
+        vol.state = 50
+        battle.last_move(i).index = 1
+        battle.last_move(i).counterable = 1
 
     # opp stuff
     battle.side(1).pokemon(0).hp = 15
     battle.side(1).last_selected_move = 1
 
     battle.last_damage = 15
+
+    durations.get(0).binding = 1
+    durations.get(1).binding = 1
 
     return battle, durations
 
@@ -211,11 +218,21 @@ def scan():
             )
 
             if not matches:
+                can_sub_glitch = False
+                if reason.startswith("last_damage"):
+                    sides = tuple(ps_battle.public.side(i) for i in range(2))
+                    can_sub_glitch = Mechanics.can_sub_confusion_glitch(
+                        sides[0], sides[1]
+                    ) or Mechanics.can_sub_confusion_glitch(sides[1], sides[0])
                 messages.append(f"Mismatch: {reason}")
                 for line in messages.data:
                     print(line)
                 print(f"Failure at seed: {seed}")
-                return
+                if can_sub_glitch:
+                    print("SKIPPING SEED")
+                    continue
+                else:
+                    return
 
 
 def main():

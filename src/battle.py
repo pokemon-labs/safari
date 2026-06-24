@@ -12,30 +12,17 @@ import oak
 
 type Msg = list[str]
 
-from src.mechanics import BOOSTS, Constants, _STAT_ABBREV_TO_BOOST_PROPERTY, _STATUS_BYTE, Mechanics
-
-class BeforeMove(Enum):
-    done = auto()
-    ok = auto()
-
-
-class ActivateReason(Enum):
-    confusion = auto()
-
-
-class CantReason(Enum):
-    slp = auto()
-    frz = auto()
-    par = auto()
-    partiallytrapped = auto()
-    flinch = auto()
-    Disable = auto()
-    recharge = auto()
-    nopp = auto()
-
-
-class FailReason(Enum):
-    bide = auto()
+from src.mechanics import (
+    BOOSTS,
+    Constants,
+    _STAT_ABBREV_TO_BOOST_PROPERTY,
+    _STATUS_BYTE,
+    Mechanics,
+    CantReason,
+    ActivateReason,
+    FailReason,
+    BeforeMove,
+)
 
 
 def normalize_name(name):
@@ -329,6 +316,7 @@ class PSBattle:
             len(split_msg) < 5 or split_msg[4] in ("confusion",)
         ) and not from_sub
         if damage and damage_counts:
+            dmg = 0
             if from_confusion:
                 if hp == 0:
                     opp_def_temp = opp_side.active.stats().def_
@@ -358,8 +346,10 @@ class PSBattle:
         if len(split_msg) > 4:
             reason = normalize_name(split_msg[4])
             if reason == "confusion":
-                self.before_move(side, duration, reason=ActivateReason.confusion)
-                Mechanics.interrupt(side, duration)
+                Mechanics.before_move(
+                    self.public, side, duration, reason=ActivateReason.confusion
+                )
+                self.store_stats()
             elif reason == "brn":
                 if vol.toxic:
                     vol.toxic_counter += 1
@@ -381,7 +371,7 @@ class PSBattle:
                 assert False
 
     def _sethp(self, split_msg):
-        assert False, "sethp assumed impossile"
+        assert False, "setMechanics.intehp assumed impossile"
 
     def _fail(self, split_msg):
         is_us = self.is_us(split_msg)
@@ -397,7 +387,8 @@ class PSBattle:
         vol = side.active.volatiles()
         dur, opp_dur = self.get_durations(is_us)
 
-        self.before_move(side, dur)
+        Mechanics.before_move(self.public, side, dur, None)
+        self.store_stats()
         move_id: str | None = (
             normalize_name(split_msg[3]) if len(split_msg) > 3 else None
         )
@@ -436,6 +427,8 @@ class PSBattle:
             charging_move and not vol.charging
         ):
             side.last_used_move = move
+            side.last_selected_move = move
+            Mechanics.set_counterable(self.public, 0 if is_us else 1)
 
         mimic_move, mimic_move_index = None, None
         mimic_ = oak.id_to_move("mimic")
@@ -482,9 +475,7 @@ class PSBattle:
                     ms.pp = max(0, ms.pp - pp_deduction)
 
         if move_id in Constants.THRASHING_MOVES:
-            if vol.thrashing:
-                dur.attacking = dur.attacking + 1
-            else:
+            if not vol.thrashing:
                 vol.thrashing = True
                 dur.attacking = 1
 
@@ -514,7 +505,9 @@ class PSBattle:
                 # rage is not applied if target is immune
                 if len(self.msg_lines) >= self.msg_index + 2:
                     next_ = self.prev_split_msg(-1)
-                    if next_[1] == "-immune":
+                    immune = next_[1] == "-immune"
+                    broke_sub = next_[1] == "-end" and next_[3] == "Substitute"
+                    if immune or broke_sub:
                         vol.rage = False
 
         is_still = len(split_msg) > 5 and split_msg[5] == "[still]"
@@ -552,7 +545,7 @@ class PSBattle:
             and len(prev) > 4
             and prev[3] == "atk"
             and prev[4] == "[from] Rage"
-            and side.active.stats().atk == 999 # aurora beam :\
+            and side.active.stats().atk == 999  # aurora beam :\
         ):
             # TODO bug from bubblebeam failing after rage succeeds
             side.active.boosts().atk -= 1
@@ -595,14 +588,17 @@ class PSBattle:
         side, _ = self.sides(is_us)
         dur, _ = self.get_durations(is_us)
         from_haze = False
-        from_mist = False # TODO does mist cause errors???
+        from_mist = False  # TODO does mist cause errors???
         if self.msg_index > 0:
             prev = self.msg_lines[self.msg_index - 1].split("|")
             if prev[1] == "-clearallboost":
                 from_haze = True
-        woke = Mechanics.is_sleep(side.stored().status) and not from_haze and not from_mist
+        woke = (
+            Mechanics.is_sleep(side.stored().status) and not from_haze and not from_mist
+        )
         if woke:
-            self.before_move(side, dur)
+            Mechanics.before_move(self.public, side, dur)
+            self.store_stats()
         Mechanics.cure_status(side, dur)
 
     def _start(self, split_msg):
@@ -621,9 +617,12 @@ class PSBattle:
             vol.light_screen = True
         elif s == "bide":
             vol.bide = True
+            vol.state = 0
+            vol.attacks = 1
             dur.attacking = 1
         elif s == "disable":
             move = oak.id_to_move(normalize_name(split_msg[4]))
+            vol.disable_left = 1
             dur.disable = 1
             slot = 0
             for i in range(4):
@@ -631,7 +630,7 @@ class PSBattle:
                     slot = i + 1
                     break
             if slot == 0:
-            # we have revealed a new move
+                # we have revealed a new move
                 for i in range(4):
                     if active.move(i).id == 0:
                         slot = i + 1
@@ -699,8 +698,11 @@ class PSBattle:
             vol.disable_move = 0
             dur.disable = 0
         elif s == "bide":
-            self.before_move(side, dur, reason=FailReason.bide)
+            Mechanics.before_move(self.public, side, dur, reason=FailReason.bide)
+            self.store_stats()
             vol.bide = False
+            vol.state = 0
+            vol.attacks = 0
             dur.attacking = 0
         elif s == "confusion":
             vol.confusion = False
@@ -784,7 +786,8 @@ class PSBattle:
         elif s == "confusion":
             dur.confusion = dur.confusion + 1
         elif s == "bide":
-            self.before_move(side, dur)
+            Mechanics.before_move(self.public, side, dur)
+            self.store_stats()
             dur.attacking = dur.attacking + 1
         elif s == "":
             assert split_msg[-1] == "move: Splash"
@@ -808,41 +811,6 @@ class PSBattle:
         else:
             assert False, f"Prepare unexpected move: {move_name}"
 
-    def before_move(self, side: oak.Side, duration: oak.Duration, reason=None):
-        # upkeep like incrementing confusion
-
-        if Mechanics.is_sleep(side.stored().status):
-            side.last_used_move = 0
-            return BeforeMove.done
-        if side.stored().status == _STATUS_BYTE[Constants.FROZEN]:
-            return BeforeMove.done
-
-        if reason == CantReason.recharge:
-            return BeforeMove.done
-
-        vol = side.active.volatiles()
-        if vol.disable_move != 0:
-            duration.disable += 1
-        if reason == CantReason.Disable:
-            vol.charging = False
-            return BeforeMove.done
-
-        if reason == ActivateReason.confusion:
-            return BeforeMove.done
-
-        if reason == FailReason.bide:
-            return BeforeMove.done
-
-        if vol.binding:
-            if duration.binding < 4:
-                duration.binding = duration.binding + 1
-            else:
-                # max binding duration is 4
-                vol.binding = 0
-                duration.binding = 0
-        self.store_stats()
-        return BeforeMove.ok
-
     def cant(self, split_msg):
         is_us = self.is_us(split_msg)
         side, opp_side = self.sides(is_us)
@@ -853,14 +821,10 @@ class PSBattle:
 
         reason = split_msg[3].strip()
         if reason == "recharge":
-            side.active.volatiles().recharging = False
             cant = CantReason.recharge
         elif reason == Constants.PARALYZED:
-            # gen1: full paralysis releases partial trap on other side
-            Mechanics.interrupt(side, dur)
             cant = CantReason.par
         elif reason == Constants.FROZEN:
-            side.last_used_move = 0
             cant = CantReason.frz
         elif reason == Constants.SLEEP:
             dur.set_sleep(0, dur.sleep(0) + 1)
@@ -882,7 +846,8 @@ class PSBattle:
         else:
             assert False, f"Unsupported reason for cant {reason}"
 
-        self.before_move(side, dur, cant)
+        Mechanics.before_move(self.public, side, dur, cant)
+        self.store_stats()
 
     def turn(self, split_msg):
         self.public.turn = int(split_msg[2])
@@ -908,15 +873,8 @@ class PSBattle:
         pass
 
     def _immune(self, split_msg):
-        # TODO rage
-        is_us = self.is_us(split_msg)
-        # vol, _ = self.volatiles(is_us)
-        # if self.msg_index > 0:
-        #     prev_split_msg = self.msg_lines[self.msg_index - 1]
-        #     move_id: str | None = (
-        #         normalize_name(prev_split_msg[3]) if len(prev_split_msg) > 3 else None
-        #     )
-        #     if move_id == "rage" and
+        # rage/immune is handled in move
+        pass
 
     def _miss(self, split_msg):
         self.public.last_damage = 0

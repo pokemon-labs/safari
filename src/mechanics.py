@@ -1,3 +1,5 @@
+from enum import Enum, auto
+
 import oak
 
 BOOSTS = (
@@ -83,6 +85,30 @@ _STATUS_BYTE = {
 # fmt: on
 
 
+class CantReason(Enum):
+    slp = auto()
+    frz = auto()
+    par = auto()
+    partiallytrapped = auto()
+    flinch = auto()
+    Disable = auto()
+    recharge = auto()
+    nopp = auto()
+
+
+class BeforeMove(Enum):
+    done = auto()
+    ok = auto()
+
+
+class ActivateReason(Enum):
+    confusion = auto()
+
+
+class FailReason(Enum):
+    bide = auto()
+
+
 class Mechanics:
     def is_sleep(status: int) -> bool:
         return bool(status & 7)
@@ -95,17 +121,6 @@ class Mechanics:
     def rest(side: oak.Side, duration: oak.Duration):
         side.stored().status = _STATUS_BYTE["rest"]
         duration.set_sleep(0, 1)
-
-    def interrupt(side: oak.Side, duration: oak.Duration):
-        vol = side.active.volatiles()
-        if not vol.rage:
-            vol.state = 0
-        vol.bide = False
-        vol.thrashing = False
-        vol.charging = False
-        vol.binding = False
-        duration.attacking = 0
-        duration.binding = 0
 
     def clear_volatiles(side: oak.Side, duration: oak.Duration):
         vol = side.active.volatiles()
@@ -378,7 +393,91 @@ class Mechanics:
         opp_dur.binding = 0
         side.last_used_move = 0
         opp_side.last_used_move = 0
+        opp_vol = opp_side.active.volatiles()
+        if opp_vol.bide:
+            opp_vol.state = 0
 
     def cure_status(side: oak.Side, duration: oak.Duration):
         side.stored().status = 0
         duration.set_sleep(0, 0)
+
+    def interrupt(side: oak.Side, duration: oak.Duration):
+        vol = side.active.volatiles()
+        if not vol.rage:
+            vol.state = 0
+        vol.bide = False
+        vol.thrashing = False
+        vol.charging = False
+        vol.binding = False
+        duration.attacking = 0
+        duration.binding = 0
+
+    def before_move(
+        battle: oak.Battle, side: oak.Side, duration: oak.Duration, reason=None
+    ):
+        vol = side.active.volatiles()
+        if Mechanics.is_sleep(side.stored().status):
+            side.last_used_move = 0
+            return BeforeMove.done
+
+        if reason == CantReason.frz:
+            side.last_used_move = 0
+            return BeforeMove.done
+
+        if reason == CantReason.partiallytrapped:
+            return BeforeMove.done
+
+        if reason == CantReason.flinch:
+            # recharge clearing is in the Effect fn
+            return BeforeMove.done
+
+        if reason == CantReason.recharge:
+            vol.recharging = False
+            return BeforeMove.done
+
+        if vol.disable_move != 0:
+            duration.disable += 1
+
+        if reason == CantReason.Disable:
+            vol.charging = False
+            return BeforeMove.done
+
+        if reason == ActivateReason.confusion:
+            Mechanics.interrupt(side, duration)
+            return BeforeMove.done
+
+        if reason == CantReason.par:
+            Mechanics.interrupt(side, duration)
+            return BeforeMove.done
+
+        if vol.bide:
+            vol.state += battle.last_damage
+
+        if reason == FailReason.bide:
+            return BeforeMove.done
+
+        if vol.thrashing:
+            duration.attacking += 1
+
+        if vol.binding:
+            duration.binding += 1
+            return BeforeMove.done
+
+        return BeforeMove.ok
+
+    def set_counterable(battle: oak.Battle, player: int):
+        last = battle.side(player).last_selected_move
+        data = oak.move_data(last)
+        battle.last_move(player).counterable = (
+            last != oak.id_to_move("counter")
+            and data["bp"] > 0
+            and data["type"] in (0, 1)
+        )
+
+    def can_sub_confusion_glitch(side: oak.Side, opp_side: oak.Side):
+        vol = side.active.volatiles()
+        return (
+            vol.substitute
+            and vol.confusion
+            and not opp_side.active.volatiles().substitute
+        )
