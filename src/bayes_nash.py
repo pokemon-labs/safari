@@ -99,7 +99,6 @@ class Solver:
         # print(p1_returns.shape, p2_returns.shape)
         p1_foo = np.max(p1_returns, axis=2)
         p2_foo = np.max(p2_returns, axis=2)
-        # print(p1_foo + p2_foo)
         worst_case = np.max(p1_foo + p2_foo)
 
         p1_options = np.sum(self.omega * p1_returns, axis=1)
@@ -115,9 +114,6 @@ class Solver:
         r = np.einsum("im,ijmn,jn->ij", p1_policies, self.batched_payoffs, p2_policies)[
             ..., None
         ]
-        # print(r.shape)
-        # print(self.omega.shape)
-        # return r
         return (r * self.omega).sum()
 
 

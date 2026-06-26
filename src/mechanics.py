@@ -254,7 +254,9 @@ class Mechanics:
     #     assert active.move(mslot.pp) == side.stored().move(mslot).pp
 
     # TODO review claude
+    # This covers normal damage, specialDamage, and counterDamage
     def calc_damage(
+        battle: oak.Battle,
         attacker: oak.Side,
         defender: oak.Side,
         move: int | None,
@@ -266,6 +268,13 @@ class Mechanics:
         if move is None:
             cfz = True
             move = oak.id_to_move("pound")
+
+        if move == oak.id_to_move("counter"):
+            return 2 * battle.last_damage
+        if move == oak.id_to_move("bide"):
+            d = attacker.active.volatiles().state * 2
+            attacker.active.volatiles().state = 0
+            return d
 
         move_data = oak.move_data(move)
         bp = move_data["bp"]

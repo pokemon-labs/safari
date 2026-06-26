@@ -39,6 +39,12 @@ parser.add_argument(
     default="",
 )
 parser.add_argument(
+    "--required-moves",
+    type=str,
+    default="",
+)
+
+parser.add_argument(
     "--no-flinch",
     action="store_true",
 )
@@ -50,6 +56,11 @@ parser.add_argument(
     "--no-pp",
     action="store_true",
 )
+parser.add_argument(
+    "--no-confusion",
+    action="store_true",
+)
+
 
 TEAMS = oak.load_teams("/home/user/teams150")
 
@@ -70,9 +81,22 @@ def get_banned_moves(args) -> list[int]:
         banned += ["wrap", "bind", "clamp", "firespin"]
     if args.no_pp:
         banned += ["metronome", "mimic", "mirrormove"]
+    if args.no_confusion:
+        banned += [
+            "confusion",
+            "confuseray",
+            "supersonic",
+            "psybeam",
+            "thrash",
+            "petaldance",
+        ]
     if args.banned_moves:
         banned += args.banned_moves.split(",")
     return [oak.id_to_move(m) for m in banned]
+
+
+def get_required_moves(args) -> list[int]:
+    return [oak.id_to_move(m) for m in args.required_moves.split(",")]
 
 
 def get_match_keys(args):
@@ -98,7 +122,9 @@ def get_match_keys(args):
     return battle, durations
 
 
-def fill_side_randomly(RNG, side: oak.Side, banned_moves: list[int]):
+def fill_side_randomly(
+    RNG, side: oak.Side, banned_moves: list[int], required_moves: list[int] = []
+):
     species_list = list(range(1, 150))
     # species_list.remove(oak.id_to_species("ditto"))
     RNG.shuffle(species_list)

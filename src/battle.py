@@ -337,7 +337,13 @@ class PSBattle:
                     opp_def_temp = opp_side.active.stats().def_
                     opp_side.active.stats().def_ = side.active.stats().def_
                     dmg = Mechanics.calc_damage(
-                        side, opp_side, None, crit=False, adjust=False, roll=255
+                        self.public,
+                        side,
+                        opp_side,
+                        None,
+                        crit=False,
+                        adjust=False,
+                        roll=255,
                     )
                     opp_side.active.stats().def_ = opp_def_temp
                     self.public.last_damage = dmg
@@ -685,13 +691,28 @@ class PSBattle:
         else:
             assert False, f"Bad volatile {s}"
 
-    def sub_dmg(self, side: oak.Side, opp_side: oak.Side):
-        prev = self.prev_split_msg()
-        crit = prev[1] == "-crit"
-        if not crit and self.msg_index >= 2:
-            prev = self.prev_split_msg(2)
-            crit = prev[1] == "-crit"
-        dmg = Mechanics.calc_damage(opp_side, side, opp_side.last_used_move, crit)
+    def did_player_crit(self, player: int) -> bool:
+        for line in self.msg_lines:
+            split_msg = line.split("|")
+            if split_msg[1] == "-crit":
+                critting_player = 1 if self.is_us(split_msg) else 0
+                if critting_player == player:
+                    return True
+        return False
+
+    def sub_dmg(self, attacker: int):
+        attacking_side, defending_side = self.sides(attacker == 0)
+        crit = self.did_player_crit(attacker)
+        dmg = Mechanics.calc_damage(
+            self.public,
+            attacking_side,
+            defending_side,
+            attacking_side.last_used_move,
+            crit,
+        )
+        print(
+            f"attacker {attacker}, crit {crit}, move {oak.move_id(attacking_side.last_used_move)} attacker {oak.species_id(attacking_side.active.species)} dmg {dmg}"
+        )
         self.public.last_damage = dmg
         return dmg
 
@@ -705,7 +726,7 @@ class PSBattle:
         if s == "mustrecharge":
             vol.recharging = False
         elif s == "substitute":
-            dmg = self.sub_dmg(side, opp_side)
+            dmg = self.sub_dmg(attacker=(1 if is_us else 0))
             vol.substitute = False
             vol.substitute_hp = 0
         elif s == "disable":
@@ -716,7 +737,7 @@ class PSBattle:
             Mechanics.before_move(self.public, side, dur, reason=FailReason.bide)
             self.store_stats()
             vol.bide = False
-            vol.state = 0
+            # vol.state = 0
             vol.attacks = 0
             dur.attacking = 0
         elif s == "confusion":
@@ -793,8 +814,10 @@ class PSBattle:
         assert s is not None
         if s == "substitute":
             # TODO this happens when a sub is damaged but not broken or when a bnding move is immune's while the foe sub is up
-            dmg = self.sub_dmg(side, opp_side)
-            vol.substitute_hp -= min(vol.substitute_hp, dmg)
+            dmg = self.sub_dmg(attacker=(1 if is_us else 0))
+            print("SUB", dmg)
+            vol.substitute_hp -= min(vol.substitute_hp - 1, dmg)
+            # vol.substitute_hp = max(1, vol.substitute_hp)
             self.public.last_damage = dmg
             if oak.move_data(opp_side.last_used_move)["effect"] in (32, 33):
                 self.public.last_damage = max(1, self.public.last_damage // 2)
@@ -893,6 +916,12 @@ class PSBattle:
 
     def _miss(self, split_msg):
         self.public.last_damage = 0
+        is_us = self.is_us(split_msg)
+        side, _ = self.sides(is_us)
+        if side.last_used_move in tuple(
+            oak.id_to_move(_) for _ in ("jumpkick", "highjumpkick")
+        ):
+            self.public.last_damage = 1
 
     def impossible(self):
         pass
