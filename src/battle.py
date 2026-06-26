@@ -202,7 +202,7 @@ class PSBattle:
         pokemon_list = side_data.get("pokemon", [])
         # TODO we may need this for action parsing
 
-    def switch_or_drag(self, split_msg: Msg) -> None:
+    def _switch(self, split_msg: Msg) -> None:
         is_us = self.is_us(split_msg)
         side, opp_side = self.sides(is_us)
         duration, opp_duration = self.get_durations(is_us)
@@ -246,6 +246,7 @@ class PSBattle:
         side.order = order
 
         # last_ stuff
+        self.public.last_move(0 if is_us else 1).index = 1
         side.last_used_move = 0
         opp_side.last_used_move = 0
 
@@ -449,6 +450,8 @@ class PSBattle:
         ):
             side.last_used_move = move
             side.last_selected_move = move
+
+        if rage or pp_deduction or vol.thrashing:
             Mechanics.set_counterable(self.public, 0 if is_us else 1)
 
         mimic_move, mimic_move_index = None, None
@@ -710,9 +713,6 @@ class PSBattle:
             attacking_side.last_used_move,
             crit,
         )
-        print(
-            f"attacker {attacker}, crit {crit}, move {oak.move_id(attacking_side.last_used_move)} attacker {oak.species_id(attacking_side.active.species)} dmg {dmg}"
-        )
         self.public.last_damage = dmg
         return dmg
 
@@ -815,7 +815,6 @@ class PSBattle:
         if s == "substitute":
             # TODO this happens when a sub is damaged but not broken or when a bnding move is immune's while the foe sub is up
             dmg = self.sub_dmg(attacker=(1 if is_us else 0))
-            print("SUB", dmg)
             vol.substitute_hp -= min(vol.substitute_hp - 1, dmg)
             # vol.substitute_hp = max(1, vol.substitute_hp)
             self.public.last_damage = dmg
@@ -955,8 +954,8 @@ class PSBattle:
 
     _HANDLERS = {
         "move": move,
-        "switch": switch_or_drag,
-        "drag": switch_or_drag,
+        "switch": _switch,
+        "drag": impossible,
         "faint": faint,
         "turn": turn,
         "-fail": _fail,

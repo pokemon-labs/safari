@@ -110,12 +110,12 @@ def get_match_keys(args):
         vol.state = 50
         vol.binding = True
         durations.get(i).binding = 1
-        battle.last_move(i).index = 1
-        battle.last_move(i).counterable = 1
 
     # opp stuff
     battle.side(1).pokemon(0).hp = 15
     battle.side(1).last_selected_move = 1
+    battle.last_move(1).index = 1
+    # battle.last_move(1).counterable = 1
 
     battle.last_damage = 15
 
@@ -201,10 +201,12 @@ def scan():
             is_forced = vol.charging or vol.recharging or vol.rage or vol.thrashing
             c1_type = c1 & 3
             c1_data = c1 >> 2
+            # messages.append(f"p1 choice- type {c1_type} data {c1_data}")
             if c1_type == 1:
                 if c1_data > 0 and not is_forced:
                     ms = battle.side(0).active.move(c1_data - 1)
                     ps_battle.public.side(0).last_selected_move = ms.id
+                    ps_battle.public.last_move(0).index = c1_data
                 elif c1_data == 0:
                     ps_battle.public.side(0).last_selected_move = oak.id_to_move(
                         "struggle"
@@ -212,7 +214,6 @@ def scan():
 
             # UPDATE
             result, msg = oak.log.update(battle, durations, c1, c2, PLAYER)
-
             for line in msg:
                 ps_battle.update(line)
                 messages.append(line)
