@@ -408,6 +408,7 @@ class PSBattle:
         side, opp_side = self.sides(is_us)
         vol = side.active.volatiles()
         dur, opp_dur = self.get_durations(is_us)
+        move_details = self.public.last_move(0 if is_us else 1)
 
         Mechanics.before_move(self.public, side, dur, None)
         self.store_stats()
@@ -450,6 +451,13 @@ class PSBattle:
         ):
             side.last_used_move = move
             side.last_selected_move = move
+            if not is_us:
+                move_details.index = 1
+                for m in range(4):
+                    ms = side.active.move(m)
+                    if ms.id == move:
+                        move_details.index = m + 1
+            # move_details.index =
 
         if rage or pp_deduction or vol.thrashing:
             Mechanics.set_counterable(self.public, 0 if is_us else 1)

@@ -114,7 +114,7 @@ def get_match_keys(args):
     # opp stuff
     battle.side(1).pokemon(0).hp = 15
     battle.side(1).last_selected_move = 1
-    battle.last_move(1).index = 1
+    # battle.last_move(1).index = 1
     # battle.last_move(1).counterable = 1
 
     battle.last_damage = 15
