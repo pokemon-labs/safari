@@ -142,6 +142,7 @@
   padding: 14px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0;
   background: var(--panel);
 }
+#center-header .ptitle { margin: 0; }
 #matrix-label { font-size: 28px; color: var(--text); font-family: var(--mono); font-weight: 700; letter-spacing: .02em; }
 .hval { font-size: 16px; color: var(--muted); display: flex; flex-direction: column; gap: 1px; }
 .hval span { font-family: var(--mono); color: var(--text); font-weight: 700; font-size: 22px; }
@@ -183,9 +184,7 @@
   color: #888;
 }
 
-/* Merged from two .ev-cell declarations */
 .ev-cell {
-  position: relative; overflow: hidden;
   border-radius: 4px; cursor: default;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   transition: border-color .1s;
@@ -193,10 +192,7 @@
 }
 .ev-cell .ev-v { font-size: 14px; font-family: var(--mono); font-weight: 700; line-height: 1; }
 .ev-cell .ev-visits { font-size: 9px; font-family: var(--mono); opacity: .65; margin-top: 2px; }
-.ev-cell .visit-bar {
-  position: absolute; bottom: 0; left: 0; right: 0;
-  pointer-events: none;
-}
+.ev-cell .ev-n { font-size: 8px; font-family: var(--mono); opacity: .6; }
 
 /* bottom ctrl bar in center */
 #battle-ctrl-bar {
@@ -258,6 +254,7 @@
 .pbar-track { flex: 1; height: 10px; border-radius: 3px; overflow: hidden; }
 .pbar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
 .pbar-fill.p1 { background: var(--p1); }
+
 .pbar-pct { font-size: 13px; width: 40px; text-align: right; font-family: var(--mono); }
 .divider { height: 1px; background: var(--border); margin: 4px 0; }
 #no-sel { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--dim); font-size: 11px; }
@@ -295,6 +292,8 @@
 .sprite-slot img {
   image-rendering: pixelated;
 }
+.sprite-slot.p2 img { width: 192; height: 192; }
+.sprite-slot.p1 img { width: 192; height: 192; }
 
 .sprite-hpbar {
   width: 140px;
@@ -315,6 +314,7 @@
 .shp-status.fnt { background: #444; color: #aaa; }
 .sprite-hpbar .shp-track {
   border-radius: 3px; overflow: hidden;
+
 }
 .sprite-hpbar .shp-fill {
   height: 100%; border-radius: 3px; transition: width .5s;
@@ -333,6 +333,7 @@
   padding: 6px 16px; cursor: pointer;
   border: none; transition: all .12s;
 }
+
 .bdt-btn.active { font-weight: 700; }
 
 /* chibi move tooltip */
@@ -372,7 +373,14 @@
   padding: 5px 14px; cursor: pointer;
   border: none; transition: all .12s;
 }
+
 .mmt-btn.active { font-weight: 700; }
+.ev-cell { position: relative; overflow: hidden; }
+.ev-cell .visit-bar {
+  position: absolute; bottom: 0; left: 0; right: 0;
+
+  pointer-events: none;
+}
 
 /* History navigation */
 #hist-nav {
@@ -385,6 +393,7 @@
   padding: 0 8px; border-radius: 4px; transition: color .1s, background .1s;
   line-height: 1.4;
 }
+
 #hist-nav .hn-arrow.disabled { color: var(--dim); cursor: default; background: none; }
 #hist-label {
   font-family: var(--mono); font-size: 13px; color: var(--text);
@@ -395,26 +404,21 @@
   padding: 2px 6px; border-radius: 3px;
   font-weight: 700; letter-spacing: .05em;
 }
-
-/* Per-type strategy section */
-.type-strat-wrap { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); }
-.type-strat-title { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin-bottom: 4px; }
+#hist-live.hidden { display: none; }
 
 /* ==========================================================
    RBY STYLE OVERRIDES
    ========================================================== */
 
 html,
-body {
+body,
+#left,
+#center,
+#right,
+#battle-repr-text {
   background: var(--bg);
   color: var(--text);
   font-family: var(--mono);
-}
-
-/* #left and #right background overrides (their original rule uses --panel, not --bg) */
-#left,
-#right {
-  background: var(--bg);
 }
 
 /* remove modern gradients */
@@ -422,7 +426,7 @@ body {
   background: #e8e8e8;
 }
 
-/* zero letter-spacing on elements where original rules set non-zero */
+/* headers */
 .ptitle,
 .type-col-hdr,
 .pol-title,
@@ -560,9 +564,18 @@ body {
 }
 
 /* policy bars */
+.pbar-name,
+.pbar-pct {
+  color: #000;
+}
+
 .pbar-track {
   background: #fff;
   border: 1px solid #000;
+}
+
+.pbar-fill.p1 {
+  background: #000;
 }
 
 .pbar-fill.p2 {
@@ -570,10 +583,18 @@ body {
 }
 
 /* hp bars */
+.sprite-hpbar .shp-name {
+  color: #000;
+}
+
 .sprite-hpbar .shp-track {
   background: #fff;
   border: 2px solid #000;
   height: 8px;
+}
+
+.sprite-hpbar .shp-nums {
+  color: #000;
 }
 
 /* battle text panel */
@@ -584,6 +605,10 @@ body {
 /* history nav */
 #hist-nav {
   background: #e8e8e8;
+}
+
+#hist-label {
+  color: #000;
 }
 
 #hist-live {
@@ -611,9 +636,19 @@ body {
 }
 
 /* status indicators */
+.dot.live {
+  box-shadow: none;
+}
+
 #status {
   color: #404040;
 }
+
+
+
+/* Per-type strategy section */
+.type-strat-wrap { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); }
+.type-strat-title { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin-bottom: 4px; }
 </style>
 </head>
 <body>
@@ -1118,6 +1153,7 @@ function setBattleMode(mode) {
   S.battleMode = mode;
   $('bdt-sprite').className = 'bdt-btn' + (mode === 'sprite' ? ' active' : '');
   $('bdt-text').className   = 'bdt-btn' + (mode === 'text'   ? ' active' : '');
+  $('battle-sprite-view').className = 'active' in {} ? '' : ''; // reset
   $('battle-sprite-view').className = mode === 'sprite' ? 'active' : '';
   const te = $('battle-repr-text');
   if (te) te.className = mode === 'text' ? '' : 'hidden';
@@ -1145,6 +1181,7 @@ function buildSpriteSlot(elId, state, isBack) {
   const pct = Math.round(hp / maxhp * 100);
   const name = sid.charAt(0).toUpperCase() + sid.slice(1);
   const status = state.status && state.status !== 'ok' ? state.status.toLowerCase() : '';
+  const statusCls = status ? ` shp-status ${status}` : '';
   const statusBadge = status ? `<span class="shp-status ${status}">${status.toUpperCase()}</span>` : '';
 
   // HP bar block — above sprite for p2, below for p1
@@ -1297,6 +1334,7 @@ function updateHistNav() {
   const snap = S.history[idx] || {};
 
   $('hist-label').textContent = `turn ${snap.turn ?? idx + 1}  (${idx + 1} / ${S.history.length})`;
+  $('hist-live').className = 'hist-live' + (isLive ? '' : ' hidden');  // note: id not class
   $('hist-live').style.display = isLive ? '' : 'none';
 
   const atFirst = idx === 0;
