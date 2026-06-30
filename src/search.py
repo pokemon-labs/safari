@@ -17,6 +17,7 @@ import src.bayes_nash
 
 import numpy as np
 import oak
+import oak.search
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +120,7 @@ def get_agent(p1: Player, p2: Player, t1: int, t2: int) -> Oak.Agent:
 
 # we need this wrapper for ProcessPool pickling
 def _oak_search_mp(*args):
-    return oak.search_mp(*args)
+    return oak.search.search_mp(*args)
 
 
 class Search:

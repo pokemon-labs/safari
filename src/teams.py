@@ -119,7 +119,7 @@ class SetDict:
             return [(s, p / den) for s, p in result]
         else:
             s_copy = deepcopy(s)
-            oak.fill_random_moveset(s_copy)
+            oak.fill_random_moveset(s_copy, 0)
             return [(s_copy, 1)]
 
 

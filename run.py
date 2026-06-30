@@ -341,7 +341,6 @@ async def _run_battle(
 
     # await client.send_message(tag, ["/timer on"])
 
-    # TODO ask pmarg why this is here
     if not battle.wait:
         move = await _pick_move(battle, predictor)
         await client.send_message(tag, move)

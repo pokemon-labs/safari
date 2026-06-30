@@ -483,6 +483,15 @@ class Mechanics:
             and data["type"] in (0, 1)
         )
 
+    def is_counterable(battle: oak.Battle, player: int):
+        last = battle.side(player).last_selected_move
+        data = oak.move_data(last)
+        return (
+            last != oak.id_to_move("counter")
+            and data["bp"] > 0
+            and data["type"] in (0, 1)
+        )
+
     def can_sub_confusion_glitch(side: oak.Side, opp_side: oak.Side):
         vol = side.active.volatiles()
         return (

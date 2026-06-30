@@ -236,7 +236,7 @@ class PSBattle:
 
                 s = oak.Set()
                 s.species = species
-                s.level = 100  # TODO actually parse
+                s.level = level
                 oak.complete_pokemon_from_set(side.pokemon(index), s)
                 break
         assert index is not None, "Failed to find incoming or an empty slot for it"
@@ -388,7 +388,10 @@ class PSBattle:
             elif reason == "[from]drain":
                 # we don't halve last_damage here (for now WIP)
                 pass
+            elif reason == "[from]recoil":
+                pass
             else:
+
                 print(split_msg)
                 assert False
 
@@ -446,22 +449,6 @@ class PSBattle:
             else 1
         )
 
-        if (rage or pp_deduction or vol.thrashing) and not (
-            charging_move and not vol.charging
-        ):
-            side.last_used_move = move
-            side.last_selected_move = move
-            if not is_us:
-                move_details.index = 1
-                for m in range(4):
-                    ms = side.active.move(m)
-                    if ms.id == move:
-                        move_details.index = m + 1
-            # move_details.index =
-
-        if rage or pp_deduction or vol.thrashing:
-            Mechanics.set_counterable(self.public, 0 if is_us else 1)
-
         mimic_move, mimic_move_index = None, None
         mimic_ = oak.id_to_move("mimic")
         for i in range(4):
@@ -506,6 +493,35 @@ class PSBattle:
                     assert ms.pp > 0, "Used move with tracked pp=0"
                     ms.pp = max(0, ms.pp - pp_deduction)
 
+        # counterable
+
+        # TODO wtf is this, fix it
+
+        if (rage or pp_deduction or vol.thrashing) and not (
+            charging_move and not vol.charging
+        ):
+            side.last_used_move = move
+            side.last_selected_move = move
+            if not is_us:
+                move_details.index = 1
+                for m in range(4):
+                    ms = side.active.move(m)
+                    if ms.id == move:
+                        move_details.index = m + 1
+                        break
+
+        if (rage or pp_deduction or vol.thrashing or charging_move) and not (
+            vol.charging
+        ):
+            side.last_selected_move = move
+
+        if rage or pp_deduction or vol.thrashing or charging_move:
+            player_index = 0 if is_us else 1
+            counterable = Mechanics.is_counterable(self.public, player_index)
+            self.public.last_move(player_index).counterable = counterable
+
+        # Move side effects
+
         if move_id in Constants.THRASHING_MOVES:
             if not vol.thrashing:
                 vol.thrashing = True
@@ -520,8 +536,7 @@ class PSBattle:
         else:
             if move_id in Constants.BINDING_MOVES:
                 if vol.binding:
-                    # dur.binding = dur.binding + 1
-                    pass
+                    dur.binding = min(4, dur.binding + 1)
                 else:
                     side.active.volatiles().binding = True
                     dur.binding = 1
