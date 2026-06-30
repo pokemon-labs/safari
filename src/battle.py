@@ -390,6 +390,8 @@ class PSBattle:
                 pass
             elif reason == "[from]recoil":
                 pass
+            elif reason == "[from]confusion":
+                pass
             else:
 
                 print(split_msg)
