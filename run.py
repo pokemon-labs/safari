@@ -30,6 +30,7 @@ from src.battle import PSBattle, PSPlayer, normalize_name
 from src.teams import TeamPredictor, to_packed, get_teams_and_probs, team_to_string
 from src.search import Player, Search, process_policy
 from src.vis import DebugViz
+from src.replay import ReplayRecorder
 
 _viz: DebugViz | None = None
 
@@ -210,7 +211,11 @@ def _battle_finished(tag: str, msg: str) -> bool:
     )
 
 
-async def _pick_move(battle: PSBattle, predictor: TeamPredictor) -> tuple[str, str]:
+async def _pick_move(
+    battle: PSBattle,
+    predictor: TeamPredictor,
+    recorder: ReplayRecorder | None = None,
+) -> tuple[str, str]:
     p1_teams, p1_probs = get_teams_and_probs(
         battle.public.side(0), predictor, Config.p1_types, battle.team
     )
@@ -246,6 +251,9 @@ async def _pick_move(battle: PSBattle, predictor: TeamPredictor) -> tuple[str, s
     else:
         assert False, "Bad selection mode"
     pending_move = search.parse_pkmn_choice(c)
+
+    if recorder is not None:
+        recorder.record(battle, search, pending_move, c, Config.policy)
 
     if _viz is not None:
         _viz.push(battle, search, pending_move)
@@ -305,6 +313,12 @@ async def _run_battle(
     battle = PSBattle(tag, p1, p2)
     battle.format = fmt.value
     battle.team = selected_team
+
+    recorder = (
+        ReplayRecorder(fmt.value, Config.username, opp_name, selected_team)
+        if Config.save_replay != SaveReplay.never
+        else None
+    )
     while battle.us is None:
         msg = await client.receive_message()
         for line in msg.split("\n"):
@@ -342,7 +356,7 @@ async def _run_battle(
     # await client.send_message(tag, ["/timer on"])
 
     if not battle.wait:
-        move = await _pick_move(battle, predictor)
+        move = await _pick_move(battle, predictor, recorder)
         await client.send_message(tag, move)
 
     # main battle loop
@@ -363,12 +377,16 @@ async def _run_battle(
                 or (cfg.save_replay == SaveReplay.on_win and winner == cfg.username)
             ):
                 await client.save_replay(tag)
+                if recorder is not None:
+                    recorder.finish(winner)
+                    path = recorder.save()
+                    logger.info(f"saved search replay to {path}")
             await client.leave_battle(tag)
             return winner
 
         action_required = battle.update(msg)
         if action_required and not battle.wait:
-            move = await _pick_move(battle, predictor)
+            move = await _pick_move(battle, predictor, recorder)
             await client.send_message(tag, move)
 
 

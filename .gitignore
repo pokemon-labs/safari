@@ -3,3 +3,6 @@ tests/__pycache__/*.pyc
 teams*
 chall*
 pac*
+__pycache__/
+*.pyc
+/replay_*.pkl

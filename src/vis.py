@@ -242,6 +242,17 @@ class DebugViz:
     # Public API
     # ------------------------------------------------------------------
 
+    def load_history(self, history: list[dict]) -> None:
+        """
+        Preload a full history (e.g. reconstructed from a saved replay file) so
+        clients connecting to start() see it immediately via the 'init' message.
+        Call before start().
+        """
+        with self._lock:
+            self._history = list(history)
+            if history:
+                self._data.update(history[-1])
+
     def start(self):
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
