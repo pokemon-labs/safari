@@ -399,12 +399,6 @@
   font-family: var(--mono); font-size: 13px; color: var(--text);
   min-width: 100px; text-align: center;
 }
-#hist-live {
-  font-size: 9px; font-family: var(--mono); text-transform: uppercase;
-  padding: 2px 6px; border-radius: 3px;
-  font-weight: 700; letter-spacing: .05em;
-}
-#hist-live.hidden { display: none; }
 
 /* ==========================================================
    RBY STYLE OVERRIDES
@@ -432,8 +426,7 @@ body,
 .pol-title,
 .mode-btn,
 .bdt-btn,
-.mmt-btn,
-#hist-live {
+.mmt-btn {
   letter-spacing: 0;
   text-transform: uppercase;
   font-family: var(--mono);
@@ -611,11 +604,6 @@ body,
   color: #000;
 }
 
-#hist-live {
-  background: #000;
-  color: #fff;
-}
-
 #hist-nav .hn-arrow {
   color: #000;
 }
@@ -695,7 +683,6 @@ body,
     <div class="hn-arrow" id="hn-first" onclick="navHist('first')" title="First turn">&#x21E4;</div>
     <div class="hn-arrow" id="hn-prev"  onclick="navHist('prev')"  title="Previous turn">&#x2190;</div>
     <div id="hist-label">—</div>
-    <span id="hist-live">live</span>
     <div class="hn-arrow" id="hn-next"  onclick="navHist('next')"  title="Next turn">&#x2192;</div>
     <div class="hn-arrow" id="hn-last"  onclick="navHist('last')"  title="Latest turn">&#x21E5;</div>
   </div>
@@ -1369,7 +1356,6 @@ function navHist(dir) {
 function updateHistNav() {
   if (!S.history.length) {
     $('hist-label').textContent = '—';
-    $('hist-live').style.display = 'none';
     $('hn-first').className = 'hn-arrow disabled';
     $('hn-prev').className  = 'hn-arrow disabled';
     $('hn-next').className  = 'hn-arrow disabled';
@@ -1382,8 +1368,6 @@ function updateHistNav() {
   const snap = S.history[idx] || {};
 
   $('hist-label').textContent = `turn ${snap.turn ?? idx + 1}  (${idx + 1} / ${S.history.length})`;
-  $('hist-live').className = 'hist-live' + (isLive ? '' : ' hidden');  // note: id not class
-  $('hist-live').style.display = isLive ? '' : 'none';
 
   const atFirst = idx === 0;
   const atLast  = isLive || idx === last;
