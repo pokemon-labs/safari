@@ -243,7 +243,7 @@ class Search:
             for i in range(self.p2_actions[t]):
                 self.p2.strategies[t][Policy.bayesian_nash][i] = p2_avg[t, i]
 
-    def parse_pkmn_choice(self, c: int) -> str:
+    def parse_pkmn_choice(self, c: int, battle: PSBattle) -> str:
         side = self.battles[(0, 0)].side(0)
 
         choice_type = c & 3
@@ -251,8 +251,7 @@ class Search:
         if choice_type == 0:
             return "/choose pass"
         elif choice_type == 1:
-            # TODO this happens with binding, but I think showdown still expects move 1?
-            if choice_data == 0:
+            if battle.fight_button:
                 return "/choose move 1"
 
             # is forced

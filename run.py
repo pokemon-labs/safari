@@ -250,7 +250,7 @@ async def _pick_move(
         c = output["p1_choices"][np.argmax(processed_policy)]
     else:
         assert False, "Bad selection mode"
-    pending_move = search.parse_pkmn_choice(c)
+    pending_move: str = search.parse_pkmn_choice(c, battle)
 
     if recorder is not None:
         recorder.record(battle, search, pending_move, c, Config.policy)
@@ -441,6 +441,8 @@ async def main() -> None:
         else:
             record[Result.lose] += 1
             logger.info(f"lost with {team_to_string(selected_team)}")
+            # TODO remove
+            # exit()
 
         for key, value in record.items():
             print(f"{key.name} : {value}")

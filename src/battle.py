@@ -197,6 +197,16 @@ class PSBattle:
         self.wait = bool(req.get(Constants.WAIT))
         self._apply_request()
 
+        # check if fight button is only option
+        self.fight_button = False
+        if req.get("active"):
+            moves = req['active'][0]['moves']
+            if len(moves) == 1 and moves[0]['id'] == 'fight':
+                self.fight_button = True
+        
+
+
+
     def _apply_request(self):
         """Write request JSON into self.private (and sync into self.public side 0)."""
         if not self.request:
@@ -395,8 +405,9 @@ class PSBattle:
                 pass
             elif reason == "[from]confusion":
                 pass
+            elif reason == "[from]leechseed":
+                pass
             else:
-
                 print(split_msg)
                 assert False
 
