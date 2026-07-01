@@ -1319,6 +1319,19 @@ function connect() {
           return;
         }
       }
+    } else if (msg.type === 'reset') {
+      // New battle started — the live view forgets previous games.
+      // (Replays are unaffected; this only clears the long-lived live state.)
+      S.history = [];
+      S.histIdx = -1;
+      S.selP1 = 0;
+      S.selP2 = 0;
+      $('turn-lbl').textContent = 'turn —';
+      $('pending-lbl').textContent = '';
+      $('status-txt').textContent = `waiting for next turn · ${new Date().toLocaleTimeString()}`;
+      updateHistNav();
+      refresh();
+      return;
     } else return;
 
     const snap = currentSnap();
@@ -1351,7 +1364,15 @@ function navHist(dir) {
 }
 
 function updateHistNav() {
-  if (!S.history.length) return;
+  if (!S.history.length) {
+    $('hist-label').textContent = '—';
+    $('hist-live').style.display = 'none';
+    $('hn-first').className = 'hn-arrow disabled';
+    $('hn-prev').className  = 'hn-arrow disabled';
+    $('hn-next').className  = 'hn-arrow disabled';
+    $('hn-last').className  = 'hn-arrow disabled';
+    return;
+  }
   const last = S.history.length - 1;
   const isLive = S.histIdx < 0;
   const idx = isLive ? last : S.histIdx;

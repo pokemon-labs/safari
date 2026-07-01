@@ -319,6 +319,8 @@ async def _run_battle(
         if Config.save_replay != SaveReplay.never
         else None
     )
+    if _viz is not None:
+        _viz.reset()
     while battle.us is None:
         msg = await client.receive_message()
         for line in msg.split("\n"):

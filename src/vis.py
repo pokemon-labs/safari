@@ -312,11 +312,9 @@ def build_snapshot(
 
 
 class DebugViz:
-    def __init__(self, port: int = 8765, auto_open: bool = False):
-        self.port = port
-        self.auto_open = auto_open
-
-        self._data: dict = {
+    @staticmethod
+    def _default_data() -> dict:
+        return {
             "p1_types": [],
             "p2_types": [],
             "p1_teams": [],
@@ -335,6 +333,12 @@ class DebugViz:
             "turn": 0,
             "search_ready": False,
         }
+
+    def __init__(self, port: int = 8765, auto_open: bool = False):
+        self.port = port
+        self.auto_open = auto_open
+
+        self._data: dict = self._default_data()
         self._history: list[dict] = []
         self._lock = threading.Lock()
         self._clients: set[WebSocket] = set()
@@ -361,6 +365,22 @@ class DebugViz:
             self._history = list(history)
             if history:
                 self._data.update(history[-1])
+
+    def reset(self) -> None:
+        """
+        Clear all history — call at the start of a new battle so the live
+        dashboard doesn't bleed together multiple games run in one process.
+        Replays are unaffected (each gets its own ReplayRecorder already);
+        this only resets the long-lived live-view state. Manual-mode is left
+        alone since it's a UI preference, not battle data.
+        """
+        with self._lock:
+            self._history = []
+            self._data = self._default_data()
+            payload = json.dumps({"type": "reset"})
+
+        if self._loop:
+            asyncio.run_coroutine_threadsafe(self._broadcast(payload), self._loop)
 
     def start(self):
         self._thread = threading.Thread(target=self._run, daemon=True)
