@@ -140,6 +140,9 @@ class PSBattle:
 
         self.request: dict | None = None
         self.msg_lines: list[str] = []
+        # Snapshot of msg_lines taken right before each clear — i.e. the
+        # protocol log that led up to the most recent decision point.
+        self.last_log: list[str] = []
 
         self.started: bool = False
         self.rqid: int | None = None
@@ -966,6 +969,7 @@ class PSBattle:
                 self.msg_lines.append(line)
 
     def process_msg_lines_and_clear(self):
+        self.last_log = list(self.msg_lines)
         for line in self.msg_lines:
             split_msg = line.split("|")
             if len(split_msg) < 2:

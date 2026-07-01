@@ -256,7 +256,7 @@ async def _pick_move(
         recorder.record(battle, search, pending_move, c, Config.policy)
 
     if _viz is not None:
-        _viz.push(battle, search, pending_move)
+        _viz.push(battle, search, pending_move, c)
         override = _viz.get_move_override()
         if override is not None:
             return (override, str(battle.rqid))

@@ -329,8 +329,8 @@
   display: flex; gap: 0; border: 1px solid var(--border2); border-radius: 4px; overflow: hidden;
 }
 .bdt-btn {
-  font-size: 16px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .04em;
-  padding: 6px 16px; cursor: pointer;
+  font-size: 14px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .04em;
+  padding: 6px 12px; cursor: pointer;
   border: none; transition: all .12s;
 }
 
@@ -676,6 +676,8 @@ body,
       <div id="battle-display-toggle">
         <div class="bdt-btn active" id="bdt-sprite" onclick="setBattleMode('sprite')">sprite</div>
         <div class="bdt-btn" id="bdt-text" onclick="setBattleMode('text')">text</div>
+        <div class="bdt-btn" id="bdt-request" onclick="setBattleMode('request')">request</div>
+        <div class="bdt-btn" id="bdt-log" onclick="setBattleMode('log')">log</div>
       </div>
     </div>
     <div id="battle-sprite-view" class="active">
@@ -816,6 +818,17 @@ function snapField(field) {
   return snap ? snap[field] : S[field];
 }
 
+// The choice Safari actually selected for this decision, if known
+// (blank live until a decision has been made; always known in a replay).
+function matrixLabelText() {
+  const choice = snapField('pkmn_choice');
+  const move = snapField('pending_move');
+  const parts = [];
+  if (choice !== null && choice !== undefined) parts.push(`choice ${choice}`);
+  if (move) parts.push(move);
+  return parts.join('  ·  ');
+}
+
 // ─────────────────────────────────────────────────────────
 // EV matrix — rows = p1 actions, cols = p2 actions
 // ─────────────────────────────────────────────────────────
@@ -838,14 +851,14 @@ function buildMatrix() {
 
   if (!p1a.length || !p2a.length) {
     mat.innerHTML = '<div style="color:var(--dim);font-size:11px">no data for this type pair</div>';
-    $('matrix-label').textContent = '—';
+    $('matrix-label').textContent = matrixLabelText();
     $('hv-emp').textContent = '—';
     $('hv-nash').textContent = '—';
     return;
   }
 
   const M = p1a.length, N = p2a.length;
-  $('matrix-label').textContent = `P1T${S.selP1+1}  ·  P2T${S.selP2+1}`;
+  $('matrix-label').textContent = matrixLabelText();
   $('hv-emp').textContent  = d.empirical_value?.toFixed(3) ?? '—';
   $('hv-nash').textContent = d.nash_value?.toFixed(3) ?? '—';
   const maxVisits = Math.max(1, ...vm.flatMap(row => row.map(x => x ?? 0)));
@@ -1151,12 +1164,13 @@ function buildRight() {
 // ─────────────────────────────────────────────────────────
 function setBattleMode(mode) {
   S.battleMode = mode;
-  $('bdt-sprite').className = 'bdt-btn' + (mode === 'sprite' ? ' active' : '');
-  $('bdt-text').className   = 'bdt-btn' + (mode === 'text'   ? ' active' : '');
-  $('battle-sprite-view').className = 'active' in {} ? '' : ''; // reset
+  ['sprite', 'text', 'request', 'log'].forEach(m => {
+    const btn = $('bdt-' + m);
+    if (btn) btn.className = 'bdt-btn' + (mode === m ? ' active' : '');
+  });
   $('battle-sprite-view').className = mode === 'sprite' ? 'active' : '';
   const te = $('battle-repr-text');
-  if (te) te.className = mode === 'text' ? '' : 'hidden';
+  if (te) te.className = mode === 'sprite' ? 'hidden' : '';
   buildBattle();
 }
 
@@ -1213,9 +1227,19 @@ function buildSpriteSlot(elId, state, isBack) {
 function buildBattle() {
   const d = activeCell();
 
-  // Always update text repr
+  // Text-like modes share #battle-repr-text; content depends on which mode.
   const reprEl = $('battle-repr-text');
-  if (reprEl) reprEl.textContent = d.battle_repr || 'no battle data';
+  if (reprEl) {
+    if (S.battleMode === 'request') {
+      const req = snapField('request');
+      reprEl.textContent = req ? JSON.stringify(req, null, 2) : 'no request data';
+    } else if (S.battleMode === 'log') {
+      const log = snapField('log');
+      reprEl.textContent = (log && log.length) ? log.join('\n') : 'no log data';
+    } else {
+      reprEl.textContent = d.battle_repr || 'no battle data';
+    }
+  }
 
   // Update sprite view
   if (S.battleMode === 'sprite' && d.battle_state) {
@@ -1274,7 +1298,7 @@ function connect() {
       // If server sends current state at top level, add as snapshot if history empty
       if (!S.history.length && msg.p1_types) {
         const snap = {};
-        for (const k of ['p1_types','p2_types','p1_teams','p2_teams','p1_omega','p2_omega','probs','cells','pending_move','turn'])
+        for (const k of ['p1_types','p2_types','p1_teams','p2_teams','p1_omega','p2_omega','probs','cells','pending_move','pkmn_choice','request','log','turn'])
           if (msg[k] != null) snap[k] = msg[k];
         if (Object.keys(snap).length) S.history.push(snap);
       }

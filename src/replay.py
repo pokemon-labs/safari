@@ -101,6 +101,10 @@ class DecisionPoint:
     pkmn_choice: int  # the raw pkmn_choice int it corresponds to
     policy_used: str  # name of the Policy used to select the move (Config.policy)
 
+    # Raw showdown protocol data for this decision.
+    request: dict | None  # the last |request| JSON showdown sent (PSBattle.request)
+    log: list[str]  # protocol lines since the previous decision (PSBattle.last_log)
+
 
 @dataclass
 class Replay:
@@ -146,6 +150,8 @@ class ReplayRecorder:
             pending_move=pending_move,
             pkmn_choice=pkmn_choice,
             policy_used=policy_used.name,
+            request=battle.request,
+            log=list(battle.last_log),
         )
         self.replay.decisions.append(dp)
 

@@ -224,6 +224,9 @@ class DebugViz:
             "probs": [],
             "cells": {},
             "pending_move": "",
+            "pkmn_choice": None,
+            "request": None,
+            "log": [],
             "turn": 0,
         }
         self._history: list[dict] = []
@@ -284,6 +287,9 @@ class DebugViz:
             "p1_strategies": [],  # no search data yet
             "p2_strategies": [],
             "pending_move": "",
+            "pkmn_choice": None,  # not decided yet
+            "request": battle.request,
+            "log": list(battle.last_log),
             "turn": battle.public.turn,
             "search_ready": False,
         }
@@ -307,10 +313,12 @@ class DebugViz:
         battle,  # PSBattle — for turn number
         search: Search,
         pending_move: str,
+        pkmn_choice: int,
     ):
         """
         Call this after search.run() + search.solve() to push live data to the browser.
         Amends the most recent battle snapshot (from push_battle) with search results.
+        pkmn_choice is the raw int Safari selected (before formatting into pending_move).
         """
         p1_labels = _team_labels(search.p1)
         p2_labels = _team_labels(search.p2)
@@ -331,6 +339,9 @@ class DebugViz:
             "p1_strategies": _player_strategies(search.p1, search.p1_actions),
             "p2_strategies": _player_strategies(search.p2, search.p2_actions),
             "pending_move": pending_move,
+            "pkmn_choice": pkmn_choice,
+            "request": battle.request,
+            "log": list(battle.last_log),
             "turn": battle.public.turn,
             "search_ready": True,
         }
