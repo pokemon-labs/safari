@@ -1,12 +1,11 @@
 """
 src/replay_view.py — Load a saved search replay into the existing debug dashboard.
 
-Reconstructs, per decision point, lightweight proxy objects shaped just enough
-like a live src.search.Search / src.search.Player so we can reuse vis.py's
-existing snapshot-building helpers unmodified (_extract_cells, _team_labels,
-_team_species, _omega_matrix, _player_strategies). The result is a history
-list identical in shape to what DebugViz.push() produces live, so the
-existing vis_dashboard.html needs no changes.
+Reconstructs, per decision point, lightweight proxy objects satisfying
+vis.SearchLike/vis.PlayerLike/vis.BattleLike, then feeds them into vis.py's
+build_snapshot() — the exact same function DebugViz.push() calls live — so
+replayed and live history entries are built by identical code and share one
+Snapshot type. See vis.py's "Shared snapshot type" section for the contract.
 
 Usage:
     python -m src.replay_view path/to/replay.pkl [--port 8765]
@@ -24,14 +23,7 @@ import oak
 
 from src.config import Policy
 from src.replay import Replay, DecisionPoint
-from src.vis import (
-    DebugViz,
-    _extract_cells,
-    _team_labels,
-    _team_species,
-    _omega_matrix,
-    _player_strategies,
-)
+from src.vis import DebugViz, Snapshot, build_snapshot as _build_snapshot
 
 
 @dataclass
@@ -61,9 +53,8 @@ class _ReplayPlayer:
 
 
 class _ReplaySearch:
-    """Stand-in for src.search.Search, built from one DecisionPoint. Only
-    exposes what _extract_cells() needs: indices(), outputs, battles,
-    battle.durations."""
+    """Stand-in for src.search.Search — satisfies vis.SearchLike: indices(),
+    outputs, battles, battle.durations, p1/p2 (PlayerLike), p1_actions/p2_actions."""
 
     def __init__(self, dp: DecisionPoint) -> None:
         self.outputs = dp.outputs
@@ -72,44 +63,37 @@ class _ReplaySearch:
         }
         self._indices = list(dp.outputs.keys())
         self.battle = SimpleNamespace(durations=oak.Durations(dp.durations_bytes))
+        self.p1 = _ReplayPlayer(dp.p1)
+        self.p2 = _ReplayPlayer(dp.p2)
+        self.p1_actions = dp.p1_actions
+        self.p2_actions = dp.p2_actions
 
     def indices(self):
         return self._indices
 
 
-def build_snapshot(dp: DecisionPoint) -> dict:
-    """Reconstruct one DebugViz-shaped snapshot dict from a DecisionPoint,
-    matching what DebugViz.push() builds live."""
-    search = _ReplaySearch(dp)
-    p1 = _ReplayPlayer(dp.p1)
-    p2 = _ReplayPlayer(dp.p2)
+class _ReplayBattle:
+    """Stand-in for PSBattle — satisfies vis.BattleLike: request, last_log, public.turn."""
 
-    p1_labels = _team_labels(p1)
-    p2_labels = _team_labels(p2)
-    p1_species = _team_species(p1)
-    p2_species = _team_species(p2)
-    probs = _omega_matrix(p1.omega, p2.omega)
-    cells = _extract_cells(search)
+    def __init__(self, dp: DecisionPoint) -> None:
+        self.request = dp.request
+        self.last_log = dp.log
+        self.public = SimpleNamespace(turn=dp.turn)
 
-    return {
-        "p1_types": p1_labels,
-        "p2_types": p2_labels,
-        "p1_teams": p1_species,
-        "p2_teams": p2_species,
-        "p1_omega": list(p1.omega),
-        "p2_omega": list(p2.omega),
-        "probs": probs,
-        "cells": cells,
-        "p1_strategies": _player_strategies(p1, dp.p1_actions),
-        "p2_strategies": _player_strategies(p2, dp.p2_actions),
-        "pending_move": dp.pending_move,
-        "pkmn_choice": dp.pkmn_choice,
-        "request": dp.request,
-        "log": dp.log,
-        "policy_used": dp.policy_used,
-        "turn": dp.turn,
-        "search_ready": True,
-    }
+
+def build_replay_snapshot(dp: DecisionPoint) -> Snapshot:
+    """
+    Reconstruct one dashboard-shaped Snapshot from a DecisionPoint by feeding
+    proxies satisfying vis.SearchLike/BattleLike into the same build_snapshot()
+    the live path uses — see vis.py's "Shared snapshot type" section.
+    """
+    return _build_snapshot(
+        _ReplayBattle(dp),
+        _ReplaySearch(dp),
+        dp.pending_move,
+        dp.pkmn_choice,
+        dp.policy_used,
+    )
 
 
 def load_replay(path: str) -> Replay:
@@ -133,7 +117,7 @@ def main() -> None:
         f"winner={replay.winner}"
     )
 
-    history = [build_snapshot(dp) for dp in replay.decisions]
+    history = [build_replay_snapshot(dp) for dp in replay.decisions]
 
     viz = DebugViz(port=args.port, auto_open=not args.no_open)
     viz.load_history(history)

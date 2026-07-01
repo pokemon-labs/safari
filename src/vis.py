@@ -23,7 +23,7 @@ import json
 import os
 import threading
 import webbrowser
-from typing import Optional
+from typing import Optional, Protocol, TypedDict, Any
 
 import numpy as np
 import uvicorn
@@ -32,7 +32,6 @@ from fastapi.responses import HTMLResponse
 
 import oak
 from src.teams import team_to_string
-from src.search import Search
 from src.config import Policy
 
 # Load HTML from sibling file so this module stays readable
@@ -86,7 +85,7 @@ def _battle_state(battle) -> dict:
 
 
 def _player_strategies(
-    player, action_counts: list[int]
+    player: PlayerLike, action_counts: list[int]
 ) -> list[dict[str, list[float]]]:
     """Per-type strategies: list indexed by type, each a dict of policy_name -> list[float]."""
     result = []
@@ -99,7 +98,7 @@ def _player_strategies(
     return result
 
 
-def _extract_cells(search: Search) -> dict:
+def _extract_cells(search: SearchLike) -> dict:
     """
     Build the cells dict from a completed Search.
 
@@ -169,7 +168,7 @@ def _omega_matrix(p1_omega: list[float], p2_omega: list[float]) -> list[list[flo
     return [[p1 * p2 for p2 in p2_omega] for p1 in p1_omega]
 
 
-def _team_labels(player) -> list[str]:
+def _team_labels(player: PlayerLike) -> list[str]:
     """Short label for each type (Team) — lead species + bench count."""
     labels = []
     for team in player.teams:
@@ -180,7 +179,7 @@ def _team_labels(player) -> list[str]:
     return labels
 
 
-def _team_species(player) -> list[list[dict]]:
+def _team_species(player: PlayerLike) -> list[list[dict]]:
     """All species for each team: [{num, id, moves: [move_id, ...]}, ...]."""
     result = []
     for team in player.teams:
@@ -205,6 +204,109 @@ def _team_species(player) -> list[list[dict]]:
 
 
 # ---------------------------------------------------------------------------
+# Shared snapshot type
+#
+# One Snapshot dict is what actually reaches the dashboard (S.history in the
+# JS), built by build_snapshot() below. Both the live path (DebugViz.push,
+# fed real Search/Player/PSBattle objects) and the replay path
+# (src.replay_view, fed lightweight proxy objects built from a pickled
+# DecisionPoint) construct their inputs to satisfy these same Protocols, so
+# build_snapshot() runs unmodified either way — no duplicated dict literals.
+#
+# This is deliberately structural (Protocol), not nominal: neither
+# src.search.Search/Player nor the replay-side proxies need to inherit from
+# anything here. It's just a static contract for what build_snapshot() reads.
+# ---------------------------------------------------------------------------
+
+
+class TeamMemberLike(Protocol):
+    species: int
+    level: int
+    moves: list[int]
+
+
+class PlayerLike(Protocol):
+    teams: list[list[TeamMemberLike]]
+    omega: list[float]
+    strategies: list[dict[Policy, list[float]]]
+
+
+class DurationsHolderLike(Protocol):
+    durations: Any  # oak.Durations or a compatible stand-in
+
+
+class SearchLike(Protocol):
+    p1: PlayerLike
+    p2: PlayerLike
+    p1_actions: list[int]
+    p2_actions: list[int]
+    outputs: dict[tuple[int, int], dict]
+    battles: dict[tuple[int, int], Any]  # oak.Battle or a compatible stand-in
+    battle: DurationsHolderLike
+
+    def indices(self) -> list[tuple[int, int]]: ...
+
+
+class BattleLike(Protocol):
+    request: dict | None
+    last_log: list[str]
+    public: Any  # needs .turn
+
+
+class Snapshot(TypedDict):
+    p1_types: list[str]
+    p2_types: list[str]
+    p1_teams: list[list[dict]]
+    p2_teams: list[list[dict]]
+    p1_omega: list[float]
+    p2_omega: list[float]
+    probs: list[list[float]]
+    cells: dict[str, dict]
+    p1_strategies: list[dict[str, list[float]]]
+    p2_strategies: list[dict[str, list[float]]]
+    pending_move: str
+    pkmn_choice: int | None
+    request: dict | None
+    log: list[str]
+    policy_used: str
+    turn: int
+    search_ready: bool
+
+
+def build_snapshot(
+    battle: BattleLike,
+    search: SearchLike,
+    pending_move: str,
+    pkmn_choice: int | None,
+    policy_used: str,
+) -> Snapshot:
+    """
+    Build the one dashboard-facing Snapshot for a completed decision point.
+    Used identically by the live path (DebugViz.push) and the replay path
+    (src.replay_view.build_replay_snapshot) — see module docstring above.
+    """
+    return Snapshot(
+        p1_types=_team_labels(search.p1),
+        p2_types=_team_labels(search.p2),
+        p1_teams=_team_species(search.p1),
+        p2_teams=_team_species(search.p2),
+        p1_omega=list(search.p1.omega),
+        p2_omega=list(search.p2.omega),
+        probs=_omega_matrix(search.p1.omega, search.p2.omega),
+        cells=_extract_cells(search),
+        p1_strategies=_player_strategies(search.p1, search.p1_actions),
+        p2_strategies=_player_strategies(search.p2, search.p2_actions),
+        pending_move=pending_move,
+        pkmn_choice=pkmn_choice,
+        request=battle.request,
+        log=list(battle.last_log),
+        policy_used=policy_used,
+        turn=battle.public.turn,
+        search_ready=True,
+    )
+
+
+# ---------------------------------------------------------------------------
 # DebugViz
 # ---------------------------------------------------------------------------
 
@@ -223,11 +325,15 @@ class DebugViz:
             "p2_omega": [],
             "probs": [],
             "cells": {},
+            "p1_strategies": [],
+            "p2_strategies": [],
             "pending_move": "",
             "pkmn_choice": None,
             "request": None,
             "log": [],
+            "policy_used": "",
             "turn": 0,
+            "search_ready": False,
         }
         self._history: list[dict] = []
         self._lock = threading.Lock()
@@ -275,24 +381,25 @@ class DebugViz:
         p2_species = _team_species(search_p2)
         probs = _omega_matrix(search_p1.omega, search_p2.omega)
 
-        snapshot = {
-            "p1_types": p1_labels,
-            "p2_types": p2_labels,
-            "p1_teams": p1_species,
-            "p2_teams": p2_species,
-            "p1_omega": list(search_p1.omega),
-            "p2_omega": list(search_p2.omega),
-            "probs": probs,
-            "cells": {},  # no search data yet
-            "p1_strategies": [],  # no search data yet
-            "p2_strategies": [],
-            "pending_move": "",
-            "pkmn_choice": None,  # not decided yet
-            "request": battle.request,
-            "log": list(battle.last_log),
-            "turn": battle.public.turn,
-            "search_ready": False,
-        }
+        snapshot: Snapshot = Snapshot(
+            p1_types=p1_labels,
+            p2_types=p2_labels,
+            p1_teams=p1_species,
+            p2_teams=p2_species,
+            p1_omega=list(search_p1.omega),
+            p2_omega=list(search_p2.omega),
+            probs=probs,
+            cells={},  # no search data yet
+            p1_strategies=[],  # no search data yet
+            p2_strategies=[],
+            pending_move="",
+            pkmn_choice=None,  # not decided yet
+            request=battle.request,
+            log=list(battle.last_log),
+            policy_used="",  # not decided yet
+            turn=battle.public.turn,
+            search_ready=False,
+        )
 
         with self._lock:
             self._data.update(snapshot)
@@ -310,41 +417,20 @@ class DebugViz:
 
     def push(
         self,
-        battle,  # PSBattle — for turn number
-        search: Search,
+        battle: BattleLike,
+        search: SearchLike,
         pending_move: str,
         pkmn_choice: int,
+        policy_used: str = "",
     ):
         """
         Call this after search.run() + search.solve() to push live data to the browser.
         Amends the most recent battle snapshot (from push_battle) with search results.
         pkmn_choice is the raw int Safari selected (before formatting into pending_move).
         """
-        p1_labels = _team_labels(search.p1)
-        p2_labels = _team_labels(search.p2)
-        p1_species = _team_species(search.p1)
-        p2_species = _team_species(search.p2)
-        probs = _omega_matrix(search.p1.omega, search.p2.omega)
-        cells = _extract_cells(search)
-
-        snapshot = {
-            "p1_types": p1_labels,
-            "p2_types": p2_labels,
-            "p1_teams": p1_species,
-            "p2_teams": p2_species,
-            "p1_omega": list(search.p1.omega),
-            "p2_omega": list(search.p2.omega),
-            "probs": probs,
-            "cells": cells,
-            "p1_strategies": _player_strategies(search.p1, search.p1_actions),
-            "p2_strategies": _player_strategies(search.p2, search.p2_actions),
-            "pending_move": pending_move,
-            "pkmn_choice": pkmn_choice,
-            "request": battle.request,
-            "log": list(battle.last_log),
-            "turn": battle.public.turn,
-            "search_ready": True,
-        }
+        snapshot: Snapshot = build_snapshot(
+            battle, search, pending_move, pkmn_choice, policy_used
+        )
 
         with self._lock:
             self._data.update(snapshot)
