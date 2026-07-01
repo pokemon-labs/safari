@@ -25,13 +25,15 @@ from __future__ import annotations
 import pickle
 import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import oak
 
 from src.config import Policy
-from src.battle import PSBattle
-from src.search import Search, Player
+
+if TYPE_CHECKING:
+    from src.battle import PSBattle
+    from src.search import Search, Player
 
 
 # ---------------------------------------------------------------------------
