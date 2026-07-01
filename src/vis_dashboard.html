@@ -329,8 +329,8 @@
   display: flex; gap: 0; border: 1px solid var(--border2); border-radius: 4px; overflow: hidden;
 }
 .bdt-btn {
-  font-size: 14px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .04em;
-  padding: 6px 12px; cursor: pointer;
+  font-size: 13px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .04em;
+  padding: 6px 10px; cursor: pointer;
   border: none; transition: all .12s;
 }
 
@@ -676,6 +676,7 @@ body,
       <div id="battle-display-toggle">
         <div class="bdt-btn active" id="bdt-sprite" onclick="setBattleMode('sprite')">sprite</div>
         <div class="bdt-btn" id="bdt-text" onclick="setBattleMode('text')">text</div>
+        <div class="bdt-btn" id="bdt-public" onclick="setBattleMode('public')">public</div>
         <div class="bdt-btn" id="bdt-request" onclick="setBattleMode('request')">request</div>
         <div class="bdt-btn" id="bdt-log" onclick="setBattleMode('log')">log</div>
       </div>
@@ -1164,7 +1165,7 @@ function buildRight() {
 // ─────────────────────────────────────────────────────────
 function setBattleMode(mode) {
   S.battleMode = mode;
-  ['sprite', 'text', 'request', 'log'].forEach(m => {
+  ['sprite', 'text', 'public', 'request', 'log'].forEach(m => {
     const btn = $('bdt-' + m);
     if (btn) btn.className = 'bdt-btn' + (mode === m ? ' active' : '');
   });
@@ -1236,6 +1237,8 @@ function buildBattle() {
     } else if (S.battleMode === 'log') {
       const log = snapField('log');
       reprEl.textContent = (log && log.length) ? log.join('\n') : 'no log data';
+    } else if (S.battleMode === 'public') {
+      reprEl.textContent = snapField('public_repr') || 'no public battle data';
     } else {
       reprEl.textContent = d.battle_repr || 'no battle data';
     }
@@ -1298,7 +1301,7 @@ function connect() {
       // If server sends current state at top level, add as snapshot if history empty
       if (!S.history.length && msg.p1_types) {
         const snap = {};
-        for (const k of ['p1_types','p2_types','p1_teams','p2_teams','p1_omega','p2_omega','probs','cells','pending_move','pkmn_choice','request','log','turn'])
+        for (const k of ['p1_types','p2_types','p1_teams','p2_teams','p1_omega','p2_omega','probs','cells','pending_move','pkmn_choice','request','log','policy_used','public_repr','public_state','turn'])
           if (msg[k] != null) snap[k] = msg[k];
         if (Object.keys(snap).length) S.history.push(snap);
       }

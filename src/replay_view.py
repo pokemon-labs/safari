@@ -73,12 +73,16 @@ class _ReplaySearch:
 
 
 class _ReplayBattle:
-    """Stand-in for PSBattle — satisfies vis.BattleLike: request, last_log, public.turn."""
+    """Stand-in for PSBattle — satisfies vis.BattleLike: request, last_log,
+    public (+.turn), durations. public/durations are reconstructed from the
+    same bytes ReplayRecorder already stored (no extra persisted fields
+    needed to render the publicly-observed battle)."""
 
     def __init__(self, dp: DecisionPoint) -> None:
         self.request = dp.request
         self.last_log = dp.log
-        self.public = SimpleNamespace(turn=dp.turn)
+        self.public = oak.Battle(dp.battle_bytes)
+        self.durations = oak.Durations(dp.durations_bytes)
 
 
 def build_replay_snapshot(dp: DecisionPoint) -> Snapshot:

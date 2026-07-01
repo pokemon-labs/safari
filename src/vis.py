@@ -250,7 +250,8 @@ class SearchLike(Protocol):
 class BattleLike(Protocol):
     request: dict | None
     last_log: list[str]
-    public: Any  # needs .turn
+    public: Any  # oak.Battle — .turn, and renderable via oak.battle_string/_battle_state
+    durations: Any  # oak.Durations or compatible, needed for oak.battle_string(public, durations)
 
 
 class Snapshot(TypedDict):
@@ -271,6 +272,8 @@ class Snapshot(TypedDict):
     policy_used: str
     turn: int
     search_ready: bool
+    public_repr: str  # text repr of the incomplete-information battle Safari actually observed
+    public_state: dict  # sprite-display state for that same public battle
 
 
 def build_snapshot(
@@ -303,6 +306,8 @@ def build_snapshot(
         policy_used=policy_used,
         turn=battle.public.turn,
         search_ready=True,
+        public_repr=oak.battle_string(battle.public, battle.durations),
+        public_state=_battle_state(battle.public),
     )
 
 
@@ -332,6 +337,8 @@ class DebugViz:
             "policy_used": "",
             "turn": 0,
             "search_ready": False,
+            "public_repr": "",
+            "public_state": {},
         }
 
     def __init__(self, port: int = 8765, auto_open: bool = False):
@@ -419,6 +426,8 @@ class DebugViz:
             policy_used="",  # not decided yet
             turn=battle.public.turn,
             search_ready=False,
+            public_repr=oak.battle_string(battle.public, battle.durations),
+            public_state=_battle_state(battle.public),
         )
 
         with self._lock:
