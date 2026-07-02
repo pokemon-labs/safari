@@ -1263,6 +1263,21 @@ $('manual-toggle').addEventListener('change', e => {
 });
 $('send-btn').onclick = sendMove;
 $('move-input').onkeydown = e => { if (e.key==='Enter') sendMove(); };
+
+// ─────────────────────────────────────────────────────────
+// Keyboard nav: left/right steps through decision points,
+// shift+left/right jumps to first/last.
+// ─────────────────────────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const left = e.key === 'ArrowLeft';
+  navHist(e.shiftKey ? (left ? 'first' : 'last') : (left ? 'prev' : 'next'));
+  e.preventDefault();
+});
+
 function sendMove() {
   const v = $('move-input').value.trim();
   if (!v || ws?.readyState!==1) return;
