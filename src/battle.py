@@ -380,32 +380,25 @@ class PSBattle:
 
         if len(split_msg) > 4:
             reason = normalize_name(split_msg[4])
-            if reason == "confusion":
+            if reason in ("confusion", "[from]confusion"):
                 Mechanics.before_move(
                     self.public, side, duration, reason=ActivateReason.confusion
                 )
                 self.store_stats()
-            elif reason == "brn":
+            elif reason in ("brn", "[from]brn"):
                 if vol.toxic:
                     vol.toxic_counter += 1
-            elif reason == "psn":
+            elif reason in ("psn", "[from]psn"):
                 if vol.toxic:
                     vol.toxic_counter += 1
-            elif reason == "leechseed":
+            elif reason in ("leechseed", "[from]leechseed"):
                 if vol.toxic:
                     vol.toxic_counter += 1
-            elif reason == "recoil":
+            elif reason in ("recoil", "[from]recoil"):
+                pass
+            elif reason in ("drain", "[from]drain"):
                 pass
             elif reason == "[silent]":
-                pass
-            elif reason == "[from]drain":
-                # we don't halve last_damage here (for now WIP)
-                pass
-            elif reason == "[from]recoil":
-                pass
-            elif reason == "[from]confusion":
-                pass
-            elif reason == "[from]leechseed":
                 pass
             else:
                 print(split_msg)
