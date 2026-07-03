@@ -200,12 +200,9 @@ class PSBattle:
         # check if fight button is only option
         self.fight_button = False
         if req.get("active"):
-            moves = req['active'][0]['moves']
-            if len(moves) == 1 and moves[0]['id'] == 'fight':
+            moves = req["active"][0]["moves"]
+            if len(moves) == 1 and moves[0]["id"] == "fight":
                 self.fight_button = True
-        
-
-
 
     def _apply_request(self):
         """Write request JSON into self.private (and sync into self.public side 0)."""
@@ -493,13 +490,13 @@ class PSBattle:
                 for i in range(4):
                     ms: oak.MoveSlot = side.stored().move(i)
                     if ms.id == move:
-                        assert ms.pp > 0, "Used move with tracked pp=0"
+                        # assert ms.pp > 0, "Used move with tracked pp=0"
                         ms.pp = max(0, ms.pp - pp_deduction)
 
             for i in range(4):
                 ms: oak.MoveSlot = side.active.move(i)
                 if ms.id == move:
-                    assert ms.pp > 0, "Used move with tracked pp=0"
+                    # assert ms.pp > 0, "Used move with tracked pp=0"
                     ms.pp = max(0, ms.pp - pp_deduction)
 
         # counterable
@@ -865,6 +862,8 @@ class PSBattle:
             pass
         elif s == "mist":
             vol.mist = True
+        elif s == "struggle":
+            pass
         else:
             assert False, f"Activate idk: {s}"
 

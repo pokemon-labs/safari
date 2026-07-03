@@ -41,9 +41,7 @@ class _ReplayPlayer:
     """Stand-in for src.search.Player, built from a _player_to_record() dict."""
 
     def __init__(self, record: dict) -> None:
-        self.teams = [
-            [_FrozenSet(**s) for s in team] for team in record["teams"]
-        ]
+        self.teams = [[_FrozenSet(**s) for s in team] for team in record["teams"]]
         self.omega = record["omega"]
         self.strategies = [
             {Policy[name]: list(values) for name, values in strat.items()}
@@ -58,9 +56,7 @@ class _ReplaySearch:
 
     def __init__(self, dp: DecisionPoint) -> None:
         self.outputs = dp.outputs
-        self.battles = {
-            pair: oak.Battle(b) for pair, b in dp.battle_cells.items()
-        }
+        self.battles = {pair: oak.Battle(b) for pair, b in dp.battle_cells.items()}
         self._indices = list(dp.outputs.keys())
         self.battle = SimpleNamespace(durations=oak.Durations(dp.durations_bytes))
         self.p1 = _ReplayPlayer(dp.p1)

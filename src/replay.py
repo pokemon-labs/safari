@@ -144,9 +144,7 @@ class ReplayRecorder:
             p1_actions=list(search.p1_actions),
             p2_actions=list(search.p2_actions),
             outputs=dict(search.outputs),
-            battle_cells={
-                pair: b.bytes() for pair, b in search.battles.items()
-            },
+            battle_cells={pair: b.bytes() for pair, b in search.battles.items()},
             pending_move=pending_move,
             pkmn_choice=pkmn_choice,
             policy_used=policy_used.name,

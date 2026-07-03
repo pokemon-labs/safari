@@ -250,7 +250,9 @@ class SearchLike(Protocol):
 class BattleLike(Protocol):
     request: dict | None
     last_log: list[str]
-    public: Any  # oak.Battle — .turn, and renderable via oak.battle_string/_battle_state
+    public: (
+        Any  # oak.Battle — .turn, and renderable via oak.battle_string/_battle_state
+    )
     durations: Any  # oak.Durations or compatible, needed for oak.battle_string(public, durations)
 
 
@@ -272,7 +274,9 @@ class Snapshot(TypedDict):
     policy_used: str
     turn: int
     search_ready: bool
-    public_repr: str  # text repr of the incomplete-information battle Safari actually observed
+    public_repr: (
+        str  # text repr of the incomplete-information battle Safari actually observed
+    )
     public_state: dict  # sprite-display state for that same public battle
 
 
