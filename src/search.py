@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from concurrent.futures import ProcessPoolExecutor
 
 from src.config import Config, Policy, Selection
@@ -148,6 +149,13 @@ class Search:
         import pickle
 
         pickle.dumps(_oak_search_mp)
+
+        # NOTE: ProcessPoolExecutor.__exit__ calls shutdown(wait=True), which
+        # blocks until every submitted job finishes -- so the real oak.search_mp
+        # wall-clock cost is incurred by this `with` block itself, not by the
+        # future.result() calls below (those are effectively instant by then).
+        cells = self.indices()
+        search_start = time.perf_counter()
         with ProcessPoolExecutor(max_workers=4) as ex:
             futures = {
                 ex.submit(
@@ -156,8 +164,13 @@ class Search:
                     self.battle.durations.bytes(),
                     *get_agent(self.p1, self.p2, i, j),
                 ): (i, j)
-                for i, j in self.indices()
+                for i, j in cells
             }
+        search_elapsed = time.perf_counter() - search_start
+        logger.debug(
+            f"oak.search_mp: {len(cells)} cell(s) (max_workers=4, budget={Config.budget}) "
+            f"took {search_elapsed:.3f}s wall-clock"
+        )
 
         for future, pair in futures.items():
             out = future.result()
@@ -229,12 +242,18 @@ class Search:
             matrices[(i, j)] = out["empirical_matrix"][:m, :n]
 
         solver = src.bayes_nash.Solver(p1, p2, matrices)
+        solve_start = time.perf_counter()
         (
             p1_avg,
             p2_avg,
             p1_cur,
             p2_cur,
         ) = solver.run(10000, 1.0, 1.0)
+        solve_elapsed = time.perf_counter() - solve_start
+        logger.debug(
+            f"bayes_nash.Solver.run: 10000 iterations over "
+            f"{self.p1.n}x{self.p2.n} type matrix took {solve_elapsed:.3f}s"
+        )
 
         for t in range(self.p1.n):
             for i in range(self.p1_actions[t]):
