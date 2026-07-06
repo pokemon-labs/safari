@@ -119,9 +119,9 @@ def main() -> None:
 
     history = [build_replay_snapshot(dp) for dp in replay.decisions]
 
-    viz = DebugViz(port=args.port, auto_open=not args.no_open)
-    viz.load_history(history)
-    viz.start()
+    vis = DebugViz(port=args.port, auto_open=not args.no_open)
+    vis.load_history(history)
+    vis.start()
 
     print(f"dashboard at http://localhost:{args.port}")
     try:

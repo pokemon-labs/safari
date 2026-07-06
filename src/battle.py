@@ -184,26 +184,6 @@ class PSBattle:
     def get_durations(self, is_us: bool):
         return tuple(self.durations.get(i) for i in range(2))[:: (-1) ** (not is_us)]
 
-    def parse_request(self, split_msg: list[str]):
-        if len(split_msg) < 3:
-            return
-        raw = split_msg[2].strip("'")
-        if not raw:
-            return
-        req: dict = json.loads(raw)
-        self.request = req
-        self.rqid = req.get(Constants.RQID)
-        self.force_switch = bool(req.get(Constants.FORCE_SWITCH))
-        self.wait = bool(req.get(Constants.WAIT))
-        self._apply_request()
-
-        # check if fight button is only option
-        self.fight_button = False
-        if req.get("active"):
-            moves = req["active"][0]["moves"]
-            if len(moves) == 1 and moves[0]["id"] == "fight":
-                self.fight_button = True
-
     def _apply_request(self):
         """Write request JSON into self.private (and sync into self.public side 0)."""
         if not self.request:
@@ -965,11 +945,50 @@ class PSBattle:
                 continue
             action = split_msg[1].strip()
             if action == "request":
-                self.parse_request(split_msg)
                 self.process_msg_lines_and_clear()
+                self.parse_request(split_msg)
                 return not self.wait
             else:
                 self.msg_lines.append(line)
+
+    def parse_request(self, split_msg: list[str]):
+        if len(split_msg) < 3:
+            return
+        raw = split_msg[2].strip("'")
+        if not raw:
+            return
+        req: dict = json.loads(raw)
+        self.request = req
+        self.rqid = req.get(Constants.RQID)
+        self.force_switch = bool(req.get(Constants.FORCE_SWITCH))
+        self.wait = bool(req.get(Constants.WAIT))
+        self._apply_request()
+
+        # check if fight button is only option
+        self.fight_button = False
+        if req.get("active"):
+            moves = req["active"][0]["moves"]
+            if len(moves) == 1 and moves[0]["id"] == "fight":
+                self.fight_button = True
+
+            assert len(moves) <= 4, f"Too many moves {len(moves)}"
+            for data in moves:
+                id_ = data["id"]
+                if id_ == "fight":
+                    continue
+                try:
+                    move_id = oak.id_to_move(id_)
+                    pp = data["pp"]
+                    for i in range(4):
+                        ms = self.public.side(0).active.move(i)
+                        if ms.id == move_id:
+                            print(
+                                f"MOVE MATCH {id_}, at slot {i + 1}. PP {ms.pp} set to {pp}"
+                            )
+                            ms.pp = pp
+                            break
+                except:
+                    print(f"INVALID MOVE: {id_}")
 
     def process_msg_lines_and_clear(self):
         self.last_log = list(self.msg_lines)

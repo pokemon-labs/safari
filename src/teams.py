@@ -129,7 +129,6 @@ class TeamPredictor:
         self.teams: list[Team] = [
             tuple(sorted_team(team)) for team in oak.load_teams(path)
         ]
-        print(len(self.teams))
         assert len(self.teams) > 0, f"Failed to load any teams from {path}"
         assert all(len(team) <= 6 for team in self.teams)
         assert all(
@@ -162,7 +161,6 @@ class TeamPredictor:
     def fill_from_sets(self, side: oak.Side) -> tuple[Team, Probability]:
         result = []
         team = side_to_team(side)
-        print(f"TEAM: {team_to_string(team)}")
         legal_sets = self.sets.clone()
         selection_prob = 1
         for s in team:

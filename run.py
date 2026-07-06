@@ -32,7 +32,7 @@ from src.search import Player, Search, process_policy
 from src.vis import DebugViz
 from src.replay import ReplayRecorder
 
-_viz: DebugViz | None = None
+_vis: DebugViz | None = None
 
 logger = logging.getLogger(__name__)
 
@@ -227,8 +227,8 @@ async def _pick_move(
     p2_player = Player(battle.public.side(1), p2_teams, p2_probs)
 
     # Push battle state immediately — before search (seconds earlier)
-    if _viz is not None:
-        _viz.push_battle(battle, p1_player, p2_player)
+    if _vis is not None:
+        _vis.push_battle(battle, p1_player, p2_player)
 
     search = Search(battle, p1_player, p2_player)
     search.init_battles()
@@ -255,9 +255,9 @@ async def _pick_move(
     if recorder is not None:
         recorder.record(battle, search, pending_move, c, Config.policy)
 
-    if _viz is not None:
-        _viz.push(battle, search, pending_move, c, Config.policy.name)
-        override = _viz.get_move_override()
+    if _vis is not None:
+        _vis.push(battle, search, pending_move, c, Config.policy.name)
+        override = _vis.get_move_override()
         if override is not None:
             return (override, str(battle.rqid))
 
@@ -319,8 +319,8 @@ async def _run_battle(
         if Config.save_replay != SaveReplay.never
         else None
     )
-    if _viz is not None:
-        _viz.reset()
+    if _vis is not None:
+        _vis.reset()
     while battle.us is None:
         msg = await client.receive_message()
         for line in msg.split("\n"):
@@ -405,9 +405,9 @@ async def main() -> None:
         await client.avatar(Config.avatar)
 
     if Config.vis:
-        global _viz
-        _viz = DebugViz()
-        _viz.start()
+        global _vis
+        _vis = DebugViz()
+        _vis.start()
         logger.info("visualizer at http://localhost:8765")
 
     user_teams = TeamPredictor(Config.teams)

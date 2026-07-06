@@ -5,14 +5,14 @@ Serves a browser dashboard at http://localhost:8765 showing the m×n Bayesian
 type belief matrix and per-cell search stats + battle state.
 
 Usage (from run.py):
-    viz = DebugViz()
-    viz.start()
+    vis = DebugViz()
+    vis.start()
 
     # after search.run() + search.solve():
-    viz.push(battle, search, pending_move)
+    vis.push(battle, search, pending_move)
 
     # instead of sending the move directly:
-    override = viz.get_move_override()   # None if auto; blocks if manual toggle on
+    override = vis.get_move_override()   # None if auto; blocks if manual toggle on
     actual_move = override or pending_move
 """
 
