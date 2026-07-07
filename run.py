@@ -4,7 +4,9 @@ import asyncio
 import concurrent.futures
 import json
 import logging
+import os
 import random
+import signal
 import time
 import traceback
 from collections import defaultdict
@@ -396,6 +398,25 @@ async def main() -> None:
     Config.configure()
     init_logging(Config.log_level, Config.log_to_file)
 
+    stop_requested = asyncio.Event()
+
+    def _handle_sigint():
+        if stop_requested.is_set():
+            logger.warning("received second SIGINT: forcing immediate exit")
+            os._exit(130)  # 128 + SIGINT; hard stop, skips all cleanup on purpose
+        logger.warning(
+            "received SIGINT: finishing the current battle, then exiting "
+            "(press Ctrl+C again to force an immediate exit)"
+        )
+        stop_requested.set()
+
+    try:
+        asyncio.get_running_loop().add_signal_handler(signal.SIGINT, _handle_sigint)
+    except NotImplementedError:
+        # add_signal_handler isn't available on some platforms (e.g. Windows);
+        # fall back to default Ctrl+C behavior (immediate KeyboardInterrupt).
+        pass
+
     client = await PSWebsocketClient.create(
         Config.username, Config.password, Config.websocket_uri, Config.login_uri
     )
@@ -448,6 +469,9 @@ async def main() -> None:
             print(f"{key.name} : {value}")
 
         battles_run += 1
+        if stop_requested.is_set():
+            logger.info("graceful stop requested: exiting after this battle")
+            break
         if battles_run >= Config.run_count:
             break
 
