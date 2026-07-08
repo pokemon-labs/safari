@@ -983,9 +983,6 @@ class PSBattle:
                     for i in range(4):
                         ms = self.public.side(0).active.move(i)
                         if ms.id == move_id:
-                            print(
-                                f"MOVE MATCH {id_}, at slot {i + 1}. PP {ms.pp} set to {pp}"
-                            )
                             ms.pp = pp
                             break
                 except Exception as e:

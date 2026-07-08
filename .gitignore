@@ -5,4 +5,4 @@ chall*
 pac*
 __pycache__/
 *.pyc
-/replay_*.pkl
+*.pkl

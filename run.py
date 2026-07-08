@@ -383,7 +383,7 @@ async def _run_battle(
                 await client.save_replay(tag)
                 if recorder is not None:
                     recorder.finish(winner)
-                    path = recorder.save(args.replay_dir)
+                    path = recorder.save(cfg.replay_dir)
                     logger.info(f"saved search replay to {path}")
             await client.leave_battle(tag)
             return winner

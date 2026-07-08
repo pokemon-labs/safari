@@ -200,7 +200,7 @@ class _Config:
             default=0,
         )
         parser.add_argument(
-            "--policy.save(-temp",
+            "--policy-temp",
             type=float,
             default=1,
         )
@@ -227,7 +227,7 @@ class _Config:
             help="Launch the debug visualizer at http://localhost:8765",
         )
         parser.add_argument(
-            "--replay_dir",
+            "--replay-dir",
             default=".",
             help="Directory where pickled battle and search data is saved (NOT showdown replays)",
         )

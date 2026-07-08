@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+import signal
 from concurrent.futures import ProcessPoolExecutor
 
 from src.config import Config, Policy, Selection
@@ -124,6 +125,10 @@ def _oak_search_mp(*args):
     return oak.search.search_mp(*args)
 
 
+def _ignore_sigint():
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+
 class Search:
     def __init__(self, b: Battle, p1: Player, p2: Player) -> None:
         self.battle = b
@@ -156,7 +161,10 @@ class Search:
         # future.result() calls below (those are effectively instant by then).
         cells = self.indices()
         search_start = time.perf_counter()
-        with ProcessPoolExecutor(max_workers=4) as ex:
+        with ProcessPoolExecutor(
+            max_workers=Config.parallelism,
+            initializer=_ignore_sigint,
+        ) as ex:
             futures = {
                 ex.submit(
                     _oak_search_mp,
@@ -168,7 +176,7 @@ class Search:
             }
         search_elapsed = time.perf_counter() - search_start
         logger.debug(
-            f"oak.search_mp: {len(cells)} cell(s) (max_workers=4, budget={Config.budget}) "
+            f"oak.search_mp: {len(cells)} cell(s) (max_workers={Config.parallelism}, budget={Config.budget}) "
             f"took {search_elapsed:.3f}s wall-clock"
         )
 
