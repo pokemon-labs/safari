@@ -156,9 +156,9 @@ class ReplayRecorder:
     def finish(self, winner: str | None) -> None:
         self.replay.winner = winner
 
-    def save(self, path: str | None = None) -> str:
-        if path is None:
-            path = f"replay_{time.strftime('%Y%m%d-%H%M%S')}.pkl"
+    def save(self, dir_: str = ".") -> str:
+        path = f"replay_{time.strftime('%Y%m%d-%H%M%S')}.pkl"
+        path = os.path.join(dir_, path)
         with open(path, "wb") as f:
             pickle.dump(self.replay, f)
-        return path
+        return str(path)

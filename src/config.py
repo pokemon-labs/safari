@@ -96,6 +96,7 @@ class _Config:
     log_to_file: bool
     stdout_log_handler: logging.StreamHandler
     vis: bool = False
+    replay_dir: str = "."
 
     def configure(self):
         parser = argparse.ArgumentParser()
@@ -199,7 +200,7 @@ class _Config:
             default=0,
         )
         parser.add_argument(
-            "--policy-temp",
+            "--policy.save(-temp",
             type=float,
             default=1,
         )
@@ -224,6 +225,11 @@ class _Config:
             "--vis",
             action="store_true",
             help="Launch the debug visualizer at http://localhost:8765",
+        )
+        parser.add_argument(
+            "--replay_dir",
+            default=".",
+            help="Directory where pickled battle and search data is saved (NOT showdown replays)",
         )
 
         args = parser.parse_args()
@@ -255,6 +261,7 @@ class _Config:
         self.log_level = args.log_level
         self.log_to_file = args.log_to_file
         self.vis = args.vis
+        self.replay_dir = args.replay_dir
 
         self.validate_config()
 

@@ -978,6 +978,7 @@ class PSBattle:
                     continue
                 try:
                     move_id = oak.id_to_move(id_)
+                    # force bind does not have pp field
                     pp = data["pp"]
                     for i in range(4):
                         ms = self.public.side(0).active.move(i)
@@ -987,8 +988,8 @@ class PSBattle:
                             )
                             ms.pp = pp
                             break
-                except:
-                    print(f"INVALID MOVE: {id_}")
+                except Exception as e:
+                    pass
 
     def process_msg_lines_and_clear(self):
         self.last_log = list(self.msg_lines)
