@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+python run.py \
+--websocket-uri wss://battling.pokeagentchallenge.com/showdown/websocket \
+--login-uri https://battling.pokeagentchallenge.com/action.php? \
+--ps-username USERNAME \
+--ps-password PASSWORD \
+--bot-mode search_ladder \
+--format 'gen1ou' \
+--teams teams1 \
+--predictor-teams teams1500 \
+--run-count 10000 \
+--p1-types 3 \
+--p2-types 3 \
+--budget 3000ms \
+--eval pacnet \
+--bandit pucb-1.0 \
+--matrix-ucb 0-512-20-0.25 \
+--policy bayesian_nash \
+--selection sample \
+--save-replay on_loss \
+--log-level DEBUG

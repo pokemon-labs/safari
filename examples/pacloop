@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+stop=0
+
+trap 'stop=1' SIGINT SIGTERM
+
+while true; do
+    ./pac
+    # Exit after the current run finishes.
+    (( stop )) && break
+    sleep 10
+    # Also allow stopping during the sleep.
+    (( stop )) && break
+done
+
+echo "Loop exited cleanly."

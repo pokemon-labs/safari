@@ -2,7 +2,6 @@ src/__pycache__/*.pyc
 tests/__pycache__/*.pyc
 teams*
 chall*
-pac*
 __pycache__/
 *.pyc
 *.pkl

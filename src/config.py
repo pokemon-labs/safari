@@ -187,12 +187,14 @@ class _Config:
         parser.add_argument(
             "--policy",
             type=str,
-            default=Policy.bayesian_nash,
+            default=Policy.bayesian_nash.name,
+            choices=[e.name for e in Policy],
         )
         parser.add_argument(
             "--selection",
             type=str,
-            default=Policy.bayesian_nash,
+            default=Selection.sample.name,
+            choices=[e.name for e in Selection],
         )
         parser.add_argument(
             "--policy-min",
@@ -247,7 +249,7 @@ class _Config:
         self.p1_types = args.p1_types or 1
         self.p2_types = args.p2_types or 1
         self.parallelism = args.threads or self.p1_types * self.p2_types
-        self.policy = Policy[args.policy]  # Policy()
+        self.policy = Policy[args.policy]
         self.selection = Selection[args.selection]
         self.policy_min = args.policy_min
         self.policy_temp = args.policy_temp
