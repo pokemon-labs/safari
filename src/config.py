@@ -207,6 +207,16 @@ class _Config:
             default=1,
         )
         parser.add_argument(
+            "--skip-bayes",
+            action="store_true",
+            help="Skip replicator dynamic solving for Beyesian Nash (saves ~300ms clock time)",
+        )
+        parser.add_argument(
+            "--skip-monochoice",
+            action="store_true",
+            help="Do not perform any search if only one action is possible",
+        )
+        parser.add_argument(
             "--save-replay",
             default="never",
             choices=[e.name for e in SaveReplay],
@@ -253,6 +263,11 @@ class _Config:
         self.selection = Selection[args.selection]
         self.policy_min = args.policy_min
         self.policy_temp = args.policy_temp
+        self.skip_bayes = args.skip_bayes
+        self.skip_monochoice = args.skip_monochoice
+        assert (
+            not self.skip_bayes or not self.policy == Policy.bayesian_nash
+        ), "skip_bayes is True while policy mode is bayesian_nash"
         self.run_count = args.run_count
         self.teams = args.teams
         self.predictor_teams = args.predictor_teams

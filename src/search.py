@@ -250,25 +250,26 @@ class Search:
             matrices[(i, j)] = out["empirical_matrix"][:m, :n]
 
         solver = src.bayes_nash.Solver(p1, p2, matrices)
-        solve_start = time.perf_counter()
-        (
-            p1_avg,
-            p2_avg,
-            p1_cur,
-            p2_cur,
-        ) = solver.run(10000, 1.0, 1.0)
-        solve_elapsed = time.perf_counter() - solve_start
-        logger.debug(
-            f"bayes_nash.Solver.run: 10000 iterations over "
-            f"{self.p1.n}x{self.p2.n} type matrix took {solve_elapsed:.3f}s"
-        )
+        if not Config.skip_bayes:
+            solve_start = time.perf_counter()
+            (
+                p1_avg,
+                p2_avg,
+                p1_cur,
+                p2_cur,
+            ) = solver.run(10000, 1.0, 1.0)
+            solve_elapsed = time.perf_counter() - solve_start
+            logger.debug(
+                f"bayes_nash.Solver.run: 10000 iterations over "
+                f"{self.p1.n}x{self.p2.n} type matrix took {solve_elapsed:.3f}s"
+            )
 
-        for t in range(self.p1.n):
-            for i in range(self.p1_actions[t]):
-                self.p1.strategies[t][Policy.bayesian_nash][i] = p1_avg[t, i]
-        for t in range(self.p2.n):
-            for i in range(self.p2_actions[t]):
-                self.p2.strategies[t][Policy.bayesian_nash][i] = p2_avg[t, i]
+            for t in range(self.p1.n):
+                for i in range(self.p1_actions[t]):
+                    self.p1.strategies[t][Policy.bayesian_nash][i] = p1_avg[t, i]
+            for t in range(self.p2.n):
+                for i in range(self.p2_actions[t]):
+                    self.p2.strategies[t][Policy.bayesian_nash][i] = p2_avg[t, i]
 
     def parse_pkmn_choice(self, c: int, battle: PSBattle) -> str:
         side = self.battles[(0, 0)].side(0)
