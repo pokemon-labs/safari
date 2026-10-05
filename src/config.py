@@ -71,6 +71,7 @@ class _Config:
     format: Format
     budget: str
     eval: str
+    quantize: bool
     bandit: str
     # parallelism is derived as p1_types * p2_types in configure()
     parallelism: int
@@ -132,6 +133,11 @@ class _Config:
             type=str,
             default=None,
             help="Eval. None for PokeEngine, otherwise use Oak",
+        )
+        parser.add_argument(
+            "--quantize",
+            action="store_true",
+            help="Quantize the network eval and its side caches",
         )
         parser.add_argument(
             "--bandit",
@@ -259,6 +265,7 @@ class _Config:
         self.format = args.format
         self.budget = args.budget
         self.eval = args.eval
+        self.quantize = args.quantize
         self.bandit = args.bandit
         self.matrix_ucb = args.matrix_ucb
         self.p1_types = args.p1_types or 1

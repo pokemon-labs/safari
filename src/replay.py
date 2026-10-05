@@ -160,6 +160,7 @@ class ReplayRecorder:
     def save(self, dir_: str = ".") -> str:
         path = f"replay_{time.strftime('%Y%m%d-%H%M%S')}.pkl"
         path = os.path.join(dir_, path)
+        os.makedirs(dir_, exist_ok=True)
         with open(path, "wb") as f:
             pickle.dump(self.replay, f)
         return str(path)

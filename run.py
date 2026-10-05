@@ -331,7 +331,7 @@ async def _run_battle(
         else None
     )
     # side caches live for one game
-    pool = SideCachePool(Config.eval) if Config.side_cache else None
+    pool = SideCachePool(Config.eval, Config.quantize) if Config.side_cache else None
     if _vis is not None:
         _vis.reset()
     while battle.us is None:

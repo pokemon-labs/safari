@@ -67,8 +67,9 @@ class SideCachePool:
     sorted key, and Player.modify fills the bench to match a cached order.
     """
 
-    def __init__(self, eval: str, max_size: int = 128) -> None:
-        self.network = oak.search.Network(oak.search.parse_eval(eval, False))
+    def __init__(self, eval: str, quantize: bool, max_size: int = 128) -> None:
+        self.network = oak.search.Network(oak.search.parse_eval(eval, quantize))
+        self.quantize = quantize
         self.max_size = max_size
         self.caches: dict[TeamKey, oak.search.SideCache] = {}
         self.orders: dict[TeamKey, list[TeamKey]] = {}
@@ -111,6 +112,9 @@ class SideCachePool:
             self.misses += 1
             self._evict()
             cache = oak.search.SideCache()
+            # like oak's CachePool: quantize the empty cache, then precompute
+            if self.quantize:
+                cache.quantize(self.network)
             for i in range(6):
                 cache.precompute(self.network, side, i)
             self.caches[key] = cache
@@ -266,7 +270,7 @@ def search_cell(
     """
     start = time.perf_counter()
     # each thread parses its own eval, like oak's vs.cc
-    eval = oak.search.parse_eval(Config.eval or "fp", False)
+    eval = oak.search.parse_eval(Config.eval or "fp", Config.quantize)
     bandit = oak.search.parse_bandit(Config.bandit)
     if Config.matrix_ucb:
         bandit = parse_matrix_ucb(bandit, Config.matrix_ucb)
