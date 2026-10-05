@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import logging
 import math
 import random
+import re
 from copy import deepcopy
 from dataclasses import dataclass
 from collections import defaultdict
 
 import oak
+import requests
+
+logger = logging.getLogger(__name__)
 
 type Team = tuple[oak.Set]
 type Species = int
@@ -16,6 +21,9 @@ type Move = int
 
 type Logit = float
 type Probability = float
+type MoveWeights = dict[Species, dict[Move, float]]
+
+SMOGON_STATS = "https://www.smogon.com/stats/"
 
 
 def set_to_packed(s: oak.Set) -> str:
@@ -62,6 +70,70 @@ def side_to_team(side: oak.Side) -> Team:
     return tuple(pokemon_to_set(side.pokemon(side.order[_] - 1)) if side.order[_] else oak.Set() for _ in range(6))
 
 
+def to_id(name: str) -> str:
+    return "".join(c for c in name.lower() if c.isalnum())
+
+
+def fetch_smogon_moves(
+    format: str = "gen1ou", cutoff: int = 1760, timeout: float = 10
+) -> MoveWeights | None:
+    """
+    Per-species move usage from the latest month of Smogon chaos stats.
+    Returns None if the fetch fails, in which case movesets are filled randomly
+    """
+    try:
+        index = requests.get(SMOGON_STATS, timeout=timeout)
+        index.raise_for_status()
+        months = sorted(set(re.findall(r'href="(\d{4}-\d{2})/"', index.text)))
+        assert months, "no months listed in the stats index"
+        url = f"{SMOGON_STATS}{months[-1]}/chaos/{format}-{cutoff}.json"
+        response = requests.get(url, timeout=timeout)
+        response.raise_for_status()
+        data = response.json()["data"]
+    except Exception as e:
+        logger.warning(
+            f"failed to fetch smogon stats, falling back to random movesets: {e!r}"
+        )
+        return None
+
+    result: MoveWeights = {}
+    for name, entry in data.items():
+        try:
+            species = oak.id_to_species(to_id(name))
+        except RuntimeError:
+            continue
+        moves = {}
+        for move_name, weight in entry["Moves"].items():
+            if not move_name or weight <= 0:
+                continue
+            try:
+                moves[oak.id_to_move(move_name)] = weight
+            except RuntimeError:
+                continue
+        if moves:
+            result[species] = moves
+    logger.info(f"loaded smogon move stats for {len(result)} species from {url}")
+    return result
+
+
+def fill_moveset(s: oak.Set, smogon: MoveWeights | None) -> None:
+    """
+    Fill empty move slots by sampling without replacement from smogon move usage,
+    then randomly for anything smogon can't fill
+    """
+    weights = dict(smogon.get(s.species, {})) if smogon else {}
+    moves = list(s.moves)
+    for m in moves:
+        weights.pop(m, None)
+    for i in range(4):
+        if moves[i] == 0 and weights:
+            m = random.choices(list(weights), weights=list(weights.values()))[0]
+            moves[i] = m
+            del weights[m]
+    s.moves = moves
+    oak.fill_random_moveset(s, 0)
+
+
 def set_matches(s: Set, t: Set) -> bool:
     return (s.species == 0) or (s.species == t.species and all(m == 0 or m in t.moves for m in s.moves))
 
@@ -75,8 +147,9 @@ class SetDict:
     Used to guess teams when none are found matching in the teams list
     """
 
-    def __init__(self) -> None:
+    def __init__(self, smogon: MoveWeights | None = None) -> None:
         self.sets: dict[oak.Set, Probability] = defaultdict(lambda: 0)
+        self.smogon = smogon
 
     def print(self) -> None:
         for s, p in sorted(
@@ -99,7 +172,7 @@ class SetDict:
                 self.sets[s] += probs[index] / len(team)
 
     def clone(self) -> SetDict:
-        other = SetDict()
+        other = SetDict(self.smogon)
         other.sets = deepcopy(self.sets)
         return other
 
@@ -119,13 +192,18 @@ class SetDict:
             return [(s, p / den) for s, p in result]
         else:
             s_copy = deepcopy(s)
-            oak.fill_random_moveset(s_copy, 0)
+            fill_moveset(s_copy, self.smogon)
             return [(s_copy, 1)]
 
 
 class TeamPredictor:
 
-    def __init__(self, path: str, first_to_last_ratio: float = 1) -> None:
+    def __init__(
+        self,
+        path: str,
+        first_to_last_ratio: float = 1,
+        smogon: MoveWeights | None = None,
+    ) -> None:
         self.teams: list[Team] = [
             tuple(sorted_team(team)) for team in oak.load_teams(path)
         ]
@@ -145,7 +223,7 @@ class TeamPredictor:
             self.logits = [step * i for i in range(n)]
         den = sum(math.exp(l) for l in self.logits)
         self.probs = [math.exp(l) / den for l in self.logits]
-        self.sets = SetDict()
+        self.sets = SetDict(smogon)
         self.sets.load(self.teams, self.probs)
 
     def find_all_matching(self, side: oak.Side) -> list[tuple[Team, Logit]]:

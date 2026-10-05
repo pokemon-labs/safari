@@ -29,7 +29,13 @@ from src.config import (
     Selection,
 )
 from src.battle import PSBattle, PSPlayer, normalize_name
-from src.teams import TeamPredictor, to_packed, get_teams_and_probs, team_to_string
+from src.teams import (
+    TeamPredictor,
+    fetch_smogon_moves,
+    to_packed,
+    get_teams_and_probs,
+    team_to_string,
+)
 from src.search import Player, Search, SideCachePool, process_policy
 from src.vis import DebugViz
 from src.replay import ReplayRecorder
@@ -437,7 +443,9 @@ async def main() -> None:
         logger.info("visualizer at http://localhost:8765")
 
     user_teams = TeamPredictor(Config.teams)
-    predictor = TeamPredictor(Config.predictor_teams, Config.predictor_ratio)
+    predictor = TeamPredictor(
+        Config.predictor_teams, Config.predictor_ratio, fetch_smogon_moves()
+    )
 
     battles_run = 0
     record: dict[Result, int] = defaultdict(lambda: 0)
