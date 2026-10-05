@@ -30,7 +30,7 @@ from src.config import (
 )
 from src.battle import PSBattle, PSPlayer, normalize_name
 from src.teams import TeamPredictor, to_packed, get_teams_and_probs, team_to_string
-from src.search import Player, Search, process_policy
+from src.search import Player, Search, SideCachePool, process_policy
 from src.vis import DebugViz
 from src.replay import ReplayRecorder
 
@@ -217,6 +217,7 @@ async def _pick_move(
     battle: PSBattle,
     predictor: TeamPredictor,
     recorder: ReplayRecorder | None = None,
+    pool: SideCachePool | None = None,
 ) -> tuple[str, str]:
     p1_teams, p1_probs = get_teams_and_probs(
         battle.public.side(0), predictor, Config.p1_types, battle.team
@@ -232,7 +233,9 @@ async def _pick_move(
     if _vis is not None:
         _vis.push_battle(battle, p1_player, p2_player)
 
-    search = Search(battle, p1_player, p2_player)
+    if pool is not None:
+        pool.new_turn()
+    search = Search(battle, p1_player, p2_player, pool)
     search.init_battles()
     search.run()
     search.solve()
@@ -321,6 +324,8 @@ async def _run_battle(
         if Config.save_replay != SaveReplay.never
         else None
     )
+    # side caches live for one game
+    pool = SideCachePool(Config.eval) if Config.side_cache else None
     if _vis is not None:
         _vis.reset()
     while battle.us is None:
@@ -360,7 +365,7 @@ async def _run_battle(
     # await client.send_message(tag, ["/timer on"])
 
     if not battle.wait:
-        move = await _pick_move(battle, predictor, recorder)
+        move = await _pick_move(battle, predictor, recorder, pool)
         await client.send_message(tag, move)
 
     # main battle loop
@@ -390,7 +395,7 @@ async def _run_battle(
 
         action_required = battle.update(msg)
         if action_required and not battle.wait:
-            move = await _pick_move(battle, predictor, recorder)
+            move = await _pick_move(battle, predictor, recorder, pool)
             await client.send_message(tag, move)
 
 

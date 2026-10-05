@@ -142,7 +142,7 @@ class _Config:
             "--matrix-ucb",
             type=str,
             default="",
-            help="Matrix UCB start/solve-interval/minimum-visit/ucb-c-param",
+            help="Matrix UCB C-INTERVAL-GROW, e.g. 1.0-1-1. Requires network eval",
         )
 
         parser.add_argument(
@@ -217,6 +217,11 @@ class _Config:
             help="Do not perform any search if only one action is possible",
         )
         parser.add_argument(
+            "--no-side-cache",
+            action="store_true",
+            help="Don't precompute network side caches (they are kept per game and shared between sides)",
+        )
+        parser.add_argument(
             "--save-replay",
             default="never",
             choices=[e.name for e in SaveReplay],
@@ -265,6 +270,13 @@ class _Config:
         self.policy_temp = args.policy_temp
         self.skip_bayes = args.skip_bayes
         self.skip_monochoice = args.skip_monochoice
+        # side caches only exist for network evals
+        self.side_cache = not args.no_side_cache and self.eval not in (
+            None,
+            "fp",
+            "mc",
+            "montecarlo",
+        )
         assert (
             not self.skip_bayes or not self.policy == Policy.bayesian_nash
         ), "skip_bayes is True while policy mode is bayesian_nash"
