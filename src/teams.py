@@ -209,18 +209,35 @@ def get_teams_and_probs(
         pass
 
     if n == 0:
-        return (teams, probs)
+        return merge_duplicates(teams, probs)
 
     # if we still need more teams, just contrive them from sets
-    contrived = []
-    contrived_probs = []
+    # they are already sampled from the set probs, so they share the remaining weight equally
     for _ in range(n):
-        c, p = predictor.fill_from_sets(side)
-        contrived.append(c)
-        contrived_probs.append(p)
-    contrived_sum = sum(contrived_probs) / remaining_weight
-    teams += contrived
-    probs += [p / contrived_sum for p in contrived_probs]
+        c, _ = predictor.fill_from_sets(side)
+        teams.append(c)
+        probs.append(remaining_weight / n)
 
+    teams, probs = merge_duplicates(teams, probs)
     assert abs(1 - sum(probs)) < 1e-5
     return (teams, probs)
+
+
+def merge_duplicates(
+    teams: list[Team], probs: list[Probability]
+) -> tuple[list[Team], list[Probability]]:
+    """
+    Identical teams (up to order) are the same world, so search it once with the summed prob
+    """
+    merged: dict[tuple[oak.Set, ...], int] = {}
+    result_teams = []
+    result_probs = []
+    for team, prob in zip(teams, probs):
+        key = tuple(sorted(team))
+        if key in merged:
+            result_probs[merged[key]] += prob
+        else:
+            merged[key] = len(result_teams)
+            result_teams.append(team)
+            result_probs.append(prob)
+    return (result_teams, result_probs)
