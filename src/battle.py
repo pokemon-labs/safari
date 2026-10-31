@@ -130,6 +130,8 @@ class PSBattle:
         self.rules: list[str] = []
 
         self.team: Team | None = None
+        # search budget for this battle, if not Config.budget
+        self.budget: str | None = None
         self.public = oak.Battle(bytes(384))
         self.durations = oak.Durations(bytes(8))
         self.aux: list[SideAux, SideAux] = [SideAux() for i in range(2)]

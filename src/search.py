@@ -272,6 +272,7 @@ def search_cell(
     t1: int,
     t2: int,
     caches: tuple[oak.search.SideCache, oak.search.SideCache] | None = None,
+    budget: str | None = None,
 ) -> dict:
     """
     This information tells us the teams and also the probs
@@ -288,7 +289,7 @@ def search_cell(
         heap = oak.search.MatrixUCBNode()
     else:
         heap = oak.search.Node()
-    budget = oak.search.parse_budget(Config.budget)
+    budget = oak.search.parse_budget(budget or Config.budget)
     kwargs = {}
     if caches is not None:
         kwargs = {"p1_cache": caches[0], "p2_cache": caches[1]}
@@ -361,6 +362,7 @@ class Search:
         #         "thread safe; use --threads 1 or --no-side-cache"
         #     )
         search_start = time.perf_counter()
+        budget = self.battle.budget or Config.budget
         ex = _get_executor()
         futures = {
             ex.submit(
@@ -372,6 +374,7 @@ class Search:
                 i,
                 j,
                 self.caches.get((i, j)),
+                budget,
             ): (i, j)
             for i, j in cells
         }
@@ -379,7 +382,7 @@ class Search:
             self.outputs[pair] = future.result()
         search_elapsed = time.perf_counter() - search_start
         logger.debug(
-            f"oak.search.run: {len(cells)} cell(s) (max_workers={Config.parallelism}, budget={Config.budget}) "
+            f"oak.search.run: {len(cells)} cell(s) (max_workers={Config.parallelism}, budget={budget}) "
             f"took {search_elapsed:.3f}s wall-clock"
         )
 

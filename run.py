@@ -54,6 +54,9 @@ CHAT_STRING = "|c|"
 
 type Recv = Callable[[], Awaitable[str]]
 
+# opponents (lower case) we search less against, and the budget we give them
+QUICK_OPPONENTS = {"cocoa": "1000ms"}
+
 
 class LoginError(Exception):
     pass
@@ -380,6 +383,9 @@ async def _run_battle(
     p2 = PSPlayer(user=opp_name)
     battle = PSBattle(tag, p1, p2)
     battle.format = fmt.value
+    battle.budget = QUICK_OPPONENTS.get(opp_name.strip().lower())
+    if battle.budget:
+        logger.info(f"{tag}: searching {battle.budget} per turn against {opp_name}")
     # side caches live for one game
     pool = SideCachePool(Config.eval, Config.quantize) if Config.side_cache else None
     if _vis is not None:
@@ -491,11 +497,14 @@ async def _run_arena(
     user_teams: list[Team],
     stop_requested: asyncio.Event,
     record: dict,
+    hangup: asyncio.Event,
 ) -> None:
     """
     pkmn.bot pairs bots itself and can put one in several battles at once. One
     reader routes each room's messages to that battle's own task; searches share
-    one thread pool, so --threads caps the total across battles
+    one thread pool, so --threads caps the total across battles.
+    After hangup we send an empty team, which the arena won't pair, finish the
+    battles in progress and exit
     """
     queues: dict[str, asyncio.Queue[str]] = {}
     tasks: dict[str, asyncio.Task] = {}
@@ -506,8 +515,9 @@ async def _run_arena(
 
     async def send_team() -> None:
         # the arena keeps the last team sent and uses it for the next pairing
+        team = "" if hangup.is_set() else to_packed(random.choice(user_teams))
         try:
-            await client.update_team(to_packed(random.choice(user_teams)))
+            await client.update_team(team)
         except websockets.ConnectionClosed:
             pass  # the reader reconnects, then sends a team again
 
@@ -531,6 +541,8 @@ async def _run_arena(
 
     async def close_when_idle() -> None:
         await stop_requested.wait()
+        if hangup.is_set():
+            await send_team()
         if not tasks:
             await client.close()
 
@@ -593,6 +605,7 @@ async def main() -> None:
     init_logging(Config.log_level, Config.log_to_file)
 
     stop_requested = asyncio.Event()
+    hangup = asyncio.Event()
 
     def _handle_sigint():
         if stop_requested.is_set():
@@ -604,8 +617,17 @@ async def main() -> None:
         )
         stop_requested.set()
 
+    def _handle_sighup():
+        logger.warning(
+            "received SIGHUP: sending an empty team so no new battles are paired, "
+            "finishing the current ones, then exiting"
+        )
+        hangup.set()
+        stop_requested.set()
+
     try:
         asyncio.get_running_loop().add_signal_handler(signal.SIGINT, _handle_sigint)
+        asyncio.get_running_loop().add_signal_handler(signal.SIGHUP, _handle_sighup)
     except NotImplementedError:
         # add_signal_handler isn't available on some platforms (e.g. Windows);
         # fall back to default Ctrl+C behavior (immediate KeyboardInterrupt).
@@ -633,7 +655,9 @@ async def main() -> None:
     battles_run = 0
     record: dict[Result, int] = defaultdict(lambda: 0)
     if Config.bot_mode == BotModes.arena:
-        await _run_arena(client, predictor, user_teams.teams, stop_requested, record)
+        await _run_arena(
+            client, predictor, user_teams.teams, stop_requested, record, hangup
+        )
         return
 
     while True:
