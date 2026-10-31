@@ -22,6 +22,17 @@ import oak.search
 
 logger = logging.getLogger(__name__)
 
+# one pool for every search, so --threads caps the total even when several
+# battles search at once
+_executor: ThreadPoolExecutor | None = None
+
+
+def _get_executor() -> ThreadPoolExecutor:
+    global _executor
+    if _executor is None:
+        _executor = ThreadPoolExecutor(max_workers=Config.parallelism)
+    return _executor
+
 type Strategy = dict[Policy, list[float]]
 
 
@@ -350,22 +361,22 @@ class Search:
         #         "thread safe; use --threads 1 or --no-side-cache"
         #     )
         search_start = time.perf_counter()
-        with ThreadPoolExecutor(max_workers=Config.parallelism) as ex:
-            futures = {
-                ex.submit(
-                    search_cell,
-                    self.battles[(i, j)],
-                    self.battle.durations,
-                    self.p1,
-                    self.p2,
-                    i,
-                    j,
-                    self.caches.get((i, j)),
-                ): (i, j)
-                for i, j in cells
-            }
-            for future, pair in futures.items():
-                self.outputs[pair] = future.result()
+        ex = _get_executor()
+        futures = {
+            ex.submit(
+                search_cell,
+                self.battles[(i, j)],
+                self.battle.durations,
+                self.p1,
+                self.p2,
+                i,
+                j,
+                self.caches.get((i, j)),
+            ): (i, j)
+            for i, j in cells
+        }
+        for future, pair in futures.items():
+            self.outputs[pair] = future.result()
         search_elapsed = time.perf_counter() - search_start
         logger.debug(
             f"oak.search.run: {len(cells)} cell(s) (max_workers={Config.parallelism}, budget={Config.budget}) "
