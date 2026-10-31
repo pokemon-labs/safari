@@ -54,6 +54,8 @@ class BotModes(Enum):
     challenge_user = auto()
     accept_challenge = auto()
     search_ladder = auto()
+    # pkmn.bot: the arena pairs bots itself, so just stay online with a team
+    arena = auto()
 
 
 class Format(Enum):
@@ -108,7 +110,11 @@ class _Config:
         )
         parser.add_argument("--login-uri", type=str, default=None)
         parser.add_argument("--ps-username", required=True)
-        parser.add_argument("--ps-password", default=None)
+        parser.add_argument(
+            "--ps-password",
+            default=os.environ.get("ARENA_BOT_TOKEN"),
+            help="Defaults to $ARENA_BOT_TOKEN, so the token stays off the command line",
+        )
         parser.add_argument("--ps-avatar", default=None)
         parser.add_argument(
             "--bot-mode", required=True, choices=[e.name for e in BotModes]

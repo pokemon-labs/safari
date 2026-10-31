@@ -148,11 +148,9 @@ class PSWebsocketClient:
         await self.send_message("", [f"/trn {self.username},0,{assertion}"])
         await asyncio.sleep(3)
         logger.info(f"logged in as {self.username}")
-        return (
-            self.username
-            if self.password is None
-            else json.loads(resp.text[1:])["curuser"]["userid"]
-        )
+        if self.password is None:
+            return self.username
+        return json.loads(resp.text[1:]).get("curuser", {}).get("userid", self.username)
 
     async def update_team(self, team: str) -> None:
         await self.send_message("", [f"/utm {team}"])
@@ -275,7 +273,11 @@ async def _pick_move(
     return (pending_move, str(battle.rqid))
 
 
-async def _get_battle_tag_and_opponent(client: PSWebsocketClient) -> tuple[str, str]:
+async def _get_battle_tag_and_opponent(
+    client: PSWebsocketClient,
+) -> tuple[str, str, str]:
+    # also returns the message with the title: after a reconnect the whole
+    # battle so far arrives in that one message
     tag = p1 = p2 = None
     while True:
         msg = await client.receive_message()
@@ -290,7 +292,7 @@ async def _get_battle_tag_and_opponent(client: PSWebsocketClient) -> tuple[str, 
             if len(parts) >= 2 and parts[1] == "title":
                 p1, p2 = parts[2].split(" vs. ")
         if tag and p1 and p2:
-            return tag, p2
+            return tag, p2, msg
 
 
 async def _wait_for_first_request(client: PSWebsocketClient, battle: PSBattle) -> None:
@@ -318,7 +320,7 @@ async def _run_battle(
     selected_team: Team,
 ) -> str | None:
 
-    tag, opp_name = await _get_battle_tag_and_opponent(client)
+    tag, opp_name, msg = await _get_battle_tag_and_opponent(client)
     p1 = PSPlayer(user=Config.username)
     p2 = PSPlayer(user=opp_name)
     battle = PSBattle(tag, p1, p2)
@@ -334,8 +336,7 @@ async def _run_battle(
     pool = SideCachePool(Config.eval, Config.quantize) if Config.side_cache else None
     if _vis is not None:
         _vis.reset()
-    while battle.us is None:
-        msg = await client.receive_message()
+    while True:
         for line in msg.split("\n"):
             parts = line.split("|")
             if len(parts) >= 4 and parts[1] == "player":
@@ -351,6 +352,9 @@ async def _run_battle(
                         assert (
                             False
                         ), f"Bad slot deduction, expected p1/p2 but got {slot}"
+        if battle.us is not None:
+            break
+        msg = await client.receive_message()
 
     # wait for |start| (may already be in msg from above)
     while True:
@@ -391,12 +395,15 @@ async def _run_battle(
                 or (cfg.save_replay == SaveReplay.on_loss and winner != cfg.username)
                 or (cfg.save_replay == SaveReplay.on_win and winner == cfg.username)
             ):
-                await client.save_replay(tag)
+                # the arena has no /savereplay or /leave; its battles are all public
+                if cfg.bot_mode != BotModes.arena:
+                    await client.save_replay(tag)
                 if recorder is not None:
                     recorder.finish(winner)
                     path = recorder.save(cfg.replay_dir)
                     logger.info(f"saved search replay to {path}")
-            await client.leave_battle(tag)
+            if cfg.bot_mode != BotModes.arena:
+                await client.leave_battle(tag)
             return winner
 
         action_required = battle.update(msg)
@@ -428,10 +435,25 @@ async def main() -> None:
         # fall back to default Ctrl+C behavior (immediate KeyboardInterrupt).
         pass
 
-    client = await PSWebsocketClient.create(
-        Config.username, Config.password, Config.websocket_uri, Config.login_uri
-    )
-    Config.user_id = await client.login()
+    async def connect() -> PSWebsocketClient:
+        client = await PSWebsocketClient.create(
+            Config.username, Config.password, Config.websocket_uri, Config.login_uri
+        )
+        Config.user_id = await client.login()
+        return client
+
+    async def reconnect() -> PSWebsocketClient:
+        # the arena drops every connection when it updates; battles survive it
+        delay = 2.0
+        while True:
+            await asyncio.sleep(delay)
+            try:
+                return await connect()
+            except (OSError, LoginError, websockets.ConnectionClosed) as e:
+                logger.warning(f"reconnect failed: {e!r}, retrying in {delay}s")
+                delay = min(2 * delay, 60.0)
+
+    client = await connect()
 
     if Config.avatar is not None:
         await client.avatar(Config.avatar)
@@ -461,10 +483,25 @@ async def main() -> None:
             await client.accept_challenge(Config.format, Config.room_name)
         elif mode == BotModes.search_ladder:
             await client.search_for_match(Config.format)
+        elif mode == BotModes.arena:
+            pass
         else:
             raise ValueError(f"unknown bot mode: {mode}")
 
-        winner = await _run_battle(client, Config.format, predictor, selected_team)
+        if mode == BotModes.arena:
+            while True:
+                try:
+                    winner = await _run_battle(
+                        client, Config.format, predictor, selected_team
+                    )
+                    break
+                except (OSError, websockets.ConnectionClosed) as e:
+                    # a battle in progress is sent again in full, so start over
+                    logger.warning(f"connection lost: {e!r}, reconnecting")
+                    client = await reconnect()
+                    await client.update_team(to_packed(selected_team))
+        else:
+            winner = await _run_battle(client, Config.format, predictor, selected_team)
 
         if winner == Config.username:
             record[Result.win] += 1
